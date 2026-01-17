@@ -1,6 +1,8 @@
 import os
 import csv
 import random
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import cpu_count
 from PIL import Image, ImageEnhance, ImageFilter
 
 from util import join_path, load_json
@@ -125,8 +127,35 @@ def random_color_and_blur(img: Image.Image) -> Image.Image:
 
 
 
-def build_training_data(amount_per_card: int) -> None:
-    """Build training data for a card."""
+def _process_single_card(args: tuple) -> tuple:
+    """Worker function to process a single card image.
+
+    Args:
+        args: Tuple of (card, index, training_data_dir)
+
+    Returns:
+        Tuple of CSV row data (filename, rank, suit, enhancement, seal, edition)
+    """
+    card, idx, training_data_dir = args
+
+    img = build_card(card, "blank_card")
+    img = random_affine(img)
+    img = random_color_and_blur(img)
+
+    filename = f"{card}_{idx}.png"
+    img.save(f"{training_data_dir}/images/{filename}")
+
+    split_card = card.split("-")
+    return (filename, split_card[0], split_card[1], "blank_card", "None", "None")
+
+
+def build_training_data(amount_per_card: int, workers: int | None = None) -> None:
+    """Build training data for a card using multiprocessing.
+
+    Args:
+        amount_per_card: Number of augmented images to generate per card type.
+        workers: Number of worker processes. Defaults to CPU count.
+    """
     if not os.path.exists(TRAINING_DATA_DIR):
         os.makedirs(TRAINING_DATA_DIR, exist_ok=True)
 
@@ -138,31 +167,38 @@ def build_training_data(amount_per_card: int) -> None:
     )
     cards: list[str] = list(card_positions.keys())
 
+    # Build list of all tasks: (card_name, index, output_dir)
+    tasks = [
+        (card, idx, TRAINING_DATA_DIR)
+        for card in cards
+        for idx in range(amount_per_card)
+    ]
+
+    total_tasks = len(tasks)
+    num_workers = workers if workers else cpu_count()
+    print(f"Processing {total_tasks} images with {num_workers} workers...")
+
+    results = []
+    completed = 0
+
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = {executor.submit(_process_single_card, task): task for task in tasks}
+
+        for future in as_completed(futures):
+            results.append(future.result())
+            completed += 1
+            if completed % 1000 == 0 or completed == total_tasks:
+                print(f"Progress: {completed}/{total_tasks} ({100*completed/total_tasks:.1f}%)")
+
+    # Write CSV after all processing is done
     with open(f"{TRAINING_DATA_DIR}/labels.csv", "w", encoding="utf-8") as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow(["filename","rank","suit","enhancement","seal","edition"])
+        writer.writerow(["filename", "rank", "suit", "enhancement", "seal", "edition"])
+        writer.writerows(results)
 
-        for card in cards:
-            for _ in range(amount_per_card):
-                img = build_card(card, "blank_card")
-                img = random_affine(img)
-                img = random_color_and_blur(img)
-                filename = f"{card}_{_}.png"
-                img.save(f"{TRAINING_DATA_DIR}/images/{filename}")
-                split_card = card.split("-")
-                writer.writerow([
-                    filename,
-                    split_card[0],
-                    split_card[1],
-                    "blank_card",
-                    "None",
-                    "None"
-                ])
+    print(f"Done! Generated {total_tasks} images.")
 
 
-
-
-
-
-build_training_data(1000)
-# crop_tile(ENHANCERS)
+if __name__ == "__main__":
+    build_training_data(1000)
+    # crop_tile(ENHANCERS)

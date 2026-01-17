@@ -56,6 +56,8 @@ class BalatroDataset(Dataset):
         with open(labels_csv, encoding="utf-8") as f:
             self.rows = list(csv.DictReader(f))
 
+
+
     def __len__(self):
         return len(self.rows)
 
@@ -102,6 +104,8 @@ class MultiHeadResNet18(nn.Module):
             name: nn.Linear(in_features, size)
             for name, size in head_sizes.items()
         })
+
+
 
     def forward(self, x):
         """Forward pass through the model."""
