@@ -1,6 +1,7 @@
 import os
+import csv
 import random
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 
 from util import join_path, load_json
 from const import (
@@ -11,7 +12,8 @@ from const import (
     TILE_HEIGHT,
     PLAYING_CARDS,
     IMAGE_OUTPUT_DIR,
-    VALID_CARD_BACKGROUNDS,
+    TRAINING_DATA_DIR,
+    # VALID_CARD_BACKGROUNDS,
 )
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -51,10 +53,9 @@ def crop_tile(img_path: str, x: int, y: int) -> Image.Image:
 
 
 
-
-
-def build_card(card_type: str, background: str) -> None:
+def build_card(card_type: str, background: str, save: bool = False) -> Image.Image:
     """Build a card image from a card type and background."""
+
     if not os.path.exists(IMAGE_OUTPUT_DIR):
         os.makedirs(IMAGE_OUTPUT_DIR, exist_ok=True)
 
@@ -70,19 +71,98 @@ def build_card(card_type: str, background: str) -> None:
     card_tile = crop_tile(join_path(CURR_DIR, f"../{PLAYING_CARDS}"), card_x, card_y)
 
     final_image = Image.alpha_composite(background_tile, card_tile)
-    final_image.save(f"{IMAGE_OUTPUT_DIR}/card_{card_type}_{background}.png")
+    if save:
+        final_image.save(f"{IMAGE_OUTPUT_DIR}/card_{card_type}_{background}.png")
+
+    return final_image
 
 
 
-cards = ['2-hearts', '3-hearts', '4-hearts', '5-hearts', '6-hearts', '7-hearts', '8-hearts', '9-hearts', '10-hearts', 'J-hearts', 'Q-hearts', 'K-hearts', 'A-hearts', '2-diamonds', '3-diamonds', '4-diamonds', '5-diamonds', '6-diamonds', '7-diamonds', '8-diamonds', '9-diamonds', '10-diamonds', 'J-diamonds', 'Q-diamonds', 'K-diamonds', 'A-diamonds', '2-clubs', '3-clubs', '4-clubs', '5-clubs', '6-clubs', '7-clubs', '8-clubs', '9-clubs', '10-clubs', 'J-clubs', 'Q-clubs', 'K-clubs', 'A-clubs', '2-spades', '3-spades', '4-spades', '5-spades', '6-spades', '7-spades', '8-spades', '9-spades', '10-spades', 'J-spades', 'Q-spades', 'K-spades', 'A-spades']
+def random_affine(img: Image.Image) -> Image.Image:
+    """Apply a random affine transformation to an image."""
+    w, h = img.size
+
+    angle = random.uniform(-8.0, 8.0)
+    scale = random.uniform(0.75, 1.25)
+    dx = random.randint(-5, 5)
+    dy = random.randint(-5, 5)
+
+    # Pillow >= 10 uses Image.Resampling.*; older versions may still expose Image.BICUBIC.
+    resample_bicubic = getattr(getattr(Image, "Resampling", Image), "BICUBIC")
+
+    # scale
+    new_w, new_h = int(w * scale), int(h * scale)
+    img = img.resize((new_w, new_h), resample_bicubic)
+
+    # rotate
+    img = img.rotate(angle, resample=resample_bicubic, expand=True)
+
+    # paste back to original canvas
+    canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    x = (w - img.width) // 2 + dx
+    y = (h - img.height) // 2 + dy
+    canvas.paste(img, (x, y), img)
+
+    return canvas
 
 
-for i in range(6):
-    card_type = random.choice(cards)
-    background = random.choice(VALID_CARD_BACKGROUNDS)
-    build_card(card_type, background)
+
+def random_color_and_blur(img: Image.Image) -> Image.Image:
+    """Apply a random color and blur to an image."""
+    # Brightness
+    if random.random() < 0.8:
+        img = ImageEnhance.Brightness(img).enhance(random.uniform(0.75, 1.25))
+
+    # Contrast
+    if random.random() < 0.8:
+        img = ImageEnhance.Contrast(img).enhance(random.uniform(0.75, 1.25))
+
+    # Blur
+    if random.random() < 0.3:
+        img = img.filter(ImageFilter.GaussianBlur(radius=random.uniform(0.5, 1.5)))
+
+    return img
+
+
+
+def build_training_data(amount_per_card: int) -> None:
+    """Build training data for a card."""
+    if not os.path.exists(TRAINING_DATA_DIR):
+        os.makedirs(TRAINING_DATA_DIR, exist_ok=True)
+
+    if not os.path.exists(f"{TRAINING_DATA_DIR}/images"):
+        os.makedirs(f"{TRAINING_DATA_DIR}/images", exist_ok=True)
+
+    card_positions: dict[str, dict[str, int]] = load_json(
+        join_path(CURR_DIR, "../json/card_positions.json")
+    )
+    cards: list[str] = list(card_positions.keys())
+
+    with open(f"{TRAINING_DATA_DIR}/labels.csv", "w", encoding="utf-8") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["filename","rank","suit","enhancement","seal","edition"])
+
+        for card in cards:
+            for _ in range(amount_per_card):
+                img = build_card(card, "blank_card")
+                img = random_affine(img)
+                img = random_color_and_blur(img)
+                filename = f"{card}_{_}.png"
+                img.save(f"{TRAINING_DATA_DIR}/images/{filename}")
+                split_card = card.split("-")
+                writer.writerow([
+                    filename,
+                    split_card[0],
+                    split_card[1],
+                    "blank_card",
+                    "None",
+                    "None"
+                ])
 
 
 
 
+
+
+build_training_data(1000)
 # crop_tile(ENHANCERS)

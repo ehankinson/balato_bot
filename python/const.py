@@ -7,6 +7,7 @@ TILE_WIDTH = 140
 TILE_HEIGHT = 188
 
 IMAGE_OUTPUT_DIR = "image_output"
+TRAINING_DATA_DIR = "training_data"
 
 JOKER = "images/Joker.png"
 TAROTS = "images/Tarots.png"

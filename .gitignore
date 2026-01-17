@@ -1,3 +1,4 @@
 __pycache__/
 .DS_Store
 image_output/
+training_data/
