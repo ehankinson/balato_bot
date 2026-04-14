@@ -1,0 +1,133 @@
+enhancements:
+    0:
+        x_pos: 142
+        y_pos: 0
+    1:
+        x_pos: 710
+        y_pos: 0
+    2:
+        x_pos: 852
+        y_pos: 0
+    3:
+        x_pos: 142
+        y_pos: 190
+    4:
+        x_pos: 284
+        y_pos: 190
+    5:
+        x_pos: 426
+        y_pos: 190
+    6:
+        x_pos: 568
+        y_pos: 190
+    7:
+        x_pos: 710
+        y_pos: 190
+    8:
+        x_pos: 852
+        y_pos: 190
+
+seals:
+    0: null
+    1:
+        x_pos: 284
+        y_pos: 0
+    2:
+        x_pos: 568
+        y_pos: 760
+    3:
+        x_pos: 710
+        y_pos: 760
+    4:
+        x_pos: 852
+        y_pos: 760
+
+
+red_deck:
+    x_pos: 0
+    y_pos: 0
+
+nebula_deck:
+    x_pos: 426
+    y_pos: 0
+
+lock:
+    x_pos: 568
+    y_pos: 0
+
+soul:
+    x_pos: 0
+    y_pos: 190
+
+blue_deck:
+    x_pos: 0
+    y_pos: 380
+
+yellow_deck:
+    x_pos: 142
+    y_pos: 380
+
+green_deck:
+    x_pos: 284
+    y_pos: 380
+
+black_deck:
+    x_pos: 426
+    y_pos: 380
+
+plasma_deck:
+    x_pos: 568
+    y_pos: 380
+
+"??":
+    x_pos: 710
+    y_pos: 380
+
+ghost_deck:
+    x_pos: 852
+    y_pos: 380
+
+magic_deck:
+    x_pos: 0
+    y_pos: 570
+
+checkered_deck:
+    x_pos: 142
+    y_pos: 570
+
+erratic_deck:
+    x_pos: 284
+    y_pos: 570
+
+abandoned_deck:
+    x_pos: 426
+    y_pos: 570
+
+painted_deck:
+    x_pos: 568
+    y_pos: 570
+
+"???":
+    x_pos: 710
+    y_pos: 570
+
+"????":
+    x_pos: 852
+    y_pos: 570
+
+"?????":
+    x_pos: 0
+    y_pos: 760
+
+unused_deck:
+    x_pos: 142
+    y_pos: 760
+
+anaglyph_deck:
+    x_pos: 284
+    y_pos: 760
+
+zodiac_deck:
+    x_pos: 426
+    y_pos: 760
+

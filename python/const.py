@@ -1,29 +1,56 @@
-"Constants for the balatro project"
+from enum import IntEnum
+from dataclasses import dataclass
 
-MARGIN = 0
-SPACING = 2
+class Rank(IntEnum):
+    TWO = 2
+    THREE = 3
+    FOUR = 4
+    FIVE = 5
+    SIX = 6
+    SEVEN = 7
+    EIGHT = 8
+    NINE = 9
+    TEN = 10
+    JACK = 11
+    QUEEN = 12
+    KING = 13
+    ACE = 1
 
-TILE_WIDTH = 140
-TILE_HEIGHT = 188
-
-IMAGE_OUTPUT_DIR = "image_output"
-TRAINING_DATA_DIR = "training_data"
-
-JOKER = "images/Joker.png"
-TAROTS = "images/Tarots.png"
-VOUCHERS = "images/Vouchers.png"
-ENHANCERS = "images/Enhancers.png"
-PLAYING_CARDS = "images/8BitDeck.png"
 
 
-VALID_CARD_BACKGROUNDS = [
-    "blank_card",
-    "stone_card",
-    "gold_card",
-    "bonus_card",
-    "mult_card",
-    "wild_card",
-    "lucky_card",
-    "glass_card",
-    "steel_card",
-]
+class Suit(IntEnum):
+    HEARTS = 0
+    DIAMONDS = 1
+    CLUBS = 2
+    SPADES = 3
+
+
+
+class Enhancement(IntEnum):
+    NONE = 0
+    STONE = 1
+    GOLD = 2
+    BONUS = 3
+    MULT = 4
+    WILD = 5
+    LUCKY = 6
+    GLASS = 7
+    STEEL = 8
+
+
+
+class Seal(IntEnum):
+    NONE = 0
+    GOLD = 1
+    PURPLE = 2
+    RED = 3
+    BLUE = 4
+
+
+
+@dataclass(frozen=True)
+class Card:
+    rank: Rank
+    suit: Suit
+    enhancement: Enhancement
+    seal: Seal
