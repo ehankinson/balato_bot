@@ -1,3 +1,4 @@
+from PIL import Image
 from enum import IntEnum
 from dataclasses import dataclass
 
@@ -47,10 +48,10 @@ class Seal(IntEnum):
     BLUE = 4
 
 
-
-@dataclass(frozen=True)
+@dataclass
 class Card:
     rank: Rank
     suit: Suit
     enhancement: Enhancement
     seal: Seal
+    image: Image = None

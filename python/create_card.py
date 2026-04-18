@@ -1,4 +1,5 @@
 import os
+from turtle import back
 
 from PIL import Image
 from util import load_yaml
@@ -40,13 +41,17 @@ def get_seal(card: Card) -> Image | None:
     location = ENHANCEMENT_LOCATIONS['seals'][card.seal]
     if location is None:
         return location
-    
+
     return crop_image(ENHANCEMENTS, location["x_pos"], location["y_pos"])
 
 
 
-def create_card(card: Card) -> None:
+def create_card(card: Card) -> Card:
     background = get_background(card)
+    if card.enhancement == Enhancement.STONE:
+        card.image = background
+        return card
+
     card_image = get_card(card)
 
     background.paste(card_image, (0, 0), card_image)
@@ -55,14 +60,17 @@ def create_card(card: Card) -> None:
     if seal is not None:
         background.paste(seal, (0, 0), seal)
 
-    background.save("test.png")
+    card.image = background
+
+    return card
+
 
 
 if __name__ == '__main__':
     test_card = Card(
         Rank.KING,
-        Suit.HEARTS,
-        Enhancement.WILD,
+        Suit.SPADES,
+        Enhancement.GLASS,
         Seal.RED
     )
     create_card(test_card)
