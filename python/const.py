@@ -1,6 +1,12 @@
+import os
+
 from PIL import Image
 from enum import IntEnum
 from dataclasses import dataclass
+
+CURR_DIR = os.path.dirname(os.path.abspath(__file__))
+
+CARD_ID = 0 # used for the yolo training
 
 class Rank(IntEnum):
     TWO = 2

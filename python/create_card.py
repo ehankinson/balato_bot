@@ -3,16 +3,15 @@ from turtle import back
 
 from PIL import Image
 from util import load_yaml
-from const import Card, Suit, Rank, Seal, Enhancement
+from const import Card, Suit, Rank, Seal, Enhancement, CURR_DIR
 
 CARD_WITH = 142
 CARD_HEIGHT = 190
 
-CURR_DIR = os.path.dirname(os.path.abspath(__file__))
-PLAYING_CARDS = Image.open(os.path.join(CURR_DIR, "../images/8BitDeck.png")).convert("RGBA")
-ENHANCEMENTS = Image.open(os.path.join(CURR_DIR, "../images/Enhancers.png")).convert("RGBA")
-CARD_LOCATIONS = load_yaml(os.path.join(CURR_DIR, "../json/card_locations.yaml"))
-ENHANCEMENT_LOCATIONS = load_yaml(os.path.join(CURR_DIR, "../json/enhancements_locations.yaml"))
+PLAYING_CARDS = Image.open(os.path.join(CURR_DIR, "../game_images/8BitDeck.png")).convert("RGBA")
+ENHANCEMENTS = Image.open(os.path.join(CURR_DIR, "../game_images/Enhancers.png")).convert("RGBA")
+CARD_LOCATIONS = load_yaml(os.path.join(CURR_DIR, "../yaml/card_locations.yaml"))
+ENHANCEMENT_LOCATIONS = load_yaml(os.path.join(CURR_DIR, "../yaml/enhancements_locations.yaml"))
 
 
 
