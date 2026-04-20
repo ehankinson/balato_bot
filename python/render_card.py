@@ -2,10 +2,15 @@ import os
 
 from PIL import Image
 from util import load_yaml
-from const import Card, Suit, Rank, Seal, Enhancement, CURR_DIR
+from const import CURR_DIR
+from card_models import Card
+from card_enums import Enhancement
+
 
 CARD_WITH = 142
 CARD_HEIGHT = 190
+WIDTH_MULT = 1.625
+HEIGHT_MULT = 1.625
 
 PLAYING_CARDS = Image.open(os.path.join(CURR_DIR, "../game_images/8BitDeck.png")).convert("RGBA")
 ENHANCEMENTS = Image.open(os.path.join(CURR_DIR, "../game_images/Enhancers.png")).convert("RGBA")
@@ -44,31 +49,30 @@ def get_seal(card: Card) -> Image | None:
 
 
 
-def create_card(card: Card) -> Card:
-    background = get_background(card)
+def add_seal(img: Image, card: Card) -> Image:
+    seal = get_seal(card)
+    if seal is not None:
+        img.paste(seal, (0, 0), seal)
+
+    return img
+
+
+
+def render_card(card: Card) -> Image:
+    img = get_background(card)
     if card.enhancement == Enhancement.STONE:
-        card.image = background
-        return card
+        img = add_seal(img, card)
+        return img
 
     card_image = get_card(card)
 
-    background.paste(card_image, (0, 0), card_image)
+    img.paste(card_image, (0, 0), card_image)
+    img = add_seal(img, card)
 
-    seal = get_seal(card)
-    if seal is not None:
-        background.paste(seal, (0, 0), seal)
-
-    card.image = background
-
-    return card
-
-
-
-if __name__ == '__main__':
-    test_card = Card(
-        Rank.KING,
-        Suit.SPADES,
-        Enhancement.GLASS,
-        Seal.RED
+    w, h = card_image.size
+    img.resize(
+        (int(w * WIDTH_MULT), int(h * HEIGHT_MULT)),
+        Image.Resampling.LANCZOS
     )
-    create_card(test_card)
+
+    return img

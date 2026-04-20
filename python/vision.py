@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 
 from torchvision import models, transforms
@@ -66,26 +67,27 @@ def predict_rank(img: Image):
 
 
 def get_cards(image: Image):
-    results = CARD_BOX_MODEL(image)
-    card_positions = get_card_locations_in_hand(results)
+    for _ in range(5):
+        results = CARD_BOX_MODEL(image)
+        card_positions = get_card_locations_in_hand(results)
 
-    detected_cards = []
+        detected_cards = []
 
-    for (x1, y1, x2, y2) in card_positions:
-        card = image.crop((x1, y1, x2, y2))
-        w, h = card.size
+        for (x1, y1, x2, y2) in card_positions:
+            card = image.crop((x1, y1, x2, y2))
+            w, h = card.size
 
-        rank_crop = card.crop((
-            0, 0, int(w * 0.28), int(h * 0.25)
-        ))
+            rank_crop = card.crop((
+                0, 0, int(w * 0.28), int(h * 0.25)
+            ))
 
-        rank = predict_rank(rank_crop)
+            rank = predict_rank(rank_crop)
 
-        detected_cards.append(Rank(int(rank)))
+            detected_cards.append(Rank(int(rank)))
 
     print(detected_cards)
 
 
 if __name__ == '__main__':
-    image = Image.open("/home/hank/projects/balato_bot/training_data/real_data_2.png").convert("RGB")
+    image = Image.open("/home/hank/projects/balato_bot/training_data/real_data_1.png").convert("RGB")
     get_cards(image)
