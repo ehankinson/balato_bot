@@ -4,12 +4,12 @@ import torch
 
 from torchvision import models, transforms
 from PIL import Image
-from ultralytics import YOLO
-from const import CURR_DIR, Card, Rank, Suit, Enhancement, Seal
-from create_card import create_card
-from create_hand import WIDTH_MULT, HEIGHT_MULT
 
-CARD_BOX_MODEL = YOLO(os.path.join(CURR_DIR, "../models/card_selector.pt"))
+from card_models import Card
+from card_enums import Rank, Suit, Enhancement, Seal
+from const import BOX_MODEL
+from render_card import render_card, WIDTH_MULT, HEIGHT_MULT
+
 # load model once
 rank_model = models.mobilenet_v3_small(weights=None)
 rank_model.classifier[3] = torch.nn.Linear(rank_model.classifier[3].in_features, 13)
@@ -30,7 +30,7 @@ class_names = ['1', '10', '11', '12', '13', '2', '3', '4', '5', '6', '7', '8', '
 def create_rank_cache() -> list[Image]:
     values = []
     for rank in list(Rank):
-        card = create_card(Card(rank, Suit.SPADES, Enhancement.NONE, Seal.NONE))
+        card = render_card(Card(rank, Suit.SPADES, Enhancement.NONE, Seal.NONE))
 
         card_image = card.image
         card_image = card_image.resize(
@@ -41,7 +41,7 @@ def create_rank_cache() -> list[Image]:
         crop_image.save(f"{rank}.png")
 
 
-def get_card_locations_in_hand(results: list) -> list[Card]:
+def get_card_locations_in_hand(results: list) -> list[list[float]]:
     values = []
 
     for box in results[0].boxes:
@@ -68,7 +68,7 @@ def predict_rank(img: Image):
 
 def get_cards(image: Image):
     for _ in range(5):
-        results = CARD_BOX_MODEL(image)
+        results = BOX_MODEL(image)
         card_positions = get_card_locations_in_hand(results)
 
         detected_cards = []

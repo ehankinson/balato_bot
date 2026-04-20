@@ -44,3 +44,11 @@ class Seal(IntEnum):
     PURPLE = 2
     RED = 3
     BLUE = 4
+
+
+
+class TrainingType(IntEnum):
+    Rank = 0
+    Suit = 1
+    Enhancment = 2
+    Seal = 3
