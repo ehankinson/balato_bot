@@ -1,5 +1,4 @@
 import os
-from turtle import back
 
 from PIL import Image
 from util import load_yaml

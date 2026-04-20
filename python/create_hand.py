@@ -24,20 +24,19 @@ def calculate_card_gap(card_amount: int, card_width: int):
 
 
 
-def create_hand(card_amount: int) -> [Image, list[list[float]]]:
+def create_hand(card_amount: int) -> [Image, list[dict[int, list[float]]]]:
     img = Image.new("RGBA", (IMAGE_WIDTH, IMAGE_HEIGHT), color="green")
     mid = (card_amount - 1) / 2
     card_gap = None
     card_data = []
 
     for i in range(card_amount):
-        card = Card(
-            random.choice(list(Rank)),
-            random.choice(list(Suit)),
-            random.choice(list(Enhancement)),
-            random.choice(list(Seal))
-        )
+        rank = random.choice(list(Rank))
+        suit = random.choice(list(Suit))
+        enha = random.choice(list(Enhancement))
+        seal = random.choice(list(Seal))
 
+        card = Card(rank, suit, enha, seal)
         card_image = create_card(card).image
 
         card_image = card_image.resize(
@@ -68,42 +67,10 @@ def create_hand(card_amount: int) -> [Image, list[list[float]]]:
         norm_width = round(card_w / IMAGE_WIDTH, 6)
         norm_height = round(card_h / IMAGE_HEIGHT, 6)
 
-        card_data.append([
-            CARD_ID, center_x, center_y, norm_width, norm_height
-        ])
+        info = {
+            "box": [CARD_ID, center_x, center_y, norm_width, norm_height],
+            "features": [rank, suit, enha, seal]
+        }
+        card_data.append(info)
 
     return img, card_data
-
-
-
-def generate_hand_training_data(hand_amount: int) -> None:
-    cutoff = hand_amount * 0.9
-    for i in range(hand_amount):
-        card_amount = random.randint(2, 15)
-        image, data = create_hand(card_amount)
-
-        name = f"{i}_{card_amount}"
-        split = "train" if i < cutoff else "val"
-
-        image_path = f"training_data/card_data/images/{split}"
-        if not os.path.isdir(image_path):
-            os.mkdir(image_path)
-
-        label_path = f"training_data/card_data/labels/{split}"
-        if not os.path.isdir(label_path):
-            os.mkdir(label_path)
-
-        img_path = f"{image_path}/{name}.png"
-        label_path = f"{label_path}/{name}.txt"
-
-        image.save(img_path)
-
-        with open(label_path, "w", encoding="utf-8") as t:
-            for d in data:
-                line = " ".join([str(val) for val in d])
-                t.write(line + "\n")
-
-
-
-if __name__ == '__main__':
-    generate_hand_training_data(2000)
