@@ -21,6 +21,9 @@ class Card:
             seal=random.choice(list(Seal))
         )
 
+    def __repr__(self):
+        return f"{self.rank.name} of {self.suit.name}"
+
 
 
 @dataclass
@@ -40,6 +43,7 @@ class Hand:
 class CardAnnotation:
     card: Card
     box: list[float]
+
 
 
 @dataclass

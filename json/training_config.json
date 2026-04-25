@@ -1,0 +1,14 @@
+{
+    "rank": {
+        "data_dir": "training_data/rank_data",
+        "features": 13,
+        "img_size": 64,
+        "output_path": "models/rank_model.pt"
+    },
+    "suit": {
+        "data_dir": "training_data/suit_data",
+        "features": 4,
+        "img_size": 64,
+        "output_path": "models/suit_model.pt"
+    }
+}

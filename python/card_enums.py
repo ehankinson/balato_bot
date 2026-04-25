@@ -15,6 +15,9 @@ class Rank(IntEnum):
     KING = 13
     ACE = 1
 
+    def __str__(self):
+        return self.name
+
 
 
 class Suit(IntEnum):

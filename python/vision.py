@@ -5,40 +5,51 @@ import torch
 from torchvision import models, transforms
 from PIL import Image
 
+from util import card_crop
 from card_models import Card
 from card_enums import Rank, Suit, Enhancement, Seal
-from const import BOX_MODEL
+from const import BOX_MODEL, RANK_CROP, SUIT_CROP
 from render_card import render_card, WIDTH_MULT, HEIGHT_MULT
 
+TUPLE = True
+
+def load_model(model_path: str):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = torch.load(model_path, map_location=device)
+
+    model = models.mobilenet_v3_small(weights=None)
+    model.classifier[3] = torch.nn.Linear(
+        model.classifier[3].in_features,
+        checkpoint["num_classes"]
+    )
+
+    model.load_state_dict(checkpoint["state_dict"])
+    model = model.to(device)
+    model.eval()
+
+    transform = transforms.Compose([
+        transforms.Resize((checkpoint["img_size"], checkpoint["img_size"])),
+        transforms.ToTensor(),
+    ])
+
+    return model, transform, checkpoint["class_names"], device
+
+
 # load model once
-rank_model = models.mobilenet_v3_small(weights=None)
-rank_model.classifier[3] = torch.nn.Linear(rank_model.classifier[3].in_features, 13)
-
-rank_model.load_state_dict(torch.load("models/rank_model.pt"))
-rank_model.eval()
-
-# transform
-rank_transform = transforms.Compose([
-    transforms.Resize((64, 64)),
-    transforms.ToTensor(),
-])
-
-# class mapping (IMPORTANT — match training!)
-class_names = ['1', '10', '11', '12', '13', '2', '3', '4', '5', '6', '7', '8', '9']
+rank_model, rank_transform, rank_class_names, rank_device = load_model("models/rank_model.pt")
+suit_model, suit_transform, suit_class_names, suit_device = load_model("models/suit_model.pt")
 
 
-def create_rank_cache() -> list[Image]:
-    values = []
-    for rank in list(Rank):
-        card = render_card(Card(rank, Suit.SPADES, Enhancement.NONE, Seal.NONE))
 
-        card_image = card.image
-        card_image = card_image.resize(
-            (int(card_image.width * WIDTH_MULT),int(card_image.height * HEIGHT_MULT)),
-            Image.Resampling.LANCZOS
-        )
-        crop_image = card_image.crop((17, 15, 59, 55))
-        crop_image.save(f"{rank}.png")
+def predict_image(img: Image, model, transform, class_names, device):
+    x = transform(img).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        output = model(x)
+        pred_idx = output.argmax(1).item()
+
+    return class_names[pred_idx]
+
 
 
 def get_card_locations_in_hand(results: list) -> list[list[float]]:
@@ -54,15 +65,12 @@ def get_card_locations_in_hand(results: list) -> list[list[float]]:
 
 
 def predict_rank(img: Image):
-    x = rank_transform(img).unsqueeze(0)
+    return predict_image(img, rank_model, rank_transform, rank_class_names, rank_device)
 
-    with torch.no_grad():
-        output = rank_model(x)
-        pred_idx = output.argmax(1).item()
 
-    rank = class_names[pred_idx]
 
-    return rank
+def predict_suit(img: Image):
+    return predict_image(img, suit_model, suit_transform, suit_class_names, suit_device)
 
 
 
@@ -77,15 +85,22 @@ def get_cards(image: Image):
             card = image.crop((x1, y1, x2, y2))
             w, h = card.size
 
-            rank_crop = card.crop((
-                0, 0, int(w * 0.28), int(h * 0.25)
-            ))
+            rank_crop = card.crop(card_crop(w, h, RANK_CROP, TUPLE))
+
+            suit_crop = card.crop(card_crop(w, h, SUIT_CROP, TUPLE))
 
             rank = predict_rank(rank_crop)
+            suit = predict_suit(suit_crop)
 
-            detected_cards.append(Rank(int(rank)))
+            detected_cards.append(Card(
+                rank=Rank(int(rank)),
+                suit=Suit(int(suit)),
+                enhancement=Enhancement.NONE,
+                seal=Seal.NONE
+            ))
 
-    print(detected_cards)
+    for card in detected_cards:
+        print(card)
 
 
 if __name__ == '__main__':

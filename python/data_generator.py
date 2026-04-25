@@ -1,15 +1,14 @@
-from email.policy import default
 import os
 
 from PIL import Image
-from ultralytics import YOLO
 
-from util import random_card_amount
+from card_models import Card, Hand
 from render_hand import render_hand
-from card_models import Card, Hand, RenderedHand
 from vision import get_card_locations_in_hand
+from util import random_card_amount, card_crop
+from const import BOX_MODEL, FOLDER_TRAINING_NAMES, RANK_CROP, SUIT_CROP
 from card_enums import Rank, Suit, Seal, Enhancement, TrainingType
-from const import CURR_DIR, BOX_MODEL, FOLDER_TRAINING_NAMES
+
 
 CUTOFF = 0.9 # split between training and val
 
@@ -18,7 +17,7 @@ def generate_hand_training_data(hand_amount: int) -> None:
     for i in range(hand_amount):
         card_amount = random_card_amount()
         hand = Hand.random_hand(card_amount)
-        hand_render: RenderedHand = render_hand(hand)
+        hand_render = render_hand(hand)
 
         name = f"{i}_{card_amount}"
         split = "train" if i < cutoff else "val"
@@ -48,10 +47,10 @@ def feature_info(train_type: TrainingType, card_image: Image, card: Card) -> tup
     w, h = card_image.size
     match train_type:
         case TrainingType.Rank:
-            return card.rank, [0, 0, int(w * 0.28), int(h * 0.25)]
+            return card.rank, card_crop(w, h, RANK_CROP)
 
         case TrainingType.Suit:
-            return card.suit, [0, 35, int(w * 0.22), int(h * 0.35)]
+            return card.suit, card_crop(w, h, SUIT_CROP)
 
         case TrainingType.Enhancment:
             return card.enhancement, [0, 0, 0, 0]
@@ -68,7 +67,7 @@ def generate_card_feature_data(hand_amount: int, train_type: TrainingType) -> No
 
         card_amount = random_card_amount()
         hand = Hand.random_hand(card_amount)
-        hand_render: RenderedHand = render_hand(hand)
+        hand_render = render_hand(hand)
 
         hand_image = hand_render.image
         results = BOX_MODEL(hand_image)
