@@ -6,9 +6,8 @@ from card_models import Card, Hand
 from render_hand import render_hand
 from vision import get_card_locations_in_hand
 from util import random_card_amount, card_crop
-from const import BOX_MODEL, FOLDER_TRAINING_NAMES, RANK_CROP, SUIT_CROP
 from card_enums import Rank, Suit, Seal, Enhancement, TrainingType
-
+from const import BOX_MODEL, FOLDER_TRAINING_NAMES, RANK_CROP, SUIT_CROP, ENHANCEMENT_CROP
 
 CUTOFF = 0.9 # split between training and val
 
@@ -52,8 +51,8 @@ def feature_info(train_type: TrainingType, card_image: Image, card: Card) -> tup
         case TrainingType.Suit:
             return card.suit, card_crop(w, h, SUIT_CROP)
 
-        case TrainingType.Enhancment:
-            return card.enhancement, [0, 0, 0, 0]
+        case TrainingType.Enhancement:
+            return card.enhancement, card_crop(w, h, ENHANCEMENT_CROP)
 
         case TrainingType.Seal:
             return card.seal, [0, 0, 0, 0]
@@ -83,8 +82,8 @@ def generate_card_feature_data(hand_amount: int, train_type: TrainingType) -> No
         annotations = hand_render.annotations
         for card_index, annotation in enumerate(annotations):
             card_data = annotation.card
-            if card_data.enhancement == Enhancement.STONE and train_type != TrainingType.Enhancment:
-                continue # skipping stones
+            if card_data.enhancement == Enhancement.STONE and train_type != TrainingType.Enhancement:
+                continue # skipping stones for not enhamcement cards
 
             card_image = hand_image.crop((
                 card_locations[card_index][0],
@@ -105,4 +104,4 @@ def generate_card_feature_data(hand_amount: int, train_type: TrainingType) -> No
 
 
 if __name__ == '__main__':
-    generate_card_feature_data(5000, TrainingType.Suit)
+    generate_card_feature_data(5000, TrainingType.Enhancement)

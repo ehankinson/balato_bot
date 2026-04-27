@@ -1,5 +1,3 @@
-import os
-import time
 import torch
 
 from torchvision import models, transforms
@@ -8,14 +6,14 @@ from PIL import Image
 from util import card_crop
 from card_models import Card
 from card_enums import Rank, Suit, Enhancement, Seal
-from const import BOX_MODEL, RANK_CROP, SUIT_CROP
-from render_card import render_card, WIDTH_MULT, HEIGHT_MULT
+from const import BOX_MODEL, RANK_CROP, SUIT_CROP, ENHANCEMENT_CROP
 
-TUPLE = True
+TUPLE = False
 
 def load_model(model_path: str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(model_path, map_location=device)
+    width, height = checkpoint["img_size"]
 
     model = models.mobilenet_v3_small(weights=None)
     model.classifier[3] = torch.nn.Linear(
@@ -28,7 +26,7 @@ def load_model(model_path: str):
     model.eval()
 
     transform = transforms.Compose([
-        transforms.Resize((checkpoint["img_size"], checkpoint["img_size"])),
+        transforms.Resize((height, width)),
         transforms.ToTensor(),
     ])
 
@@ -38,6 +36,7 @@ def load_model(model_path: str):
 # load model once
 rank_model, rank_transform, rank_class_names, rank_device = load_model("models/rank_model.pt")
 suit_model, suit_transform, suit_class_names, suit_device = load_model("models/suit_model.pt")
+enhancement_model, enhancement_transform, enhancement_class_names, enhancement_device = load_model("models/enhancement_model.pt")
 
 
 
@@ -74,6 +73,11 @@ def predict_suit(img: Image):
 
 
 
+def predict_enhancement(img: Image):
+    return predict_image(img, enhancement_model, enhancement_transform, enhancement_class_names, enhancement_device)
+
+
+
 def get_cards(image: Image):
     for _ in range(5):
         results = BOX_MODEL(image)
@@ -86,16 +90,17 @@ def get_cards(image: Image):
             w, h = card.size
 
             rank_crop = card.crop(card_crop(w, h, RANK_CROP, TUPLE))
-
             suit_crop = card.crop(card_crop(w, h, SUIT_CROP, TUPLE))
+            enhancement_crop = card.crop(card_crop(w, h, ENHANCEMENT_CROP, TUPLE))
 
             rank = predict_rank(rank_crop)
             suit = predict_suit(suit_crop)
+            enhancement = predict_enhancement(enhancement_crop)
 
             detected_cards.append(Card(
                 rank=Rank(int(rank)),
                 suit=Suit(int(suit)),
-                enhancement=Enhancement.NONE,
+                enhancement=Enhancement(int(enhancement)),
                 seal=Seal.NONE
             ))
 
@@ -104,5 +109,5 @@ def get_cards(image: Image):
 
 
 if __name__ == '__main__':
-    image = Image.open("/home/hank/projects/balato_bot/training_data/real_data_1.png").convert("RGB")
+    image = Image.open("/home/hank/projects/balato_bot/training_data/real_data_6.png").convert("RGB")
     get_cards(image)

@@ -21,13 +21,13 @@ def train_card_box():
     model = YOLO("yolo11n.pt")
 
     model.train(
-        data     =trainer_config,
-        epochs   =20,
-        imgsz    =640, # scales input to be this square
-        batch    =16,
-        device   =0, # 0 GPU / 1 CPU
-        workers  =4, # how many threads to use to load the data
-        patience =20 # after x epchos if no change quite
+        data     = trainer_config,
+        epochs   = 20,
+        imgsz    = 640, # scales input to be this square
+        batch    = 16,
+        device   = 0, # 0 GPU / 1 CPU
+        workers  = 4, # how many threads to use to load the data
+        patience = 20 # after x epchos if no change quite
     )
 
 
@@ -41,14 +41,14 @@ def train_model(model_type: str):
     model_config = load_config(model_type)
 
     data_dir = model_config["data_dir"]
-    img_size = model_config["img_size"]
+    width, height = model_config["img_size"]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ===== TRANSFORMS (image prep) =====
     transform = transforms.Compose([
-        transforms.Resize((img_size, img_size)),    # make all images same size
-        transforms.ToTensor(),                      # convert to numbers
+        transforms.Resize((height, width)),    # torchvision uses (height, width)
+        transforms.ToTensor(),                 # convert to numbers
     ])
 
     # ===== LOAD DATA =====
@@ -131,7 +131,7 @@ def train_model(model_type: str):
     torch.save({
         "model_type": model_type,
         "arch": "mobilenet_v3_small",
-        "img_size": img_size,
+        "img_size": [width, height],
         "num_classes": len(train_dataset.classes),
         "class_names": train_dataset.classes,
         "state_dict": model.state_dict(),
@@ -139,4 +139,5 @@ def train_model(model_type: str):
 
 
 if __name__ == "__main__":
-    train_model("suit")
+    for feature in ["rank", "suit", "enhancement"]:
+        train_model(feature)

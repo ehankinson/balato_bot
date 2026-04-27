@@ -53,5 +53,5 @@ class Seal(IntEnum):
 class TrainingType(IntEnum):
     Rank = 0
     Suit = 1
-    Enhancment = 2
+    Enhancement = 2
     Seal = 3

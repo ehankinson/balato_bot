@@ -22,7 +22,16 @@ class Card:
         )
 
     def __repr__(self):
-        return f"{self.rank.name} of {self.suit.name}"
+        base = f"{self.rank.name} of {self.suit.name}"
+
+        base = f"{self.enhancement.name} {base}" \
+            if self.enhancement != Enhancement.NONE\
+                else f"Normal {base}"
+
+        if self.seal != Seal.NONE:
+            base = f"{self.seal.name} seal {base}"
+
+        return base
 
 
 

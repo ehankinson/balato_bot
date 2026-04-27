@@ -2,13 +2,19 @@
     "rank": {
         "data_dir": "training_data/rank_data",
         "features": 13,
-        "img_size": 64,
+        "img_size": [64, 64],
         "output_path": "models/rank_model.pt"
     },
     "suit": {
         "data_dir": "training_data/suit_data",
         "features": 4,
-        "img_size": 64,
+        "img_size": [64, 64],
         "output_path": "models/suit_model.pt"
+    },
+    "enhancement": {
+        "data_dir": "training_data/enhancement_data",
+        "features": 9,
+        "img_size": [92, 32],
+        "output_path": "models/enhancement_model.pt"
     }
 }

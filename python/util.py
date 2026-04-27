@@ -19,7 +19,7 @@ def random_card_amount() -> int:
 
 
 
-def card_crop(width: int, heigh: int, crop_values: list[float], is_list: bool = False) -> list[int] | tuple[int]:
+def card_crop(width: int, heigh: int, crop_values: list[float], is_list: bool = True) -> list[int] | tuple[int]:
     val = [
         crop_values[0], crop_values[1],
         int(width * crop_values[2]),
