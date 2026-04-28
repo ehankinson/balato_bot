@@ -104,4 +104,4 @@ def generate_card_feature_data(hand_amount: int, train_type: TrainingType) -> No
 
 
 if __name__ == '__main__':
-    generate_card_feature_data(5000, TrainingType.Enhancement)
+    generate_card_feature_data(1, TrainingType.Enhancement)

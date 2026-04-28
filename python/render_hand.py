@@ -1,18 +1,17 @@
 # 1445x393 THIS IS THE DIMENSIONS OF the SS WE ARE TAKING
 from PIL import Image
 
-from const import CARD_ID
 from render_card import render_card
 from card_models import Card, Hand, RenderedHand, CardAnnotation
+from const import CARD_ID, HAND_WIDTH, HAND_HEIGHT, X_RATIO_GAP, Y_RATIO_GAP
 
 
 Y_LIFT = 5
 ANGLE = 1.4
-X_START_GAP = 32
-Y_START_GAP = 52
-IMAGE_WIDTH = 1445
-IMAGE_HEIGHT = 393
-TOTAL_HAND_WIDTH = 1372
+X_START_GAP = int(X_RATIO_GAP * HAND_WIDTH)
+Y_START_GAP = int(Y_RATIO_GAP * HAND_HEIGHT)
+TOTAL_HAND_WIDTH_RATIO: float = 1372 / 1445
+TOTAL_HAND_WIDTH = TOTAL_HAND_WIDTH_RATIO * HAND_WIDTH
 
 def calculate_card_gap(card_amount: int, card_width: int) -> float:
     total_card_space = card_amount * card_width
@@ -24,10 +23,10 @@ def calculate_card_gap(card_amount: int, card_width: int) -> float:
 
 def calculate_box_dimensions(card: Card, card_image: Image, x_pos: int, y_pos: int) -> CardAnnotation:
     card_w, card_h = card_image.width, card_image.height
-    center_x = round((x_pos + card_w / 2) / IMAGE_WIDTH, 6)
-    center_y = round((y_pos + card_h / 2) / IMAGE_HEIGHT, 6)
-    norm_width = round(card_w / IMAGE_WIDTH, 6)
-    norm_height = round(card_h / IMAGE_HEIGHT, 6)
+    center_x = round((x_pos + card_w / 2) / HAND_WIDTH, 6)
+    center_y = round((y_pos + card_h / 2) / HAND_HEIGHT, 6)
+    norm_width = round(card_w / HAND_WIDTH, 6)
+    norm_height = round(card_h / HAND_HEIGHT, 6)
     return CardAnnotation(
         card=card,
         box=[CARD_ID, center_x, center_y, norm_width, norm_height]
@@ -36,7 +35,7 @@ def calculate_box_dimensions(card: Card, card_image: Image, x_pos: int, y_pos: i
 
 
 def render_hand(hand: Hand) -> RenderedHand:
-    img = Image.new("RGBA", (IMAGE_WIDTH, IMAGE_HEIGHT), color="green")
+    img = Image.new("RGBA", (HAND_WIDTH, HAND_HEIGHT), color="green")
 
     card_amount = len(hand.cards)
     mid = (card_amount - 1) / 2
@@ -64,7 +63,13 @@ def render_hand(hand: Hand) -> RenderedHand:
             card, card_image, x_pos, y_pos
         ))
 
+    img.save("image.png")
+
     return RenderedHand(
         image=img,
         annotations=annotations
     )
+
+if __name__ == '__main__':
+    hand = Hand.random_hand(8)
+    render_hand(hand)

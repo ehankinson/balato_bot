@@ -109,5 +109,5 @@ def get_cards(image: Image):
 
 
 if __name__ == '__main__':
-    image = Image.open("/home/hank/projects/balato_bot/training_data/real_data_6.png").convert("RGB")
+    image = Image.open("training_data/real_data_1.png").convert("RGB")
     get_cards(image)

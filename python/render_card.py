@@ -2,9 +2,9 @@ import os
 
 from PIL import Image
 from util import load_yaml
-from const import CURR_DIR
 from card_models import Card
 from card_enums import Enhancement
+from const import CURR_DIR, HAND_WIDTH, HAND_HEIGHT, HAND_WIDTH_RATIO, HAND_HEIGHT_RATION
 
 
 CARD_WITH = 142
@@ -58,21 +58,25 @@ def add_seal(img: Image, card: Card) -> Image:
 
 
 
+def resize_img(img: Image) -> Image:
+    new_width = int(round(HAND_WIDTH * HAND_WIDTH_RATIO, 0))
+    new_height = int(round(HAND_HEIGHT * HAND_HEIGHT_RATION, 0))
+    return img.resize(
+        (new_width, new_height),
+        Image.Resampling.LANCZOS
+    )
+
+
+
 def render_card(card: Card) -> Image:
     img = get_background(card)
     if card.enhancement == Enhancement.STONE:
         img = add_seal(img, card)
-        return img
+        return resize_img(img)
 
     card_image = get_card(card)
 
     img.paste(card_image, (0, 0), card_image)
     img = add_seal(img, card)
 
-    w, h = card_image.size
-    img.resize(
-        (int(w * WIDTH_MULT), int(h * HEIGHT_MULT)),
-        Image.Resampling.LANCZOS
-    )
-
-    return img
+    return resize_img(img)
