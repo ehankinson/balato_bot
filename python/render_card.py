@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 
 from PIL import Image
 from util import load_yaml
@@ -27,21 +28,21 @@ def crop_image(image: Image, x_pos: int, y_pos: int) -> Image:
 
 
 
-def get_background(card: Card) -> Image:
-    locations = ENHANCEMENT_LOCATIONS['enhancements'][card.enhancement]
+def get_background(enhancement: Enhancement) -> Image:
+    locations = ENHANCEMENT_LOCATIONS['enhancements'][enhancement]
     return crop_image(ENHANCEMENTS, locations["x_pos"], locations["y_pos"])
 
 
 
-def get_card(card: Card) -> Image:
-    y_pos = CARD_LOCATIONS["suits"][card.suit]
-    x_pos = CARD_LOCATIONS["cards"][card.rank]
+def get_card(rank: int, suit: int) -> Image:
+    y_pos = CARD_LOCATIONS["suits"][suit]
+    x_pos = CARD_LOCATIONS["cards"][rank]
     return crop_image(PLAYING_CARDS, x_pos, y_pos)
 
 
 
-def get_seal(card: Card) -> Image | None:
-    location = ENHANCEMENT_LOCATIONS['seals'][card.seal]
+def get_seal(seal: int) -> Image | None:
+    location = ENHANCEMENT_LOCATIONS['seals'][seal]
     if location is None:
         return location
 
@@ -49,8 +50,8 @@ def get_seal(card: Card) -> Image | None:
 
 
 
-def add_seal(img: Image, card: Card) -> Image:
-    seal = get_seal(card)
+def add_seal(img: Image, seal_value: int) -> Image:
+    seal = get_seal(seal_value)
     if seal is not None:
         img.paste(seal, (0, 0), seal)
 
@@ -68,15 +69,26 @@ def resize_img(img: Image) -> Image:
 
 
 
-def render_card(card: Card) -> Image:
-    img = get_background(card)
-    if card.enhancement == Enhancement.STONE:
-        img = add_seal(img, card)
+@lru_cache(maxsize=None)
+def render_card_cached(rank: int, suit: int, enhancement: int, seal: int) -> Image:
+    img = get_background(Enhancement(enhancement))
+    if enhancement == Enhancement.STONE:
+        img = add_seal(img, seal)
         return resize_img(img)
 
-    card_image = get_card(card)
+    card_image = get_card(rank, suit)
 
     img.paste(card_image, (0, 0), card_image)
-    img = add_seal(img, card)
+    img = add_seal(img, seal)
 
     return resize_img(img)
+
+
+
+def render_card(card: Card) -> Image:
+    return render_card_cached(
+        int(card.rank),
+        int(card.suit),
+        int(card.enhancement),
+        int(card.seal)
+    ).copy()

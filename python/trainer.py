@@ -7,7 +7,8 @@ from torchvision import datasets, transforms, models
 from ultralytics import YOLO
 
 from util import load_json
-from const import CURR_DIR, TRAINING_CONFIG
+from card_enums import CardFeatureTrainingType
+from const import CURR_DIR, TRAINING_CONFIG, FOLDER_TRAINING_NAMES
 
 
 EPOCHS = 10
@@ -22,9 +23,9 @@ def train_card_box():
 
     model.train(
         data     = trainer_config,
-        epochs   = 20,
+        epochs   = EPOCHS,
         imgsz    = 640, # scales input to be this square
-        batch    = 16,
+        batch    = BATCH_SIZE,
         device   = 0, # 0 GPU / 1 CPU
         workers  = 4, # how many threads to use to load the data
         patience = 20 # after x epchos if no change quite
@@ -139,5 +140,5 @@ def train_model(model_type: str):
 
 
 if __name__ == "__main__":
-    for feature in ["rank", "suit", "enhancement"]:
-        train_model(feature)
+    for t in FOLDER_TRAINING_NAMES:
+        train_model(t)

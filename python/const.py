@@ -29,6 +29,7 @@ FOLDER_TRAINING_NAMES = ["rank", "suit", "enhancement", "seal"]
 CARD_ID = 0 # used for the yolo training
 BOX_MODEL = YOLO(os.path.join(CURR_DIR, "../models/card_selector.pt"))
 
-RANK_CROP = [0.0, 0.0, 0.28, 0.25]
-SUIT_CROP = [0.0, 35.0, 0.22, 0.35]
-ENHANCEMENT_CROP = [5.0, 35.0, 0.25, 0.85]
+RANK_CROP = [0.0, 0.0, 0.30, 0.25]
+SEAL_CROP = [55.0, 35.0, 0.6, 0.45]
+SUIT_CROP = [10.0, 45.0, 0.25, 0.3]
+ENHANCEMENT_CROP = [5.0, 75.0, 0.25, 0.85]

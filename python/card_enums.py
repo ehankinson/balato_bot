@@ -15,9 +15,6 @@ class Rank(IntEnum):
     KING = 13
     ACE = 1
 
-    def __str__(self):
-        return self.name
-
 
 
 class Suit(IntEnum):
@@ -50,7 +47,7 @@ class Seal(IntEnum):
 
 
 
-class TrainingType(IntEnum):
+class CardFeatureTrainingType(IntEnum):
     Rank = 0
     Suit = 1
     Enhancement = 2

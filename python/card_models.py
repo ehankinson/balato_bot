@@ -5,6 +5,22 @@ from dataclasses import dataclass
 
 from card_enums import Rank, Suit, Enhancement, Seal
 
+CARD_STRINGS = [
+    "A",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "Q",
+    "K"
+]
+
 @dataclass
 class Card:
     rank: Rank
@@ -22,7 +38,7 @@ class Card:
         )
 
     def __repr__(self):
-        base = f"{self.rank.name} of {self.suit.name}"
+        base = f"{CARD_STRINGS[self.rank - 1]} of {self.suit.name}"
 
         base = f"{self.enhancement.name} {base}" \
             if self.enhancement != Enhancement.NONE\

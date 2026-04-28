@@ -1,5 +1,7 @@
+import os
 import json
 import yaml
+import shutil
 import random
 
 def load_yaml(filepath: str) -> dict:
@@ -19,10 +21,27 @@ def random_card_amount() -> int:
 
 
 
-def card_crop(width: int, heigh: int, crop_values: list[float], is_list: bool = True) -> list[int] | tuple[int]:
-    val = [
-        crop_values[0], crop_values[1],
+def card_crop(width: int, heigh: int, crop_values: list[float]) -> tuple[int, int, int, int]:
+    return (
+        int(crop_values[0]), int(crop_values[1]),
         int(width * crop_values[2]),
         int(heigh * crop_values[3])
-    ]
-    return val if is_list else tuple(val)
+    )
+
+
+
+def build_folder(folder_path: str) -> None:
+    if not os.path.isdir(folder_path):
+        os.mkdir(folder_path)
+
+
+
+def remove_folder(folder_path: str) -> None:
+    if os.path.isdir(folder_path):
+        shutil.rmtree(folder_path)
+
+
+
+def rebuild_folder(folder_path: str) -> None:
+    remove_folder(folder_path)
+    build_folder(folder_path)

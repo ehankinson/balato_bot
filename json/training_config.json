@@ -16,5 +16,11 @@
         "features": 9,
         "img_size": [92, 32],
         "output_path": "models/enhancement_model.pt"
+    },
+    "seal": {
+        "data_dir": "training_data/seal_data",
+        "features": 5,
+        "img_size": [64, 64],
+        "output_path": "models/seal_model.pt"
     }
 }

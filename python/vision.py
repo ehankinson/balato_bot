@@ -6,7 +6,7 @@ from PIL import Image
 from util import card_crop
 from card_models import Card
 from card_enums import Rank, Suit, Enhancement, Seal
-from const import BOX_MODEL, RANK_CROP, SUIT_CROP, ENHANCEMENT_CROP
+from const import BOX_MODEL, RANK_CROP, SUIT_CROP, SEAL_CROP, ENHANCEMENT_CROP
 
 TUPLE = False
 
@@ -37,6 +37,7 @@ def load_model(model_path: str):
 rank_model, rank_transform, rank_class_names, rank_device = load_model("models/rank_model.pt")
 suit_model, suit_transform, suit_class_names, suit_device = load_model("models/suit_model.pt")
 enhancement_model, enhancement_transform, enhancement_class_names, enhancement_device = load_model("models/enhancement_model.pt")
+seal_model, seal_transform, seal_class_names, seal_device = load_model("models/seal_model.pt")
 
 
 
@@ -78,36 +79,48 @@ def predict_enhancement(img: Image):
 
 
 
+def predict_seal(img: Image):
+    return predict_image(img, seal_model, seal_transform, seal_class_names, seal_device)
+
+
+
 def get_cards(image: Image):
-    for _ in range(5):
-        results = BOX_MODEL(image)
-        card_positions = get_card_locations_in_hand(results)
+    results = BOX_MODEL(image, verbose=False)
+    card_positions = get_card_locations_in_hand(results)
 
-        detected_cards = []
+    detected_cards = []
 
-        for (x1, y1, x2, y2) in card_positions:
-            card = image.crop((x1, y1, x2, y2))
-            w, h = card.size
+    for i, (x1, y1, x2, y2) in enumerate(card_positions):
+        card = image.crop((x1, y1, x2, y2))
+        card.save(f"{i}_card.png")
+        w, h = card.size
 
-            rank_crop = card.crop(card_crop(w, h, RANK_CROP, TUPLE))
-            suit_crop = card.crop(card_crop(w, h, SUIT_CROP, TUPLE))
-            enhancement_crop = card.crop(card_crop(w, h, ENHANCEMENT_CROP, TUPLE))
+        rank_crop = card.crop(card_crop(w, h, RANK_CROP))
+        suit_crop = card.crop(card_crop(w, h, SUIT_CROP))
+        enhancement_crop = card.crop(card_crop(w, h, ENHANCEMENT_CROP))
+        seal_crop = card.crop(card_crop(w, h, SEAL_CROP))
 
-            rank = predict_rank(rank_crop)
-            suit = predict_suit(suit_crop)
-            enhancement = predict_enhancement(enhancement_crop)
+        rank_crop.save(f"{i}_rank.png")
+        suit_crop.save(f"{i}_suit.png")
+        enhancement_crop.save(f"{i}_enhancement.png")
+        seal_crop.save(f"{i}_seal.png")
 
-            detected_cards.append(Card(
-                rank=Rank(int(rank)),
-                suit=Suit(int(suit)),
-                enhancement=Enhancement(int(enhancement)),
-                seal=Seal.NONE
-            ))
+        rank = predict_rank(rank_crop)
+        suit = predict_suit(suit_crop)
+        seal = predict_seal(seal_crop)
+        enhancement = predict_enhancement(enhancement_crop)
+
+        detected_cards.append(Card(
+            rank=Rank(int(rank)),
+            suit=Suit(int(suit)),
+            enhancement=Enhancement(int(enhancement)),
+            seal=Seal(int(seal))
+        ))
 
     for card in detected_cards:
         print(card)
 
 
 if __name__ == '__main__':
-    image = Image.open("training_data/real_data_1.png").convert("RGB")
+    image = Image.open("training_data/real_data_7.png").convert("RGB")
     get_cards(image)
