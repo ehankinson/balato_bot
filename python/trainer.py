@@ -1,6 +1,6 @@
 import os
+import sys
 import torch
-import shutil
 
 from torch import nn
 from torch.utils.data import DataLoader
@@ -28,7 +28,7 @@ def train_card_box():
         epochs   = EPOCHS,
         imgsz    = 640, # scales input to be this square
         batch    = BATCH_SIZE,
-        device   = 0, # 0 GPU / 1 CPU
+        device   = "cpu" if sys.platform == "darwin" else 0, # 0 GPU / 1 CPU
         workers  = 4, # how many threads to use to load the data
         patience = PATIENCE # after x epchos if no change quite
     )
@@ -145,7 +145,7 @@ def train_model(model_type: str):
 
 
 if __name__ == "__main__":
-    # train_card_box()
-    for t in FOLDER_TRAINING_NAMES:
-        print(f"Training {t}")
-        train_model(t)
+    train_card_box()
+    # for t in FOLDER_TRAINING_NAMES:
+    #     print(f"Training {t}")
+    #     train_model(t)

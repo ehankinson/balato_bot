@@ -1,14 +1,16 @@
 import os
 import sys
 
+from ultralytics import YOLO
+from card_enums import PokerHand
+from card_models import HandStats
+
 if sys.platform == "darwin":
     hand_dimenstions = [ 845, 224 ]
 elif sys.platform.startswith("linux"):
     hand_dimenstions = [ 1445, 393 ]
 else:
     raise OSError("Don't support this system")
-
-from ultralytics import YOLO
 
 HAND_WIDTH = hand_dimenstions[0]
 HAND_HEIGHT = hand_dimenstions[1]
@@ -33,3 +35,18 @@ RANK_CROP = [0.0, 0.0, 0.30, 0.25]
 SEAL_CROP = [55.0, 35.0, 0.6, 0.45]
 SUIT_CROP = [10.0, 45.0, 0.25, 0.3]
 ENHANCEMENT_CROP = [5.0, 75.0, 0.25, 0.85]
+
+HAND_STATS: dict[PokerHand, HandStats] = {
+    PokerHand.FLUSH_FIVE: HandStats(160, 16),
+    PokerHand.FLUSH_HOUSE: HandStats(140, 14),
+    PokerHand.FIVE_OF_A_KIND: HandStats(120, 12),
+    PokerHand.STRAIGHT_FLUSH: HandStats(100, 8),
+    PokerHand.FOUR_OF_A_KIND: HandStats(60, 7),
+    PokerHand.FULL_HOUSE: HandStats(40, 4),
+    PokerHand.FLUSH: HandStats(35, 4),
+    PokerHand.STRAIGHT: HandStats(30, 4),
+    PokerHand.THREE_OF_A_KIND: HandStats(30, 3),
+    PokerHand.TWO_PAIR: HandStats(20, 2),
+    PokerHand.PAIR: HandStats(10, 2),
+    PokerHand.HIGH_CARD: HandStats(5, 1),
+}

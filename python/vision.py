@@ -35,10 +35,10 @@ def load_model(model_path: str):
 
 
 # load model once
-rank_model, rank_transform, rank_class_names, rank_device = load_model("models/rank_model.pt")
-suit_model, suit_transform, suit_class_names, suit_device = load_model("models/suit_model.pt")
-enhancement_model, enhancement_transform, enhancement_class_names, enhancement_device = load_model("models/enhancement_model.pt")
-seal_model, seal_transform, seal_class_names, seal_device = load_model("models/seal_model.pt")
+# rank_model, rank_transform, rank_class_names, rank_device = load_model("models/rank_model.pt")
+# suit_model, suit_transform, suit_class_names, suit_device = load_model("models/suit_model.pt")
+# enhancement_model, enhancement_transform, enhancement_class_names, enhancement_device = load_model("models/enhancement_model.pt")
+# seal_model, seal_transform, seal_class_names, seal_device = load_model("models/seal_model.pt")
 
 
 

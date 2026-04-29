@@ -1,0 +1,279 @@
+import time
+from itertools import permutations, product
+
+from card_enums import Rank, Suit, Seal, Enhancement, PokerHand
+from card_models import Card, Hand, HandStats
+from const import HAND_STATS
+
+
+
+def get_stone_cards(cards: list[Card]) -> list[Card]:
+    return [card for card in cards if card.enhancement == Enhancement.STONE]
+
+
+
+def get_steel_cards(cards: list[Card] | tuple[Card, ...]) -> list[Card]:
+    return [card for card in cards if card.enhancement == Enhancement.STEEL]
+
+
+
+def unique_cards(cards: tuple[Card, ...]) -> int:
+    return len(set(card.rank for card in cards))
+
+
+
+def is_same_rank(cards: tuple[Card, ...]) -> bool:
+    initial_rank = cards[0].rank
+    return all(card.rank == initial_rank for card in cards)
+
+
+
+def is_flush(cards: tuple[Card, ...]) -> bool:
+    initial_suit = cards[0].suit
+    return all(card.suit == initial_suit for card in cards)
+
+
+
+def is_straight(cards: list[Card]) -> bool:
+    cards = sorted(cards, key=lambda x: x.rank, reverse=True)
+    for i in range(1, len(cards)):
+        if cards[i - 1].rank - cards[i].rank != 1:
+            return False
+
+    return True
+
+
+
+def filter_steel(hand_steel_cards: list[Card], steel_cards: list[Card]) -> list[int]:
+    hand_steel_cards = sorted(hand_steel_cards, key=lambda x: (x.rank, x.suit))
+    steel_cards      = sorted(steel_cards, key=lambda x: (x.rank, x.suit))
+
+    min_length = min(len(hand_steel_cards), len(steel_cards))
+    skip_index = []
+    for i in range(min_length):
+        if hand_steel_cards[i] == steel_cards[i]:
+            skip_index.append(i)
+
+    return skip_index
+
+
+def bucket_rank(cards: list[Card]) -> dict[Rank, list[Card]]:
+    bucket: dict[Rank, list[Card]] = {}
+    for card in cards:
+        if card.enhancement == Enhancement.STONE:
+            continue
+
+        if card.rank not in bucket:
+            bucket[card.rank] = []
+
+        bucket[card.rank].append(card)
+
+    return bucket
+
+
+
+def bucket_suit(cards: list[Card]) -> dict[Suit, list[Card]]:
+    bucket: dict[Suit, list[Card]] = {}
+    for card in cards:
+        if card.enhancement == Enhancement.STONE:
+            continue
+
+        if card.suit not in bucket:
+            bucket[card.suit] = []
+
+        bucket[card.suit].append(card)
+
+    return bucket
+
+
+
+def get_x_of_a_kind(bucket: dict[Rank, list[Card]]) -> list[tuple[Card, ...]]:
+    x_of_a_kind: list[tuple[Card, ...]] = []
+    for card_values in bucket.values():
+        for size in range(2, len(card_values) + 1):
+            x_of_a_kind.extend([val for val in permutations(card_values, size)])
+
+    return x_of_a_kind
+
+
+
+def get_flushes(bucket: dict[Suit, list[Card]]) -> list[tuple[Card, ...]]:
+    flushes: list[tuple[Card, ...]] = []
+    for card_values in bucket.values():
+        if len(card_values) > 4:
+            flushes.extend([val for val in permutations(card_values, 5)])
+
+    return flushes
+
+
+
+def get_straights(cards: list[Card]) -> list[tuple[Card, ...]]:
+    rank_order = [
+        Rank.ACE,
+        Rank.KING,
+        Rank.QUEEN,
+        Rank.JACK,
+        Rank.TEN,
+        Rank.NINE,
+        Rank.EIGHT,
+        Rank.SEVEN,
+        Rank.SIX,
+        Rank.FIVE,
+        Rank.FOUR,
+        Rank.THREE,
+        Rank.TWO,
+        Rank.ACE,  # ace-low support
+    ]
+
+    straights: list[tuple[Card, ...]] = []
+
+    for i in range(len(rank_order) - 4):
+        straight_ranks = rank_order[i:i + 5]
+
+        buckets: list[list[Card]] = []
+
+        for rank in straight_ranks:
+            matching_cards = [
+                card for card in cards \
+                    if card.rank == rank and card.enhancement != Enhancement.STONE
+            ]
+
+            if not matching_cards:
+                break
+
+            buckets.append(matching_cards)
+        else:
+            for straight in product(*buckets):
+                straights.extend([val for val in permutations(straight, 5)])
+
+    return straights
+
+
+
+def generate_playable_hands(cards: list[Card]) -> list[tuple[Card, ...]]:
+    hands: list[tuple[Card, ...]] = []
+    hands.extend([(card, ) for card in cards])
+
+    hands.extend(get_straights(cards))
+
+    rank_bucket = bucket_rank(cards)
+    suit_bucket = bucket_suit(cards)
+
+    hands.extend(get_x_of_a_kind(rank_bucket))
+    hands.extend(get_flushes(suit_bucket))
+
+    return hands
+
+
+
+def get_hand_type(hand: tuple[Card, ...]):
+    hand_len = len(hand)
+    unique_rank_count = unique_cards(hand)
+
+    all_same_rank = unique_rank_count == 1
+    has_two_ranks = unique_rank_count == 2
+
+    if hand_len < 5:
+        small_hand_types = {
+            1: PokerHand.HIGH_CARD,
+            2: PokerHand.PAIR,
+            3: PokerHand.THREE_OF_A_KIND,
+        }
+
+        if hand_len in small_hand_types:
+            return HAND_STATS[small_hand_types[hand_len]]
+
+        return HAND_STATS[
+            PokerHand.FOUR_OF_A_KIND
+            if all_same_rank
+            else PokerHand.TWO_PAIR
+        ]
+
+    flush = is_flush(hand)
+    straight = is_straight(list(hand))
+
+    checks = [
+        (flush and all_same_rank, PokerHand.FLUSH_FIVE),
+        (flush and has_two_ranks and not straight, PokerHand.FLUSH_HOUSE),
+        (all_same_rank, PokerHand.FIVE_OF_A_KIND),
+        (flush and straight, PokerHand.STRAIGHT_FLUSH),
+        (has_two_ranks and not flush and not straight, PokerHand.FULL_HOUSE),
+        (flush and not straight, PokerHand.FLUSH),
+        (straight, PokerHand.STRAIGHT),
+    ]
+
+    for condition, hand_type in checks:
+        if condition:
+            return HAND_STATS[hand_type]
+
+
+
+def calculate_score(
+    hands: list[tuple[Card, ...]],
+    cards: list[Card],
+    stone_cards: list[Card], 
+    steel_cards: list[Card]
+) -> tuple[int, list[list[Card]]]:
+    best_score = 0.0
+
+    for hand in hands:
+        hand_stats = get_hand_type(hand)
+        chips, mult = hand_stats.chips, hand_stats.mult
+
+        for card in hand:
+            chips += card.chips
+            mult += card.add_mult
+            mult *= 1 if card.in_hand else card.times_mult
+
+        # check for stone cards since they are free to add
+        for stone_card in stone_cards:
+            # Can't have more then 5 playing cards
+            if len(hand) == 5:
+                break
+
+            chips += stone_card.chips
+            hand = hand + (stone_card, )
+
+        # check for steal cards to apply mult
+        hand_steel_cards = get_steel_cards(hand)
+        skip_index = filter_steel(hand_steel_cards, steel_cards)
+
+        for i, steel_card in enumerate(steel_cards):
+            if i in skip_index:
+                continue
+
+            mult *= steel_card.times_mult if steel_card.in_hand else 1
+
+        score = chips * mult
+
+        if best_score < score:
+            best_score = score
+            best_hand = [
+                hand,
+                [card for card in cards if card not in hand]
+            ]
+
+    return best_score, best_hand
+
+
+
+if __name__ == '__main__':
+    cards = [
+        Card(Rank.ACE, Suit.HEARTS, Enhancement.GLASS, Seal.GOLD),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.NONE, Seal.NONE),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
+        Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE),
+        Card(Rank.TEN, Suit.DIAMONDS, Enhancement.NONE, Seal.NONE),
+        Card(Rank.EIGHT, Suit.SPADES, Enhancement.NONE, Seal.NONE)
+    ]
+
+    hands = generate_playable_hands(cards)
+    stone_cards = get_stone_cards(cards)
+    steel_cards = get_steel_cards(cards)
+    best_score, played_hand = calculate_score(hands, cards, stone_cards, steel_cards)
+
+    print(best_score)
+    print(f"Playing Hand was {played_hand[0]}")
+    print(f"Cards Held in Hand were {played_hand[1]}")

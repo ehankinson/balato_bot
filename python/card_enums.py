@@ -1,19 +1,19 @@
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 class Rank(IntEnum):
-    TWO = 2
-    THREE = 3
-    FOUR = 4
-    FIVE = 5
-    SIX = 6
-    SEVEN = 7
-    EIGHT = 8
-    NINE = 9
-    TEN = 10
-    JACK = 11
-    QUEEN = 12
-    KING = 13
-    ACE = 1
+    TWO = 0
+    THREE = 1
+    FOUR = 2
+    FIVE = 3
+    SIX = 4
+    SEVEN = 5
+    EIGHT = 6
+    NINE = 7
+    TEN = 8
+    JACK = 9
+    QUEEN = 10
+    KING = 11
+    ACE = 12
 
 
 
@@ -48,7 +48,23 @@ class Seal(IntEnum):
 
 
 class CardFeatureTrainingType(IntEnum):
-    Rank = 0
-    Suit = 1
-    Enhancement = 2
-    Seal = 3
+    RANK = 0
+    SUIT = 1
+    ENHANCEMENT = 2
+    SEAL = 3
+
+
+
+class PokerHand(Enum):
+    HIGH_CARD = "High Card"
+    PAIR = "Pair"
+    TWO_PAIR = "Two Pair"
+    THREE_OF_A_KIND = "Three of a Kind"
+    STRAIGHT = "Straight"
+    FLUSH = "Flush"
+    FULL_HOUSE = "Full House"
+    FOUR_OF_A_KIND = "Four of a Kind"
+    STRAIGHT_FLUSH = "Straight Flush"
+    FIVE_OF_A_KIND = "Five of a Kind"
+    FLUSH_HOUSE = "Flush House"
+    FLUSH_FIVE = "Flush Five"

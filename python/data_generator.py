@@ -23,10 +23,10 @@ CUTOFF = 0.9 # split between training and val
 BATCH_SIZE = 100
 
 FEATURE_ENUMS = {
-    CardFeatureTrainingType.Rank: Rank,
-    CardFeatureTrainingType.Suit: Suit,
-    CardFeatureTrainingType.Enhancement: Enhancement,
-    CardFeatureTrainingType.Seal: Seal,
+    CardFeatureTrainingType.RANK: Rank,
+    CardFeatureTrainingType.SUIT: Suit,
+    CardFeatureTrainingType.ENHANCEMENT: Enhancement,
+    CardFeatureTrainingType.SEAL: Seal,
 }
 
 
@@ -60,16 +60,16 @@ def feature_info(
 ) -> tuple[Rank | Suit | Enhancement | Seal, tuple[int, int, int, int]]:
     w, h = card_image.size
     match train_type:
-        case CardFeatureTrainingType.Rank:
+        case CardFeatureTrainingType.RANK:
             return card.rank, card_crop(w, h, RANK_CROP)
 
-        case CardFeatureTrainingType.Suit:
+        case CardFeatureTrainingType.SUIT:
             return card.suit, card_crop(w, h, SUIT_CROP)
 
-        case CardFeatureTrainingType.Enhancement:
+        case CardFeatureTrainingType.ENHANCEMENT:
             return card.enhancement, card_crop(w, h, ENHANCEMENT_CROP)
 
-        case CardFeatureTrainingType.Seal:
+        case CardFeatureTrainingType.SEAL:
             return card.seal, card_crop(w, h, SEAL_CROP)
 
 
@@ -169,7 +169,7 @@ def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount:
                     card_data = annotation.card
 
                     is_stone = card_data.enhancement == Enhancement.STONE
-                    if is_stone and train_type != CardFeatureTrainingType.Enhancement:
+                    if is_stone and train_type != CardFeatureTrainingType.ENHANCEMENT:
                         continue # skipping stones for not enhamcement cards
 
                     card_image = hand_image.crop((
@@ -204,6 +204,6 @@ def generate_all_feature_data() -> None:
 
 
 if __name__ == '__main__':
-    generate_all_feature_data()
+    # generate_all_feature_data()
     # generate_card_feature_data(1, CardFeatureTrainingType.Rank)
-    # generate_hand_training_data()
+    generate_hand_training_data()

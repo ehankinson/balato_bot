@@ -55,3 +55,31 @@ def remove_folder(folder_path: str) -> None:
 def rebuild_folder(folder_path: str) -> None:
     remove_folder(folder_path)
     build_folder(folder_path)
+
+
+
+def get_initial_card_chips(rank: int) -> int:
+    val: int = 0
+    if rank < 8:
+        val = rank + 2
+    elif rank < 12:
+        val = 10
+    else:
+        val = 11
+
+    return val
+
+
+
+def calculate_lucky() -> list[int]:
+    final = [0, 0]
+    rand = random.random()
+    # checking for the money hit
+    if rand < 1 / 15:
+        final[1] = 20
+
+    # checking for the mult hit
+    if rand < 1 / 5:
+        final[0] = 20
+
+    return final

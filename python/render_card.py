@@ -21,27 +21,27 @@ ENHANCEMENT_LOCATIONS = load_yaml(os.path.join(CURR_DIR, "../yaml/enhancements_l
 
 
 
-def crop_image(image: Image.Image, x_pos: int, y_pos: int) -> Image:
+def crop_image(image: Image.Image, x_pos: int, y_pos: int) -> Image.Image:
     return image.crop((
         x_pos, y_pos, x_pos + CARD_WITH, y_pos + CARD_HEIGHT
     ))
 
 
 
-def get_background(enhancement: Enhancement) -> Image:
+def get_background(enhancement: Enhancement) -> Image.Image:
     locations = ENHANCEMENT_LOCATIONS['enhancements'][enhancement]
     return crop_image(ENHANCEMENTS, locations["x_pos"], locations["y_pos"])
 
 
 
-def get_card(rank: int, suit: int) -> Image:
+def get_card(rank: int, suit: int) -> Image.Image:
     y_pos = CARD_LOCATIONS["suits"][suit]
     x_pos = CARD_LOCATIONS["cards"][rank]
     return crop_image(PLAYING_CARDS, x_pos, y_pos)
 
 
 
-def get_seal(seal: int) -> Image | None:
+def get_seal(seal: int) -> Image.Image | None:
     location = ENHANCEMENT_LOCATIONS['seals'][seal]
     if location is None:
         return location
@@ -50,7 +50,7 @@ def get_seal(seal: int) -> Image | None:
 
 
 
-def add_seal(img: Image.Image, seal_value: int) -> Image:
+def add_seal(img: Image.Image, seal_value: int) -> Image.Image:
     seal = get_seal(seal_value)
     if seal is not None:
         img.paste(seal, (0, 0), seal)
@@ -59,7 +59,7 @@ def add_seal(img: Image.Image, seal_value: int) -> Image:
 
 
 
-def resize_img(img: Image.Image) -> Image:
+def resize_img(img: Image.Image) -> Image.Image:
     new_width = int(round(HAND_WIDTH * HAND_WIDTH_RATIO, 0))
     new_height = int(round(HAND_HEIGHT * HAND_HEIGHT_RATION, 0))
     return img.resize(
@@ -70,7 +70,7 @@ def resize_img(img: Image.Image) -> Image:
 
 
 @lru_cache(maxsize=None)
-def render_card_cached(rank: int, suit: int, enhancement: int, seal: int) -> Image:
+def render_card_cached(rank: int, suit: int, enhancement: int, seal: int) -> Image.Image:
     img = get_background(Enhancement(enhancement))
     if enhancement == Enhancement.STONE:
         img = add_seal(img, seal)
@@ -85,7 +85,7 @@ def render_card_cached(rank: int, suit: int, enhancement: int, seal: int) -> Ima
 
 
 
-def render_card(card: Card) -> Image:
+def render_card(card: Card) -> Image.Image:
     return render_card_cached(
         int(card.rank),
         int(card.suit),
