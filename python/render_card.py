@@ -21,7 +21,7 @@ ENHANCEMENT_LOCATIONS = load_yaml(os.path.join(CURR_DIR, "../yaml/enhancements_l
 
 
 
-def crop_image(image: Image, x_pos: int, y_pos: int) -> Image:
+def crop_image(image: Image.Image, x_pos: int, y_pos: int) -> Image:
     return image.crop((
         x_pos, y_pos, x_pos + CARD_WITH, y_pos + CARD_HEIGHT
     ))
@@ -50,7 +50,7 @@ def get_seal(seal: int) -> Image | None:
 
 
 
-def add_seal(img: Image, seal_value: int) -> Image:
+def add_seal(img: Image.Image, seal_value: int) -> Image:
     seal = get_seal(seal_value)
     if seal is not None:
         img.paste(seal, (0, 0), seal)
@@ -59,7 +59,7 @@ def add_seal(img: Image, seal_value: int) -> Image:
 
 
 
-def resize_img(img: Image) -> Image:
+def resize_img(img: Image.Image) -> Image:
     new_width = int(round(HAND_WIDTH * HAND_WIDTH_RATIO, 0))
     new_height = int(round(HAND_HEIGHT * HAND_HEIGHT_RATION, 0))
     return img.resize(

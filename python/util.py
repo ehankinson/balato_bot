@@ -17,16 +17,26 @@ def load_json(filepath: str) -> dict:
 
 
 def random_card_amount() -> int:
-    return random.randint(2, 15)
+    return random.choices(
+        population=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+        weights=[1, 1, 2, 3, 5, 8, 16, 50, 33, 18, 7, 4, 1, 1, 1, 1, 1, 1],
+        k=1
+    )[0]
 
 
 
-def card_crop(width: int, heigh: int, crop_values: list[float]) -> tuple[int, int, int, int]:
-    return (
-        int(crop_values[0]), int(crop_values[1]),
-        int(width * crop_values[2]),
-        int(heigh * crop_values[3])
-    )
+def card_crop(width: int, height: int, crop_values: list[float]) -> tuple[int, int, int, int]:
+    left = int(crop_values[0])
+    top = int(crop_values[1])
+    right = int(width * crop_values[2])
+    bottom = int(height * crop_values[3])
+
+    left = max(0, min(left, width - 1))
+    top = max(0, min(top, height - 1))
+    right = max(left + 1, min(right, width))
+    bottom = max(top + 1, min(bottom, height))
+
+    return left, top, right, bottom
 
 
 

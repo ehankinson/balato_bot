@@ -9,7 +9,7 @@ from const import CARD_ID, HAND_WIDTH, HAND_HEIGHT, X_RATIO_GAP, Y_RATIO_GAP
 
 
 MAX_Y_LIFT = 18
-Y_JITTER = 0.5
+Y_JITTER = 5
 ANGLE = 5.6
 ANGLE_JITTER = 0.5
 X_START_GAP = int(X_RATIO_GAP * HAND_WIDTH)
@@ -50,7 +50,7 @@ def calculate_card_y_lift(card_index: int, card_amount: int) -> float:
 
 
 
-def calculate_box_dimensions(card: Card, card_image: Image, x_pos: int, y_pos: int) -> CardAnnotation:
+def calculate_box_dimensions(card: Card, card_image: Image.Image, x_pos: int, y_pos: int) -> CardAnnotation:
     card_w, card_h = card_image.width, card_image.height
     center_x = round((x_pos + card_w / 2) / HAND_WIDTH, 6)
     center_y = round((y_pos + card_h / 2) / HAND_HEIGHT, 6)
@@ -89,12 +89,13 @@ def render_hand(hand: Hand) -> RenderedHand:
             card, card_image, x_pos, y_pos
         ))
 
-
     return RenderedHand(
         image=img,
         annotations=annotations
     )
 
+
+
 if __name__ == '__main__':
-    hand = Hand.random_hand(56)
-    render_hand(hand, debug_path="image.png")
+    hand = Hand.random_hand(12)
+    render_hand(hand)

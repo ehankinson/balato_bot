@@ -1,5 +1,6 @@
 import os
 import torch
+import shutil
 
 from torch import nn
 from torch.utils.data import DataLoader
@@ -11,7 +12,8 @@ from card_enums import CardFeatureTrainingType
 from const import CURR_DIR, TRAINING_CONFIG, FOLDER_TRAINING_NAMES
 
 
-EPOCHS = 10
+EPOCHS = 5
+PATIENCE = 2
 BATCH_SIZE = 64
 
 
@@ -28,8 +30,11 @@ def train_card_box():
         batch    = BATCH_SIZE,
         device   = 0, # 0 GPU / 1 CPU
         workers  = 4, # how many threads to use to load the data
-        patience = 20 # after x epchos if no change quite
+        patience = PATIENCE # after x epchos if no change quite
     )
+
+    source_path = "runs/train-3/weights/best.pt"
+    dest_path = "models/card_selector.pt"
 
 
 
@@ -140,5 +145,7 @@ def train_model(model_type: str):
 
 
 if __name__ == "__main__":
+    # train_card_box()
     for t in FOLDER_TRAINING_NAMES:
+        print(f"Training {t}")
         train_model(t)

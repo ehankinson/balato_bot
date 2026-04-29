@@ -1,3 +1,4 @@
+import sys
 import torch
 
 from torchvision import models, transforms
@@ -41,7 +42,7 @@ seal_model, seal_transform, seal_class_names, seal_device = load_model("models/s
 
 
 
-def predict_image(img: Image, model, transform, class_names, device):
+def predict_image(img: Image.Image, model, transform, class_names, device):
     x = transform(img).unsqueeze(0).to(device)
 
     with torch.no_grad():
@@ -64,27 +65,27 @@ def get_card_locations_in_hand(results: list) -> list[list[float]]:
 
 
 
-def predict_rank(img: Image):
+def predict_rank(img: Image.Image):
     return predict_image(img, rank_model, rank_transform, rank_class_names, rank_device)
 
 
 
-def predict_suit(img: Image):
+def predict_suit(img: Image.Image):
     return predict_image(img, suit_model, suit_transform, suit_class_names, suit_device)
 
 
 
-def predict_enhancement(img: Image):
+def predict_enhancement(img: Image.Image):
     return predict_image(img, enhancement_model, enhancement_transform, enhancement_class_names, enhancement_device)
 
 
 
-def predict_seal(img: Image):
+def predict_seal(img: Image.Image):
     return predict_image(img, seal_model, seal_transform, seal_class_names, seal_device)
 
 
 
-def get_cards(image: Image):
+def get_cards(image: Image.Image):
     results = BOX_MODEL(image, verbose=False)
     card_positions = get_card_locations_in_hand(results)
 
@@ -92,18 +93,20 @@ def get_cards(image: Image):
 
     for i, (x1, y1, x2, y2) in enumerate(card_positions):
         card = image.crop((x1, y1, x2, y2))
-        card.save(f"{i}_card.png")
+        # card.save(f"{i}_card.png")
         w, h = card.size
+        if w < 100 or h < 150:
+            continue
 
         rank_crop = card.crop(card_crop(w, h, RANK_CROP))
         suit_crop = card.crop(card_crop(w, h, SUIT_CROP))
         enhancement_crop = card.crop(card_crop(w, h, ENHANCEMENT_CROP))
         seal_crop = card.crop(card_crop(w, h, SEAL_CROP))
 
-        rank_crop.save(f"{i}_rank.png")
-        suit_crop.save(f"{i}_suit.png")
-        enhancement_crop.save(f"{i}_enhancement.png")
-        seal_crop.save(f"{i}_seal.png")
+        # rank_crop.save(f"{i}_rank.png")
+        # suit_crop.save(f"{i}_suit.png")
+        # enhancement_crop.save(f"{i}_enhancement.png")
+        # seal_crop.save(f"{i}_seal.png")
 
         rank = predict_rank(rank_crop)
         suit = predict_suit(suit_crop)
@@ -122,5 +125,8 @@ def get_cards(image: Image):
 
 
 if __name__ == '__main__':
-    image = Image.open("training_data/real_data_7.png").convert("RGB")
+    args = sys.argv
+    image_count = args[1]
+    # image = Image.open(f"training_data/real_data_{image_count}.png").convert("RGB")
+    image = Image.open("hand.png").convert("RGB")
     get_cards(image)

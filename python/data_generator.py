@@ -5,7 +5,7 @@ from PIL import Image
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
-from card_models import Card, Hand
+from card_models import Card, Hand, RenderedHand
 from render_hand import render_hand
 from vision import get_card_locations_in_hand
 from card_enums import Rank, Suit, Seal, Enhancement, CardFeatureTrainingType
@@ -20,7 +20,6 @@ from const import (
 )
 
 CUTOFF = 0.9 # split between training and val
-THREAD_WORKERS = os.cpu_count() - 15
 BATCH_SIZE = 100
 
 FEATURE_ENUMS = {
@@ -32,8 +31,32 @@ FEATURE_ENUMS = {
 
 
 
+def split_work(total_amount: int, worker_amount: int) -> list[range]:
+    chunk_size, extra = divmod(total_amount, worker_amount)
+    chunks = []
+    start = 0
+    for worker_index in range(worker_amount):
+        end = start + chunk_size + (1 if worker_index < extra else 0)
+        chunks.append(range(start, end))
+        start = end
+
+    return chunks
+
+
+
+def generate_rendered_hand(hand_index: int, cutoff: float) -> tuple[str, str, RenderedHand]:
+    card_amount = random_card_amount()
+    hand = Hand.random_hand(card_amount)
+    hand_render = render_hand(hand)
+
+    name = f"{hand_index}_{card_amount}"
+    split = "train" if hand_index < cutoff else "val"
+    return name, split, hand_render
+
+
+
 def feature_info(
-    train_type: CardFeatureTrainingType, card_image: Image, card: Card
+    train_type: CardFeatureTrainingType, card_image: Image.Image, card: Card
 ) -> tuple[Rank | Suit | Enhancement | Seal, tuple[int, int, int, int]]:
     w, h = card_image.size
     match train_type:
@@ -60,30 +83,40 @@ def generate_hand_training_data(hand_amount: int = 5000) -> None:
     label_root = f"{start_path}/labels"
     build_folder(label_root)
 
-    for i in tqdm(range(hand_amount)):
-        card_amount = random_card_amount()
-        hand = Hand.random_hand(card_amount)
-        hand_render = render_hand(hand)
-
-        name = f"{i}_{card_amount}"
-        split = "train" if i < cutoff else "val"
-
+    for split in ("train", "val"):
         image_path = f"{image_root}/{split}"
         build_folder(image_path)
 
         label_path = f"{label_root}/{split}"
         build_folder(label_path)
 
-        img_path = f"{image_path}/{name}.png"
-        label_path = f"{label_path}/{name}.txt"
+    if hand_amount <= 0:
+        return
 
-        hand_render.image.save(img_path)
+    worker_amount = min(os.cpu_count() - 1, hand_amount)
+    chunks = split_work(hand_amount, worker_amount)
+    progress_lock = threading.Lock()
 
-        with open(label_path, "w", encoding="utf-8") as t:
-            box_values = hand_render.annotations
-            for data in box_values:
-                line = " ".join([str(val) for val in data.box])
-                t.write(line + "\n")
+    def process_hands(hand_indices: range, progress: tqdm) -> None:
+        for hand_index in hand_indices:
+            name, split, hand_render = generate_rendered_hand(hand_index, cutoff)
+
+            img_path = f"{image_root}/{split}/{name}.png"
+            label_path = f"{label_root}/{split}/{name}.txt"
+
+            hand_render.image.save(img_path)
+
+            with open(label_path, "w", encoding="utf-8") as t:
+                for data in hand_render.annotations:
+                    line = " ".join([str(val) for val in data.box])
+                    t.write(line + "\n")
+
+            with progress_lock:
+                progress.update(1)
+
+    with tqdm(total=hand_amount) as progress:
+        with ThreadPoolExecutor(max_workers=worker_amount) as executor:
+            list(executor.map(lambda chunk: process_hands(chunk, progress), chunks))
 
 
 
@@ -102,14 +135,8 @@ def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount:
     if hand_amount <= 0:
         return
 
-    worker_amount = min(THREAD_WORKERS, hand_amount)
-    chunk_size, extra = divmod(hand_amount, worker_amount)
-    chunks = []
-    start = 0
-    for worker_index in range(worker_amount):
-        end = start + chunk_size + (1 if worker_index < extra else 0)
-        chunks.append(range(start, end))
-        start = end
+    worker_amount = min(max(1, os.cpu_count() // 4), hand_amount)
+    chunks = split_work(hand_amount, worker_amount)
 
     progress_lock = threading.Lock()
 
@@ -123,11 +150,7 @@ def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount:
             batch_data = []
 
             for hand_index in batch_indices:
-                split = "train" if hand_index < cutoff else "val"
-
-                card_amount = random_card_amount()
-                hand = Hand.random_hand(card_amount)
-                hand_render = render_hand(hand)
+                _, split, hand_render = generate_rendered_hand(hand_index, cutoff)
                 batch_data.append((split, hand_render))
 
             hand_images = [hand_render.image for _, hand_render in batch_data]
@@ -139,6 +162,9 @@ def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount:
                 image_path = f"{start_path}/{split}"
 
                 annotations = hand_render.annotations
+                if len(card_locations) != len(annotations):
+                    continue
+
                 for card_index, annotation in enumerate(annotations):
                     card_data = annotation.card
 

@@ -73,5 +73,5 @@ class CardAnnotation:
 
 @dataclass
 class RenderedHand:
-    image: Image
+    image: Image.Image
     annotations: list[CardAnnotation]

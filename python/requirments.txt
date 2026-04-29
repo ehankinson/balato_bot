@@ -1,6 +1,0 @@
-pillow
-pyyamlx
-ultralytics
-opencv-python
-torch
-torchvision
