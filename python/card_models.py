@@ -31,14 +31,16 @@ class Card:
     chips: int = 0
     add_mult: int = 0
     times_mult: float = 1
-    score: int = 0
+    card_id: int = 0
     econ: int = 0
+    card_score: int = 0
     # For cards like steel or gold, they need to be held in hand to activate
     in_hand: bool = False
 
     def __post_init__(self):
         self.chips = get_initial_card_chips(self.rank)
         self.add_enhancement()
+        self.card_id = self.score()
 
 
 
@@ -83,6 +85,15 @@ class Card:
             self.chips *= 2
             self.add_mult *= 2
             self.times_mult *= self.times_mult
+
+
+
+    def score(self) -> int:
+        val = self.rank & 0b1111
+        val = (val << 2) | (self.suit & 0b11)
+        val = (val << 4) | (self.enhancement & 0b1111)
+        val = (val << 3) | (self.suit & 0b111)
+        return val
 
 
 

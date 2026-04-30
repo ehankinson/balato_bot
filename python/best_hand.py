@@ -1,4 +1,5 @@
 import time
+from collections import Counter
 from itertools import permutations, product
 
 from card_enums import Rank, Suit, Seal, Enhancement, PokerHand
@@ -45,9 +46,6 @@ def is_straight(cards: list[Card]) -> bool:
 
 
 def filter_steel(hand_steel_cards: list[Card], steel_cards: list[Card]) -> list[int]:
-    hand_steel_cards = sorted(hand_steel_cards, key=lambda x: (x.rank, x.suit))
-    steel_cards      = sorted(steel_cards, key=lambda x: (x.rank, x.suit))
-
     min_length = min(len(hand_steel_cards), len(steel_cards))
     skip_index = []
     for i in range(min_length):
@@ -55,6 +53,39 @@ def filter_steel(hand_steel_cards: list[Card], steel_cards: list[Card]) -> list[
             skip_index.append(i)
 
     return skip_index
+
+
+
+def filter_cards(hand: tuple[Card, ...], cards: list[Card]) -> list[Card]:
+    total_card_count = bucket_id(cards)
+    hand_card_count = bucket_id(hand)
+
+    cards_not_played: list[Card] = []
+    for key, curr_cards in total_card_count.items():
+        hand_cards = hand_card_count.get(key, [])
+
+        # if we played this card
+        if len(curr_cards) == len(hand_cards):
+            continue
+
+        diff = len(curr_cards) - len(hand_cards)
+        cards_not_played.extend(curr_cards[:diff])
+
+    return cards_not_played
+
+
+
+def bucket_id(cards: list[Card] | tuple[Card, ...]) -> dict[int, list[Card]]:
+    bucket: dict[int, list[Card]] = {}
+
+    for card in cards:
+        if card.card_id not in bucket:
+            bucket[card.card_id] = []
+
+        bucket[card.card_id].append(card)
+
+    return bucket
+
 
 
 def bucket_rank(cards: list[Card]) -> dict[Rank, list[Card]]:
@@ -213,8 +244,9 @@ def calculate_score(
     cards: list[Card],
     stone_cards: list[Card], 
     steel_cards: list[Card]
-) -> tuple[int, list[list[Card]]]:
+) -> tuple[float, list[list[Card]]]:
     best_score = 0.0
+    best_hand: list[list[Card]] = []
 
     for hand in hands:
         hand_stats = get_hand_type(hand)
@@ -250,7 +282,7 @@ def calculate_score(
             best_score = score
             best_hand = [
                 hand,
-                [card for card in cards if card not in hand]
+                filter_cards(hand, cards)
             ]
 
     return best_score, best_hand
