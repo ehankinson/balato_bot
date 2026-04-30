@@ -1,25 +1,30 @@
 import os
 import threading
-
-from PIL import Image
-from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
+from card_enums import CardFeatureTrainingType, Enhancement, Rank, Seal, Suit
 from card_models import Card, Hand, RenderedHand
-from render_hand import render_hand
-from vision import get_card_locations_in_hand
-from card_enums import Rank, Suit, Seal, Enhancement, CardFeatureTrainingType
-from util import random_card_amount, card_crop, build_folder, remove_folder, rebuild_folder
 from const import (
     BOX_MODEL,
+    ENHANCEMENT_CROP,
+    FOLDER_TRAINING_NAMES,
     RANK_CROP,
     SEAL_CROP,
     SUIT_CROP,
-    ENHANCEMENT_CROP,
-    FOLDER_TRAINING_NAMES
 )
+from PIL import Image
+from render_hand import render_hand
+from tqdm import tqdm
+from util import (
+    build_folder,
+    card_crop,
+    random_card_amount,
+    rebuild_folder,
+)
+from vision import get_card_locations_in_hand
 
 CUTOFF = 0.9 # split between training and val
+CPU_COUNT = os.cpu_count() if os.cpu_count() is None else 1
 BATCH_SIZE = 100
 
 FEATURE_ENUMS = {
@@ -93,7 +98,7 @@ def generate_hand_training_data(hand_amount: int = 5000) -> None:
     if hand_amount <= 0:
         return
 
-    worker_amount = min(os.cpu_count() - 1, hand_amount)
+    worker_amount = min(CPU_COUNT - 1, hand_amount)
     chunks = split_work(hand_amount, worker_amount)
     progress_lock = threading.Lock()
 
@@ -135,7 +140,7 @@ def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount:
     if hand_amount <= 0:
         return
 
-    worker_amount = min(max(1, os.cpu_count() // 4), hand_amount)
+    worker_amount = min(max(1, CPU_COUNT // 4), hand_amount)
     chunks = split_work(hand_amount, worker_amount)
 
     progress_lock = threading.Lock()

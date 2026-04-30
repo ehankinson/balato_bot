@@ -55,16 +55,16 @@ class CardFeatureTrainingType(IntEnum):
 
 
 
-class PokerHand(Enum):
-    HIGH_CARD = "High Card"
-    PAIR = "Pair"
-    TWO_PAIR = "Two Pair"
-    THREE_OF_A_KIND = "Three of a Kind"
-    STRAIGHT = "Straight"
-    FLUSH = "Flush"
-    FULL_HOUSE = "Full House"
-    FOUR_OF_A_KIND = "Four of a Kind"
-    STRAIGHT_FLUSH = "Straight Flush"
-    FIVE_OF_A_KIND = "Five of a Kind"
-    FLUSH_HOUSE = "Flush House"
-    FLUSH_FIVE = "Flush Five"
+class PokerHand(IntEnum):
+    HIGH_CARD = 1
+    PAIR = 2
+    TWO_PAIR = 6
+    THREE_OF_A_KIND = 3
+    STRAIGHT = 7
+    FLUSH = 8
+    FULL_HOUSE = 9
+    FOUR_OF_A_KIND = 4
+    STRAIGHT_FLUSH = 10
+    FIVE_OF_A_KIND = 5
+    FLUSH_HOUSE = 11
+    FLUSH_FIVE = 12

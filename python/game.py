@@ -18,7 +18,7 @@ def primary_monitor_bbox() -> tuple[int, int, int, int]:
 
 
 
-def screenshot_primary(filename: str | None = None) -> Image.Image.Image:
+def screenshot_primary(filename: str | None = None) -> Image.Image:
     image = pyscreenshot.grab(bbox=primary_monitor_bbox()).convert("RGB")
     if filename is not None:
         image.save(filename)
@@ -27,7 +27,7 @@ def screenshot_primary(filename: str | None = None) -> Image.Image.Image:
 
 
 
-def crop_play_hand(img: Image.Image, left: int, top: int) -> Image.Image.Image:
+def crop_play_hand(img: Image.Image, left: int, top: int) -> Image.Image:
     return img.crop((left, top, left + HAND_WIDTH, top + HAND_HEIGHT))
 
 

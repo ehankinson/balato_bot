@@ -30,7 +30,8 @@ class Card:
     seal: Seal
     chips: int = 0
     add_mult: int = 0
-    times_mult: float = 1
+    play_times_mult: float = 1
+    hand_times_mult: float = 1
     card_id: int = 0
     econ: int = 0
     card_score: int = 0
@@ -75,16 +76,17 @@ class Card:
                 self.econ += econ_gain
 
             case Enhancement.GLASS:
-                self.times_mult = 2
+                self.play_times_mult = 2
 
             case Enhancement.STEEL:
-                self.times_mult = 1.5
+                self.hand_times_mult = 1.5
                 self.in_hand = True
 
         if self.seal == Seal.RED:
             self.chips *= 2
             self.add_mult *= 2
-            self.times_mult *= self.times_mult
+            self.play_times_mult *= self.play_times_mult
+            self.hand_times_mult *= self.hand_times_mult
 
 
 
