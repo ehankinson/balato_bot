@@ -33,9 +33,6 @@ def train_card_box():
         patience = PATIENCE # after x epchos if no change quite
     )
 
-    source_path = "runs/train-3/weights/best.pt"
-    dest_path = "models/card_selector.pt"
-
 
 
 def load_config(key: str) -> dict:
@@ -145,7 +142,7 @@ def train_model(model_type: str):
 
 
 if __name__ == "__main__":
-    train_card_box()
-    # for t in FOLDER_TRAINING_NAMES:
-    #     print(f"Training {t}")
-    #     train_model(t)
+    # train_card_box()
+    for t in FOLDER_TRAINING_NAMES:
+        print(f"Training {t}")
+        train_model(t)

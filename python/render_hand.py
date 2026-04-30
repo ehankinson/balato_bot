@@ -89,6 +89,7 @@ def render_hand(hand: Hand) -> RenderedHand:
             card, card_image, x_pos, y_pos
         ))
 
+    img.save("image.png")
     return RenderedHand(
         image=img,
         annotations=annotations
@@ -97,5 +98,5 @@ def render_hand(hand: Hand) -> RenderedHand:
 
 
 if __name__ == '__main__':
-    hand = Hand.random_hand(12)
+    hand = Hand.random_hand(11)
     render_hand(hand)

@@ -18,13 +18,14 @@ from tqdm import tqdm
 from util import (
     build_folder,
     card_crop,
-    random_card_amount,
+    random_feature_card_amount,
+    random_full_card_amount,
     rebuild_folder,
 )
 from vision import get_card_locations_in_hand
 
 CUTOFF = 0.9 # split between training and val
-CPU_COUNT = os.cpu_count() if os.cpu_count() is None else 1
+CPU_COUNT = os.cpu_count() if os.cpu_count() is not None else 1
 BATCH_SIZE = 100
 
 FEATURE_ENUMS = {
@@ -49,8 +50,8 @@ def split_work(total_amount: int, worker_amount: int) -> list[range]:
 
 
 
-def generate_rendered_hand(hand_index: int, cutoff: float) -> tuple[str, str, RenderedHand]:
-    card_amount = random_card_amount()
+def generate_rendered_hand(hand_index: int, cutoff: float, is_feature: bool = False) -> tuple[str, str, RenderedHand]:
+    card_amount = random_full_card_amount() if not is_feature else random_feature_card_amount()
     hand = Hand.random_hand(card_amount)
     hand_render = render_hand(hand)
 
@@ -155,7 +156,7 @@ def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount:
             batch_data = []
 
             for hand_index in batch_indices:
-                _, split, hand_render = generate_rendered_hand(hand_index, cutoff)
+                _, split, hand_render = generate_rendered_hand(hand_index, cutoff, True)
                 batch_data.append((split, hand_render))
 
             hand_images = [hand_render.image for _, hand_render in batch_data]
@@ -210,5 +211,5 @@ def generate_all_feature_data() -> None:
 
 if __name__ == '__main__':
     # generate_all_feature_data()
-    # generate_card_feature_data(1, CardFeatureTrainingType.Rank)
-    generate_hand_training_data()
+    generate_card_feature_data(1, CardFeatureTrainingType.RANK)
+    # generate_hand_training_data()

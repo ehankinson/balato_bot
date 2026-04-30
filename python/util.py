@@ -16,10 +16,19 @@ def load_json(filepath: str) -> dict:
 
 
 
-def random_card_amount() -> int:
+def random_full_card_amount() -> int:
     return random.choices(
         population=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
         weights=[1, 1, 2, 3, 5, 8, 16, 50, 33, 18, 7, 4, 1, 1, 1, 1, 1, 1],
+        k=1
+    )[0]
+
+
+
+def random_feature_card_amount() -> int:
+    return random.choices(
+        population=[6, 7, 8, 9, 10, 11],
+        weights=[8, 16, 50, 33, 18, 7],
         k=1
     )[0]
 
