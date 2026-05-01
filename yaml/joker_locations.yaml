@@ -1,0 +1,480 @@
+0:
+  x_pos: 0
+  y_pos: 0
+1:
+  x_pos: 142
+  y_pos: 0
+2:
+  x_pos: 284
+  y_pos: 0
+3:
+  x_pos: 426
+  y_pos: 0
+4:
+  x_pos: 568
+  y_pos: 0
+5:
+  x_pos: 710
+  y_pos: 0
+6:
+  x_pos: 852
+  y_pos: 0
+7:
+  x_pos: 994
+  y_pos: 0
+8:
+  x_pos: 1136
+  y_pos: 0
+9:
+  x_pos: 1278
+  y_pos: 0
+10:
+  x_pos: 0
+  y_pos: 190
+11:
+  x_pos: 142
+  y_pos: 190
+12:
+  x_pos: 284
+  y_pos: 190
+13:
+  x_pos: 426
+  y_pos: 190
+14:
+  x_pos: 568
+  y_pos: 190
+15:
+  x_pos: 710
+  y_pos: 190
+16:
+  x_pos: 852
+  y_pos: 190
+17:
+  x_pos: 994
+  y_pos: 190
+18:
+  x_pos: 1136
+  y_pos: 190
+19:
+  x_pos: 1278
+  y_pos: 190
+20:
+  x_pos: 0
+  y_pos: 380
+21:
+  x_pos: 142
+  y_pos: 380
+22:
+  x_pos: 284
+  y_pos: 380
+23:
+  x_pos: 426
+  y_pos: 380
+24:
+  x_pos: 568
+  y_pos: 380
+25:
+  x_pos: 710
+  y_pos: 380
+26:
+  x_pos: 852
+  y_pos: 380
+27:
+  x_pos: 994
+  y_pos: 380
+28:
+  x_pos: 1136
+  y_pos: 380
+29:
+  x_pos: 1278
+  y_pos: 380
+30:
+  x_pos: 0
+  y_pos: 570
+31:
+  x_pos: 142
+  y_pos: 570
+32:
+  x_pos: 284
+  y_pos: 570
+33:
+  x_pos: 426
+  y_pos: 570
+34:
+  x_pos: 568
+  y_pos: 570
+35:
+  x_pos: 710
+  y_pos: 570
+36:
+  x_pos: 852
+  y_pos: 570
+37:
+  x_pos: 994
+  y_pos: 570
+38:
+  x_pos: 1136
+  y_pos: 570
+39:
+  x_pos: 1278
+  y_pos: 570
+40:
+  x_pos: 0
+  y_pos: 760
+41:
+  x_pos: 142
+  y_pos: 760
+42:
+  x_pos: 284
+  y_pos: 760
+43:
+  x_pos: 426
+  y_pos: 760
+44:
+  x_pos: 568
+  y_pos: 760
+45:
+  x_pos: 710
+  y_pos: 760
+46:
+  x_pos: 852
+  y_pos: 760
+47:
+  x_pos: 994
+  y_pos: 760
+48:
+  x_pos: 1136
+  y_pos: 760
+49:
+  x_pos: 1278
+  y_pos: 760
+50:
+  x_pos: 0
+  y_pos: 950
+51:
+  x_pos: 142
+  y_pos: 950
+52:
+  x_pos: 284
+  y_pos: 950
+53:
+  x_pos: 426
+  y_pos: 950
+54:
+  x_pos: 568
+  y_pos: 950
+55:
+  x_pos: 710
+  y_pos: 950
+56:
+  x_pos: 852
+  y_pos: 950
+57:
+  x_pos: 994
+  y_pos: 950
+58:
+  x_pos: 1136
+  y_pos: 950
+59:
+  x_pos: 1278
+  y_pos: 950
+60:
+  x_pos: 0
+  y_pos: 1140
+61:
+  x_pos: 142
+  y_pos: 1140
+62:
+  x_pos: 284
+  y_pos: 1140
+63:
+  x_pos: 426
+  y_pos: 1140
+64:
+  x_pos: 568
+  y_pos: 1140
+65:
+  x_pos: 710
+  y_pos: 1140
+66:
+  x_pos: 852
+  y_pos: 1140
+67:
+  x_pos: 994
+  y_pos: 1140
+68:
+  x_pos: 1136
+  y_pos: 1140
+69:
+  x_pos: 1278
+  y_pos: 1140
+70:
+  x_pos: 0
+  y_pos: 1330
+71:
+  x_pos: 142
+  y_pos: 1330
+72:
+  x_pos: 284
+  y_pos: 1330
+73:
+  x_pos: 426
+  y_pos: 1330
+74:
+  x_pos: 568
+  y_pos: 1330
+75:
+  x_pos: 710
+  y_pos: 1330
+76:
+  x_pos: 852
+  y_pos: 1330
+77:
+  x_pos: 994
+  y_pos: 1330
+78:
+  x_pos: 1136
+  y_pos: 1330
+79:
+  x_pos: 1278
+  y_pos: 1330
+80:
+  x_pos: 0
+  y_pos: 1520
+81:
+  x_pos: 142
+  y_pos: 1520
+82:
+  x_pos: 284
+  y_pos: 1520
+83:
+  x_pos: 426
+  y_pos: 1520
+84:
+  x_pos: 568
+  y_pos: 1520
+85:
+  x_pos: 710
+  y_pos: 1520
+86:
+  x_pos: 852
+  y_pos: 1520
+87:
+  x_pos: 994
+  y_pos: 1520
+88:
+  x_pos: 1136
+  y_pos: 1520
+89:
+  x_pos: 1278
+  y_pos: 1520
+90:
+  x_pos: 0
+  y_pos: 1710
+91:
+  x_pos: 142
+  y_pos: 1710
+92:
+  x_pos: 284
+  y_pos: 1710
+93:
+  x_pos: 426
+  y_pos: 1710
+94:
+  x_pos: 568
+  y_pos: 1710
+95:
+  x_pos: 710
+  y_pos: 1710
+96:
+  x_pos: 852
+  y_pos: 1710
+97:
+  x_pos: 994
+  y_pos: 1710
+98:
+  x_pos: 1136
+  y_pos: 1710
+99:
+  x_pos: 1278
+  y_pos: 1710
+100:
+  x_pos: 0
+  y_pos: 1900
+101:
+  x_pos: 142
+  y_pos: 1900
+102:
+  x_pos: 284
+  y_pos: 1900
+103:
+  x_pos: 426
+  y_pos: 1900
+104:
+  x_pos: 568
+  y_pos: 1900
+105:
+  x_pos: 710
+  y_pos: 1900
+106:
+  x_pos: 852
+  y_pos: 1900
+107:
+  x_pos: 994
+  y_pos: 1900
+108:
+  x_pos: 1136
+  y_pos: 1900
+109:
+  x_pos: 1278
+  y_pos: 1900
+110:
+  x_pos: 0
+  y_pos: 2090
+111:
+  x_pos: 142
+  y_pos: 2090
+112:
+  x_pos: 284
+  y_pos: 2090
+113:
+  x_pos: 426
+  y_pos: 2090
+114:
+  x_pos: 568
+  y_pos: 2090
+115:
+  x_pos: 710
+  y_pos: 2090
+116:
+  x_pos: 852
+  y_pos: 2090
+117:
+  x_pos: 994
+  y_pos: 2090
+118:
+  x_pos: 1136
+  y_pos: 2090
+119:
+  x_pos: 1278
+  y_pos: 2090
+120:
+  x_pos: 0
+  y_pos: 2280
+121:
+  x_pos: 142
+  y_pos: 2280
+122:
+  x_pos: 284
+  y_pos: 2280
+123:
+  x_pos: 426
+  y_pos: 2280
+124:
+  x_pos: 568
+  y_pos: 2280
+125:
+  x_pos: 710
+  y_pos: 2280
+126:
+  x_pos: 852
+  y_pos: 2280
+127:
+  x_pos: 994
+  y_pos: 2280
+128:
+  x_pos: 1136
+  y_pos: 2280
+129:
+  x_pos: 1278
+  y_pos: 2280
+130:
+  x_pos: 0
+  y_pos: 2470
+131:
+  x_pos: 142
+  y_pos: 2470
+132:
+  x_pos: 284
+  y_pos: 2470
+133:
+  x_pos: 426
+  y_pos: 2470
+134:
+  x_pos: 568
+  y_pos: 2470
+135:
+  x_pos: 710
+  y_pos: 2470
+136:
+  x_pos: 852
+  y_pos: 2470
+137:
+  x_pos: 994
+  y_pos: 2470
+138:
+  x_pos: 1136
+  y_pos: 2470
+139:
+  x_pos: 1278
+  y_pos: 2470
+140:
+  x_pos: 0
+  y_pos: 2660
+141:
+  x_pos: 142
+  y_pos: 2660
+142:
+  x_pos: 284
+  y_pos: 2660
+143:
+  x_pos: 426
+  y_pos: 2660
+144:
+  x_pos: 568
+  y_pos: 2660
+145:
+  x_pos: 710
+  y_pos: 2660
+146:
+  x_pos: 852
+  y_pos: 2660
+147:
+  x_pos: 994
+  y_pos: 2660
+148:
+  x_pos: 1136
+  y_pos: 2660
+149:
+  x_pos: 1278
+  y_pos: 2660
+150:
+  x_pos: 0
+  y_pos: 2850
+151:
+  x_pos: 142
+  y_pos: 2850
+152:
+  x_pos: 284
+  y_pos: 2850
+153:
+  x_pos: 426
+  y_pos: 2850
+154:
+  x_pos: 568
+  y_pos: 2850
+155:
+  x_pos: 710
+  y_pos: 2850
+156:
+  x_pos: 852
+  y_pos: 2850
+157:
+  x_pos: 994
+  y_pos: 2850
+158:
+  x_pos: 1136
+  y_pos: 2850
+159:
+  x_pos: 1278
+  y_pos: 2850

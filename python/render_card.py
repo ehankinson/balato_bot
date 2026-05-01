@@ -1,43 +1,45 @@
 import os
 from functools import lru_cache
 
-from PIL import Image
-from util import load_yaml
-from card_models import Card
 from card_enums import Enhancement
-from const import CURR_DIR, HAND_WIDTH, HAND_HEIGHT, HAND_WIDTH_RATIO, HAND_HEIGHT_RATION
-
+from card_models import Card
+from const import (
+    HAND_HEIGHT,
+    HAND_HEIGHT_RATION,
+    HAND_WIDTH,
+    HAND_WIDTH_RATIO,
+    ROOT_DIR,
+)
+from PIL import Image
+from util import load_yaml, crop_image
 
 CARD_WITH = 142
 CARD_HEIGHT = 190
 WIDTH_MULT = 1.625
 HEIGHT_MULT = 1.625
 
-PLAYING_CARDS = Image.open(os.path.join(CURR_DIR, "../game_images/8BitDeck.png")).convert("RGBA")
-ENHANCEMENTS = Image.open(os.path.join(CURR_DIR, "../game_images/Enhancers.png")).convert("RGBA")
-CARD_LOCATIONS = load_yaml(os.path.join(CURR_DIR, "../yaml/card_locations.yaml"))
-ENHANCEMENT_LOCATIONS = load_yaml(os.path.join(CURR_DIR, "../yaml/enhancements_locations.yaml"))
+PLAYING_CARDS = Image.open(os.path.join(ROOT_DIR, "game_images/8BitDeck.png")).convert("RGBA")
+ENHANCEMENTS = Image.open(os.path.join(ROOT_DIR, "game_images/Enhancers.png")).convert("RGBA")
+CARD_LOCATIONS = load_yaml(os.path.join(ROOT_DIR, "yaml/card_locations.yaml"))
+ENHANCEMENT_LOCATIONS = load_yaml(os.path.join(ROOT_DIR, "yaml/enhancements_locations.yaml"))
 
 
 
 
-def crop_image(image: Image.Image, x_pos: int, y_pos: int) -> Image.Image:
-    return image.crop((
-        x_pos, y_pos, x_pos + CARD_WITH, y_pos + CARD_HEIGHT
-    ))
+
 
 
 
 def get_background(enhancement: Enhancement) -> Image.Image:
     locations = ENHANCEMENT_LOCATIONS['enhancements'][enhancement]
-    return crop_image(ENHANCEMENTS, locations["x_pos"], locations["y_pos"])
+    return crop_image(ENHANCEMENTS, locations["x_pos"], locations["y_pos"], CARD_WITH, CARD_HEIGHT)
 
 
 
 def get_card(rank: int, suit: int) -> Image.Image:
     y_pos = CARD_LOCATIONS["suits"][suit]
     x_pos = CARD_LOCATIONS["cards"][rank]
-    return crop_image(PLAYING_CARDS, x_pos, y_pos)
+    return crop_image(PLAYING_CARDS, x_pos, y_pos, CARD_WITH, CARD_HEIGHT)
 
 
 
@@ -46,7 +48,7 @@ def get_seal(seal: int) -> Image.Image | None:
     if location is None:
         return location
 
-    return crop_image(ENHANCEMENTS, location["x_pos"], location["y_pos"])
+    return crop_image(ENHANCEMENTS, location["x_pos"], location["y_pos"], CARD_WITH, CARD_HEIGHT)
 
 
 

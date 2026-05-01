@@ -89,7 +89,6 @@ def render_hand(hand: Hand) -> RenderedHand:
             card, card_image, x_pos, y_pos
         ))
 
-    img.save("image.png")
     return RenderedHand(
         image=img,
         annotations=annotations

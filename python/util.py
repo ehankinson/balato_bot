@@ -1,12 +1,22 @@
-import os
 import json
-import yaml
-import shutil
+import os
 import random
+import shutil
+
+from PIL import Image
+
+import yaml
+
 
 def load_yaml(filepath: str) -> dict:
     with open(filepath, "r", encoding="utf-8") as y:
         return yaml.safe_load(y)
+
+
+
+def write_yaml(filepath: str, object: dict) -> None:
+    with open(filepath, "w") as y:
+        yaml.dump(object, y)
 
 
 
@@ -92,3 +102,10 @@ def calculate_lucky() -> list[int]:
         final[0] = 20
 
     return final
+
+
+
+def crop_image(image: Image.Image, x_pos: int, y_pos: int, width: int, height: int) -> Image.Image:
+    return image.crop((
+        x_pos, y_pos, x_pos + width, y_pos + height
+    ))
