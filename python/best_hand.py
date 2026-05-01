@@ -263,6 +263,14 @@ def calculate_score(
     return best_score, best_hand
 
 
+
+def get_best_scoring_hand(cards: list[Card]) -> tuple[float, list[list[Card]]]:
+    hands = generate_playable_hands(cards)
+    stone_cards = get_stone_cards(cards)
+    steel_cards = get_steel_cards(cards)
+    return calculate_score(hands, cards, stone_cards, steel_cards)
+
+
 if __name__ == "__main__":
     cards = [
         Card(Rank.ACE, Suit.HEARTS, Enhancement.GLASS, Seal.GOLD),

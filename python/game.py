@@ -5,9 +5,10 @@ import pyscreenshot
 from const import HAND_HEIGHT, HAND_WIDTH
 
 
+count = 0
 
 def primary_monitor_bbox() -> tuple[int, int, int, int]:
-    with mss.mss() as screen_capture:
+    with mss.MSS() as screen_capture:
         primary_monitor = screen_capture.monitors[1]
 
     left = primary_monitor["left"]
@@ -32,8 +33,23 @@ def crop_play_hand(img: Image.Image, left: int, top: int) -> Image.Image:
 
 
 
+def get_hand() -> Image.Image:
+    main_screen = screenshot_primary()
+    return crop_play_hand(main_screen, 670, 800)
+
+
+def save_hand() -> None:
+    global count
+
+    img = get_hand()
+    filename = f"training_data/real_data/hand_{count}.png"
+    img.save(filename)
+
+    print(f"Saved {filename}")
+    count += 1
+
+
 if __name__ == "__main__":
-    # screenshot = screenshot_primary("image.png")
-    img = Image.open("image.png").convert("RGB")
-    hand = crop_play_hand(img, left=670, top=800)
-    hand.save("hand.png")
+    while True:
+        if input() == "p":
+            save_hand()

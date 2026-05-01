@@ -4,6 +4,7 @@ import torch
 from torchvision import models, transforms
 from PIL import Image
 
+from best_hand import get_best_scoring_hand
 from util import card_crop
 from card_models import Card
 from card_enums import Rank, Suit, Enhancement, Seal
@@ -85,7 +86,7 @@ def predict_seal(img: Image.Image):
 
 
 
-def get_cards(image: Image.Image):
+def get_cards(image: Image.Image) -> list[Card]:
     results = BOX_MODEL(image, verbose=False)
     card_positions = get_card_locations_in_hand(results)
 
@@ -120,13 +121,19 @@ def get_cards(image: Image.Image):
             seal=Seal(int(seal))
         ))
 
-    for card in detected_cards:
-        print(card)
+    return detected_cards
 
 
 if __name__ == '__main__':
     args = sys.argv
     image_count = args[1]
-    # image = Image.open(f"training_data/real_data_{image_count}.png").convert("RGB")
-    image = Image.open("image.png").convert("RGB")
-    get_cards(image)
+    image = Image.open(f"training_data/real_data/hand_{image_count}.png").convert("RGB")
+    # image = Image.open("image.png").convert("RGB")
+    cards = get_cards(image)
+    for card in cards:
+        print(card)
+        
+    best_score, best_hand = get_best_scoring_hand(cards)
+    print(f"The best score is {best_score}")
+    print(f"The Cards played are {best_hand[0]}")
+    print(f"The Cards held in hand are {best_hand[1]}")
