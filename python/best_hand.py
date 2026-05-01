@@ -1,5 +1,5 @@
 import time
-from itertools import permutations, product
+from itertools import combinations, permutations, product
 
 from card_enums import Enhancement, PokerHand, Rank, Seal, Suit
 from card_models import Card, HandStats
@@ -34,6 +34,10 @@ def is_straight(cards: list[Card]) -> bool:
             return False
 
     return True
+
+
+def generate_individual_x_of_a_kind(hand_size: int, cards: list[Card]) -> list[list[Card]]:
+    return [list(val) for val in permutations(cards, hand_size)]
 
 
 def filter_steel(hand_steel_cards: list[Card], steel_cards: list[Card]) -> list[int]:
@@ -108,7 +112,7 @@ def get_x_of_a_kind(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
     x_of_a_kind: list[list[Card]] = []
     for card_values in bucket.values():
         for size in range(2, len(card_values) + 1):
-            x_of_a_kind.extend([list(val) for val in permutations(card_values, size)])
+            x_of_a_kind.extend(generate_individual_x_of_a_kind(size, card_values))
 
     return x_of_a_kind
 
@@ -165,6 +169,44 @@ def get_straights(cards: list[Card]) -> list[list[Card]]:
     return straights
 
 
+def get_2_pair(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
+    pair_options: dict[Rank, list[list[Card]]] = {
+        rank: generate_individual_x_of_a_kind(2, cards)
+        for rank, cards in bucket.items()
+        if len(cards) >= 2
+    }
+
+    return [
+        pair1 + pair2
+        for rank1, rank2 in combinations(pair_options.keys(), 2)
+        for pair1, pair2 in product(pair_options[rank1], pair_options[rank2])
+    ]
+
+
+def get_full_house(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
+    pair_options: dict[Rank, list[list[Card]]] = {}
+    triple_options: dict[Rank, list[list[Card]]] = {}
+
+    for rank, cards in bucket.items():
+        if len(cards) >= 2:
+            pair_options[rank] = generate_individual_x_of_a_kind(2, cards)
+
+        if len(cards) >= 3:
+            triple_options[rank] = generate_individual_x_of_a_kind(3, cards)
+
+    hands: list[list[Card]] = []
+
+    for triple_rank, triples in triple_options.items():
+        for pair_rank, pairs in pair_options.items():
+            if triple_rank == pair_rank:
+                continue
+
+            for triple, pair in product(triples, pairs):
+                hands.append(triple + pair)
+
+    return hands
+    
+
 def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
     hands: list[list[Card]] = []
     hands.extend([[card] for card in cards])
@@ -176,6 +218,8 @@ def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
 
     hands.extend(get_x_of_a_kind(rank_bucket))
     hands.extend(get_flushes(suit_bucket))
+    hands.extend(get_2_pair(rank_bucket))
+    hands.extend(get_full_house(rank_bucket))
 
     return hands
 
@@ -273,14 +317,14 @@ def get_best_scoring_hand(cards: list[Card]) -> tuple[float, list[list[Card]]]:
 
 if __name__ == "__main__":
     cards = [
-        Card(Rank.ACE, Suit.HEARTS, Enhancement.GLASS, Seal.GOLD),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.GLASS, Seal.RED),
         Card(Rank.KING, Suit.CLUBS, Enhancement.NONE, Seal.NONE),
         Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
         Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
         Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
         Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE),
-        Card(Rank.TEN, Suit.DIAMONDS, Enhancement.NONE, Seal.NONE),
-        Card(Rank.EIGHT, Suit.SPADES, Enhancement.NONE, Seal.NONE),
+        Card(Rank.TEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE),
+        Card(Rank.ACE, Suit.CLUBS, Enhancement.GLASS, Seal.GOLD),
     ]
 
     # hand = Hand.random_hand(8)
