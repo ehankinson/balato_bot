@@ -1,5 +1,6 @@
 from enum import IntEnum
 
+
 class Rank(IntEnum):
     TWO = 0
     THREE = 1
@@ -14,7 +15,7 @@ class Rank(IntEnum):
     QUEEN = 10
     KING = 11
     ACE = 12
-
+    NONE = 13 # If we have a stone card and are not sure
 
 
 class Suit(IntEnum):
@@ -22,7 +23,6 @@ class Suit(IntEnum):
     DIAMONDS = 1
     CLUBS = 2
     SPADES = 3
-
 
 
 class Enhancement(IntEnum):
@@ -37,7 +37,6 @@ class Enhancement(IntEnum):
     STEEL = 8
 
 
-
 class Seal(IntEnum):
     NONE = 0
     GOLD = 1
@@ -46,13 +45,18 @@ class Seal(IntEnum):
     BLUE = 4
 
 
+class Edition(IntEnum):
+    NONE = 0
+    FOIL = 1
+    HOLOGRAPHIC = 2
+    POLYCHROME = 3
+
 
 class CardFeatureTrainingType(IntEnum):
     RANK = 0
     SUIT = 1
     ENHANCEMENT = 2
     SEAL = 3
-
 
 
 class PokerHand(IntEnum):

@@ -3,7 +3,7 @@ import random
 from PIL import Image
 from dataclasses import dataclass
 
-from card_enums import Rank, Suit, Enhancement, Seal
+from card_enums import Edition, Rank, Suit, Enhancement, Seal
 from util import get_initial_card_chips, calculate_lucky
 
 CARD_STRINGS = [
@@ -28,6 +28,7 @@ class Card:
     suit: Suit
     enhancement: Enhancement
     seal: Seal
+    edition: Edition
     chips: int = 0
     add_mult: int = 0
     play_times_mult: float = 1
@@ -106,6 +107,7 @@ class Card:
             suit=random.choice(list(Suit)),
             enhancement=random.choice(list(Enhancement)),
             seal=random.choice(list(Seal)),
+            edition=random.choice(list(Edition))
         )
 
 
