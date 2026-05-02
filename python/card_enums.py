@@ -15,7 +15,6 @@ class Rank(IntEnum):
     QUEEN = 10
     KING = 11
     ACE = 12
-    NONE = 13 # If we have a stone card and are not sure
 
 
 class Suit(IntEnum):
@@ -57,6 +56,7 @@ class CardFeatureTrainingType(IntEnum):
     SUIT = 1
     ENHANCEMENT = 2
     SEAL = 3
+    EDITION = 4
 
 
 class PokerHand(IntEnum):

@@ -42,6 +42,8 @@ class Card:
     def __post_init__(self):
         self.chips = get_initial_card_chips(self.rank)
         self.add_enhancement()
+        self.add_edition()
+        self.add_seal()
         self.card_id = self.score()
 
 
@@ -83,6 +85,20 @@ class Card:
                 self.hand_times_mult = 1.5
                 self.in_hand = True
 
+
+    def add_edition(self) -> None:
+        match self.edition:
+            case Edition.FOIL:
+                self.chips += 50
+
+            case Edition.HOLOGRAPHIC:
+                self.add_mult += 10
+
+            case Edition.POLYCHROME:
+                self.play_times_mult *= 1.5
+
+    
+    def add_seal(self) -> None:
         if self.seal == Seal.RED:
             self.chips *= 2
             self.add_mult *= 2
@@ -90,12 +106,12 @@ class Card:
             self.hand_times_mult *= self.hand_times_mult
 
 
-
     def score(self) -> int:
         val = self.rank & 0b1111
         val = (val << 2) | (self.suit & 0b11)
         val = (val << 4) | (self.enhancement & 0b1111)
         val = (val << 3) | (self.suit & 0b111)
+        val = (val << 2) | (self.edition & 0b11)
         return val
 
 
@@ -118,6 +134,9 @@ class Card:
         base = f"{self.enhancement.name} {base}" \
             if self.enhancement != Enhancement.NONE\
                 else f"Normal {base}"
+
+        if self.edition != Edition.NONE:
+            base = f"{self.edition.name} {base}"
 
         if self.seal != Seal.NONE:
             base = f"{self.seal.name} seal {base}"

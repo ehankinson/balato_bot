@@ -22,5 +22,11 @@
         "features": 5,
         "img_size": [64, 64],
         "output_path": "models/seal_model.pt"
+    },
+    "edition": {
+        "data_dir": "training_data/edition_data",
+        "features": 4,
+        "img_size": [92, 32],
+        "output_path": "models/edition_model.pt"
     }
 }

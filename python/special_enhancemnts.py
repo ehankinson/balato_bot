@@ -262,8 +262,7 @@ def hologram_effect(img: Image.Image) -> Image.Image:
 def foil_effect(
     img: Image.Image,
 ) -> Image.Image:
-    alpha_floor = 0.78
-    brightness_boost = 0.16
+    brightness_boost = 0.03
     foil_r = _random_phase()
     foil_g = _random_phase()
 
@@ -345,19 +344,28 @@ def foil_effect(
         0.0,
     )
 
+    rings = 0.5 + 0.5 * np.cos(length_90 * 2.8 + foil_r * 4.0)
+    fine_lines = np.clip((rings - 0.78) / 0.22, 0.0, 1.0)
+    center_beam = np.exp(-((uvx - 0.5) ** 2) / 0.0018) * 0.58
+
     out = tex.copy()
-
-    out[..., 0] = tex[..., 0] - delta * 0.7 + delta * maxfac * 0.45
-    out[..., 1] = tex[..., 1] - delta * 0.7 + delta * maxfac * 0.45
-    out[..., 2] = tex[..., 2] + delta * maxfac * 2.2
-    out[..., 3] = np.minimum(
-        alpha,
-        0.3 * alpha + 0.9 * np.minimum(0.5, maxfac * 0.1),
-    )
-
+    base_tint = np.array([0.38, 0.5, 1.0], dtype=np.float32)
+    light_face_mask = np.clip((high - 0.45) / 0.55, 0.0, 1.0)
+    dark_art_mask = 1.0 - np.clip((high - 0.15) / 0.45, 0.0, 1.0)
+    color_mask = np.clip((high - low - 0.08) / 0.38, 0.0, 1.0)
+    base_mix = 0.24 + 0.42 * light_face_mask
+    highlight = np.minimum(fine_lines * 0.46 + center_beam + maxfac * 0.04, 0.82)
+    shadow = dark_art_mask * 0.08
     opaque = alpha[..., None]
+
+    base_mix *= 1.0 - 0.55 * color_mask
+    highlight *= 1.0 - 0.45 * color_mask
+
+    out[..., :3] = rgb * (1.0 - base_mix[..., None]) + base_tint * base_mix[..., None]
+    out[..., :3] += (1.0 - out[..., :3]) * highlight[..., None]
+    out[..., :3] -= shadow[..., None] * delta[..., None] * opaque
     out[..., :3] += brightness_boost * delta[..., None] * opaque
-    out[..., 3] = np.maximum(out[..., 3], alpha * alpha_floor)
+    out[..., 3] = alpha
 
     out = np.clip(out, 0.0, 1.0)
     return Image.fromarray((out * 255).astype(np.uint8), "RGBA")

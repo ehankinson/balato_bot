@@ -108,6 +108,7 @@ def render_card(card: Card) -> Image.Image:
 
 if __name__ == "__main__":
     card = Card.random()
-
+    card.edition = Edition.FOIL
     card_image = render_card(card)
-    card_image.save("image.png")
+    card_image.save("foil.png")
+    

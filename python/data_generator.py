@@ -2,7 +2,7 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from card_enums import CardFeatureTrainingType, Enhancement, Rank, Seal, Suit
+from card_enums import CardFeatureTrainingType, Edition, Enhancement, Rank, Seal, Suit
 from card_models import Card, Hand, RenderedHand
 from const import (
     BOX_MODEL,
@@ -11,6 +11,7 @@ from const import (
     RANK_CROP,
     SEAL_CROP,
     SUIT_CROP,
+    EDITION_CROP
 )
 from PIL import Image
 from render_hand import render_hand
@@ -26,13 +27,14 @@ from vision import get_card_locations_in_hand
 
 CUTOFF = 0.9 # split between training and val
 CPU_COUNT = os.cpu_count() if os.cpu_count() is not None else 1
-BATCH_SIZE = 100
+BATCH_SIZE = 50
 
 FEATURE_ENUMS = {
     CardFeatureTrainingType.RANK: Rank,
     CardFeatureTrainingType.SUIT: Suit,
     CardFeatureTrainingType.ENHANCEMENT: Enhancement,
     CardFeatureTrainingType.SEAL: Seal,
+    CardFeatureTrainingType.EDITION: Edition
 }
 
 
@@ -63,7 +65,7 @@ def generate_rendered_hand(hand_index: int, cutoff: float, is_feature: bool = Fa
 
 def feature_info(
     train_type: CardFeatureTrainingType, card_image: Image.Image, card: Card
-) -> tuple[Rank | Suit | Enhancement | Seal, tuple[int, int, int, int]]:
+) -> tuple[Rank | Suit | Enhancement | Seal | Edition, tuple[int, int, int, int]]:
     w, h = card_image.size
     match train_type:
         case CardFeatureTrainingType.RANK:
@@ -77,6 +79,9 @@ def feature_info(
 
         case CardFeatureTrainingType.SEAL:
             return card.seal, card_crop(w, h, SEAL_CROP)
+
+        case CardFeatureTrainingType.EDITION:
+            return card.edition, card_crop(w, h, EDITION_CROP)
 
 
 
@@ -141,7 +146,7 @@ def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount:
     if hand_amount <= 0:
         return
 
-    worker_amount = min(max(1, CPU_COUNT // 4), hand_amount)
+    worker_amount = min(max(1, CPU_COUNT // 2), hand_amount)
     chunks = split_work(hand_amount, worker_amount)
 
     progress_lock = threading.Lock()
@@ -210,6 +215,6 @@ def generate_all_feature_data() -> None:
 
 
 if __name__ == '__main__':
-    # generate_all_feature_data()
-    generate_card_feature_data(1, CardFeatureTrainingType.RANK)
+    generate_all_feature_data()
+    # generate_card_feature_data(1, CardFeatureTrainingType.RANK)
     # generate_hand_training_data()

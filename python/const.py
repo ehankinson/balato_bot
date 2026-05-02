@@ -26,15 +26,16 @@ ROOT_DIR = os.path.join(CURR_DIR, "..")
 
 TRAINING_CONFIG = os.path.join(ROOT_DIR, "json", "training_config.json")
 
-FOLDER_TRAINING_NAMES = ["rank", "suit", "enhancement", "seal"]
+FOLDER_TRAINING_NAMES = ["rank", "suit", "enhancement", "seal", "edition"]
 
 CARD_ID = 0 # used for the yolo training
-BOX_MODEL = YOLO(os.path.join(CURR_DIR, "../models/card_selector.pt"))
+BOX_MODEL = YOLO(os.path.join(ROOT_DIR, "models/card_selector.pt"))
 
-RANK_CROP = [0.0, 0.0, 0.30, 0.25]
+RANK_CROP = [0.0, 0.0, 0.42, 0.35]
 SEAL_CROP = [55.0, 35.0, 0.6, 0.45]
-SUIT_CROP = [10.0, 45.0, 0.25, 0.3]
+SUIT_CROP = [12.0, 45.0, 0.28, 0.32]
 ENHANCEMENT_CROP = [5.0, 75.0, 0.25, 0.85]
+EDITION_CROP = [5.0, 75.0, 0.25, 0.85]
 
 HAND_STATS: dict[PokerHand, HandStats] = {
     PokerHand.FLUSH_FIVE: HandStats(160, 16),
