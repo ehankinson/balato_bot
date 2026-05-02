@@ -1,6 +1,6 @@
 import os
 
-from config.settings import CARD_HEIGHT, CARD_WIDTH, ROOT_DIR
+from config.settings import CARD_HEIGHT, CARD_WIDTH, JOKER_ID, ROOT_DIR
 from core.enums import Edition
 from core.models import CardAnnotation, Joker, RenderedHand
 from PIL import Image
@@ -72,8 +72,8 @@ def calculate_x_pos(card_gap: float, image_width: int, card_amount: int, card_in
             else int(card_index * (image_width + card_gap)) 
 
 
-def render_jokers(jokers: list[Joker], save: bool = False):
-    background = render_background(IMAGE_WIDTH, IMAGE_HEIGHT)
+def render_jokers(jokers: list[Joker], training: bool = False):
+    background = render_background(IMAGE_WIDTH, IMAGE_HEIGHT, training)
     
     card_gap: float = 0.0
     joker_count = len(jokers)
@@ -95,11 +95,8 @@ def render_jokers(jokers: list[Joker], save: bool = False):
 
         annotations.append(CardAnnotation(
             card=joker,
-            box=calculate_box_dimensions(joker_image, x_pos, y_pos)
+            box=calculate_box_dimensions(joker_image, x_pos, y_pos, JOKER_ID)
         ))
-
-    if save:
-        background.save("image.png")
 
     return RenderedHand(
         image=background,

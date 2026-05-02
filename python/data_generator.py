@@ -1,10 +1,13 @@
 import os
+import sys
 import random
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+from typing_extensions import Callable
+
 from core.enums import CardFeatureTrainingType, Edition, Enhancement, Rank, Seal, Suit
-from core.models import Card, Hand, RenderedHand
+from core.models import Card, Hand, RenderedHand, Joker
 from config.model_registry import BOX_MODEL
 from config.settings import (
     ENHANCEMENT_CROP,
@@ -16,6 +19,7 @@ from config.settings import (
 )
 from PIL import Image
 from rendering.hand import render_hand
+from rendering.joker import render_jokers
 from tqdm import tqdm
 from utils.files import build_folder, rebuild_folder
 from utils.images import card_crop
@@ -67,11 +71,21 @@ def split_work(total_amount: int, worker_amount: int) -> list[range]:
 def generate_rendered_hand(hand_index: int, cutoff: float, is_feature: bool = False) -> tuple[str, str, RenderedHand]:
     card_amount = random_full_card_amount() if not is_feature else random_feature_card_amount()
     hand = Hand.random_hand(card_amount)
-    hand_render = render_hand(hand)
+    hand_render = render_hand(hand, True)
 
     name = f"{hand_index}_{card_amount}"
     split = "train" if hand_index < cutoff else "val"
     return name, split, hand_render
+
+
+def generate_rendered_jokers(hand_index: int, cutoff: float) -> tuple[str, str, RenderedHand]:
+    joker_amount = random.randint(1, 9)
+    jokers = [Joker.random() for _ in range(joker_amount)]
+    jokers_render = render_jokers(jokers, True)
+
+    name = f"{hand_index}_{joker_amount}"
+    split = "train" if hand_index < cutoff else "val"
+    return name, split, jokers_render
 
 
 
@@ -96,16 +110,16 @@ def feature_info(
             return card.edition, card_crop(w, h, EDITION_CROP)
 
 
-
-def generate_hand_training_data(hand_amount: int = 5000) -> None:
-    cutoff = hand_amount * CUTOFF
-    start_path = "training_data/card_data"
+def generate_box_training_data(size: int, data_type: str, function: Callable[..., tuple[str, str, RenderedHand]], is_feature: bool = False) -> None:
+    cutoff = size * CUTOFF
+    
+    start_path = f"training_data/{data_type}"
     rebuild_folder(start_path)
     image_root = f"{start_path}/images"
     build_folder(image_root)
     label_root = f"{start_path}/labels"
     build_folder(label_root)
-
+    
     for split in ("train", "val"):
         image_path = f"{image_root}/{split}"
         build_folder(image_path)
@@ -113,16 +127,19 @@ def generate_hand_training_data(hand_amount: int = 5000) -> None:
         label_path = f"{label_root}/{split}"
         build_folder(label_path)
 
-    if hand_amount <= 0:
+    if size <= 0:
         return
 
-    worker_amount = min(CPU_COUNT - 1, hand_amount)
-    chunks = split_work(hand_amount, worker_amount)
+    cpu_threads = CPU_COUNT if CPU_COUNT is not None else 2
+    worker_amount = min(cpu_threads - 1, size)
+    chunks = split_work(size, worker_amount)
     progress_lock = threading.Lock()
+    args = [0, cutoff, is_feature] if is_feature else [0, cutoff]
 
     def process_hands(hand_indices: range, progress: tqdm) -> None:
         for hand_index in hand_indices:
-            name, split, hand_render = generate_rendered_hand(hand_index, cutoff)
+            args[0] = hand_index
+            name, split, hand_render = function(*args)
 
             img_path = f"{image_root}/{split}/{name}.png"
             label_path = f"{label_root}/{split}/{name}.txt"
@@ -137,10 +154,18 @@ def generate_hand_training_data(hand_amount: int = 5000) -> None:
             with progress_lock:
                 progress.update(1)
 
-    with tqdm(total=hand_amount) as progress:
+    with tqdm(total=size) as progress:
         with ThreadPoolExecutor(max_workers=worker_amount) as executor:
             list(executor.map(lambda chunk: process_hands(chunk, progress), chunks))
 
+
+def generate_hand_training_data(hand_amount: int = 5000) -> None:
+    generate_box_training_data(hand_amount, "hand_data", generate_rendered_hand)
+
+
+def generate_joker_training_data(joker_amount: int = 25000) -> None:
+    generate_box_training_data(joker_amount, "joker_data", generate_rendered_jokers)
+            
 
 
 def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount: int = 5000) -> None:
@@ -227,6 +252,26 @@ def generate_all_feature_data() -> None:
 
 
 if __name__ == '__main__':
-    generate_all_feature_data()
-    # generate_card_feature_data(1, CardFeatureTrainingType.RANK)
-    # generate_hand_training_data()
+    available_commands = {
+        "all_card_features": {"function": generate_all_feature_data},
+        "card_enhancement": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.ENHANCEMENT]},
+        "card_edition": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.EDITION]},
+        "card_rank": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.RANK]},
+        "card_suit": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SUIT]},
+        "card_seal": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SEAL]},
+        "playing_hands": {"function": generate_hand_training_data},
+        "jokers": {"function": generate_joker_training_data}
+        # "all_joker_features",
+        # "joker_edition"
+    }
+
+    command = sys.argv[1]
+    if command not in available_commands:
+        print("Sorry that command is invalid please add 1 of the following:")
+        for key in available_commands.keys():
+            print(key)
+
+    function = available_commands[command]["function"]
+    args = available_commands[command].get("args", [])
+    function(*args)
+    
