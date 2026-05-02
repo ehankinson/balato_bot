@@ -1,9 +1,10 @@
 import time
 from itertools import combinations, permutations, product
 
-from card_enums import Edition, Enhancement, PokerHand, Rank, Seal, Suit
-from card_models import Card, HandStats
-from const import HAND_STATS
+from core.enums import Edition, Enhancement, PokerHand, Rank, Seal, Suit
+from core.hand_stats import HandStats
+from core.models import Card
+from config.poker_hands import HAND_STATS
 
 
 def get_stone_cards(cards: list[Card]) -> list[Card]:

@@ -2,7 +2,7 @@ from PIL import Image
 import mss
 import pyscreenshot
 
-from const import HAND_HEIGHT, HAND_WIDTH
+from config.settings import HAND_HEIGHT, HAND_WIDTH
 
 
 count = 0

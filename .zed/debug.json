@@ -1,12 +1,13 @@
 [
   {
+    "label": "Debug rendering.joker",
     "adapter": "Debugpy",
-    "label": "Debug best_hand.py",
     "request": "launch",
-    "python": "$ZED_CUSTOM_PYTHON_ACTIVE_ZED_TOOLCHAIN",
-    "program": "$ZED_WORKTREE_ROOT/python/best_hand.py",
-    "cwd": "$ZED_WORKTREE_ROOT/python",
-    "args": [],
-    "justMyCode": false
+    "module": "rendering.joker",
+    "cwd": "/home/hank/projects/balato_bot",
+    "env": {
+      "PYTHONPATH": "/home/hank/projects/balato_bot/python"
+    }
   }
+
 ]

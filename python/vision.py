@@ -6,10 +6,11 @@ from PIL import Image
 import cv2
 
 from best_hand import get_best_scoring_hand
-from util import card_crop
-from card_models import Card
-from card_enums import Edition, Rank, Suit, Enhancement, Seal
-from const import BOX_MODEL, EDITION_CROP, RANK_CROP, SUIT_CROP, SEAL_CROP, ENHANCEMENT_CROP
+from utils.images import card_crop
+from core.models import Card
+from core.enums import Edition, Rank, Suit, Enhancement, Seal
+from config.model_registry import BOX_MODEL
+from config.settings import EDITION_CROP, RANK_CROP, SUIT_CROP, SEAL_CROP, ENHANCEMENT_CROP
 
 TUPLE = False
 

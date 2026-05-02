@@ -7,9 +7,9 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms, models
 from ultralytics import YOLO
 
-from util import load_json
-from card_enums import CardFeatureTrainingType
-from const import CURR_DIR, TRAINING_CONFIG, FOLDER_TRAINING_NAMES
+from utils.files import load_json
+from core.enums import CardFeatureTrainingType
+from config.settings import CURR_DIR, TRAINING_CONFIG, FOLDER_TRAINING_NAMES
 
 
 EPOCHS = 5

@@ -1,11 +1,12 @@
 import os
+import random
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from card_enums import CardFeatureTrainingType, Edition, Enhancement, Rank, Seal, Suit
-from card_models import Card, Hand, RenderedHand
-from const import (
-    BOX_MODEL,
+from core.enums import CardFeatureTrainingType, Edition, Enhancement, Rank, Seal, Suit
+from core.models import Card, Hand, RenderedHand
+from config.model_registry import BOX_MODEL
+from config.settings import (
     ENHANCEMENT_CROP,
     FOLDER_TRAINING_NAMES,
     RANK_CROP,
@@ -14,15 +15,10 @@ from const import (
     EDITION_CROP
 )
 from PIL import Image
-from render_hand import render_hand
+from rendering.hand import render_hand
 from tqdm import tqdm
-from util import (
-    build_folder,
-    card_crop,
-    random_feature_card_amount,
-    random_full_card_amount,
-    rebuild_folder,
-)
+from utils.files import build_folder, rebuild_folder
+from utils.images import card_crop
 from vision import get_card_locations_in_hand
 
 CUTOFF = 0.9 # split between training and val
@@ -36,6 +32,22 @@ FEATURE_ENUMS = {
     CardFeatureTrainingType.SEAL: Seal,
     CardFeatureTrainingType.EDITION: Edition
 }
+
+
+def random_full_card_amount() -> int:
+    return random.choices(
+        population=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+        weights=[1, 1, 2, 3, 5, 8, 16, 50, 33, 18, 7, 4, 1, 1, 1, 1, 1, 1],
+        k=1
+    )[0]
+
+
+def random_feature_card_amount() -> int:
+    return random.choices(
+        population=[6, 7, 8, 9, 10, 11],
+        weights=[8, 16, 50, 33, 18, 7],
+        k=1
+    )[0]
 
 
 

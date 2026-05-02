@@ -3,8 +3,9 @@ import random
 from PIL import Image
 from dataclasses import dataclass
 
-from card_enums import Edition, Rank, Suit, Enhancement, Seal
-from util import get_initial_card_chips, calculate_lucky
+from core.enums import Edition, Rank, Suit, Enhancement, Seal, Jokers
+from core.hand_stats import HandStats
+from core.scoring import get_initial_card_chips, calculate_lucky
 
 CARD_STRINGS = [
     "2",
@@ -21,6 +22,10 @@ CARD_STRINGS = [
     "K",
     "A"
 ]
+
+BACKGROUND_JOKERS = {
+    Jokers.CANIO_BACKGROUND, Jokers.CHICOT_BACKGROUND, Jokers.PERKEO_BACKGROUND, Jokers.YORICK_BACKGROUND, Jokers.HOLOGRAM_BACKGROUND, Jokers.TRIBOULET_BACKGROUND
+}
 
 @dataclass
 class Card:
@@ -181,8 +186,17 @@ class RenderedHand:
 
 
 
-@dataclass(frozen=True)
-class HandStats:
-    chips: int
-    mult: int
-    level: int = 1
+@dataclass
+class Joker:
+    background_image: Jokers
+    face_image: Jokers | None = None
+
+
+    def __post_init__(self):
+        self._add_face()
+
+
+    def _add_face(self):
+        
+        if self.background_image in BACKGROUND_JOKERS:
+            self.face_image = Jokers(int(self.background_image) + 10)
