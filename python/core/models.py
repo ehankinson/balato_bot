@@ -27,6 +27,10 @@ BACKGROUND_JOKERS = {
     Jokers.CANIO_BACKGROUND, Jokers.CHICOT_BACKGROUND, Jokers.PERKEO_BACKGROUND, Jokers.YORICK_BACKGROUND, Jokers.HOLOGRAM_BACKGROUND, Jokers.TRIBOULET_BACKGROUND
 }
 
+RANDOM_JOKERS = [
+    joker for joker in list(Jokers) if "REAL_FACE" not in joker.name
+]
+
 @dataclass
 class Card:
     rank: Rank
@@ -171,10 +175,34 @@ class Hand:
         self.cards = sorted(self.cards, key=lambda x: (x.suit, x.rank), reverse=True)
 
 
+@dataclass
+class Joker:
+    background_image: Jokers
+    face_image: Jokers | None = None
+    negative: bool = False
+    edition: Edition = Edition.NONE
+
+
+    def __post_init__(self):
+        self._add_face()
+
+
+    def _add_face(self):
+        if self.background_image in BACKGROUND_JOKERS:
+            self.face_image = Jokers(int(self.background_image) + 10)
+
+    @classmethod
+    def random(cls):
+        return cls(
+            background_image=random.choice(RANDOM_JOKERS),
+            negative=random.choice([True, False]),
+            edition=random.choice(list(Edition))
+        )
+
 
 @dataclass
 class CardAnnotation:
-    card: Card
+    card: Card | Joker
     box: list[float]
 
 
@@ -183,20 +211,3 @@ class CardAnnotation:
 class RenderedHand:
     image: Image.Image
     annotations: list[CardAnnotation]
-
-
-
-@dataclass
-class Joker:
-    background_image: Jokers
-    face_image: Jokers | None = None
-
-
-    def __post_init__(self):
-        self._add_face()
-
-
-    def _add_face(self):
-        
-        if self.background_image in BACKGROUND_JOKERS:
-            self.face_image = Jokers(int(self.background_image) + 10)

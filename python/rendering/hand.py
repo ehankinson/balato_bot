@@ -1,5 +1,3 @@
-import random
-
 from config.settings import (
     HAND_HEIGHT,
     HAND_WIDTH,
@@ -13,13 +11,11 @@ from rendering.backgrounds import render_background
 from rendering.card import render_card
 from rendering.layout import (
     calculate_box_dimensions,
-    calculate_card_angle,
+    calculate_angle,
     calculate_card_y_lift,
+    y_jitter,
 )
 
-Y_JITTER = 5
-
-ANGLE_JITTER = 0.5
 X_START_GAP = int(X_RATIO_GAP * HAND_WIDTH)
 Y_START_GAP = int(Y_RATIO_GAP * HAND_HEIGHT)
 TOTAL_HAND_WIDTH_RATIO: float = 1372 / 1445
@@ -50,20 +46,20 @@ def render_hand(hand: Hand) -> RenderedHand:
     for i, card in enumerate(hand.cards):
         card_image = render_card(card)
 
-        angle = calculate_card_angle(i, card_amount) + random.uniform(-ANGLE_JITTER, ANGLE_JITTER)
+        angle = calculate_angle(i, card_amount)
 
         if i == 0:
             card_gap = calculate_card_gap(card_amount, card_image.width)
 
         x_pos = int(X_START_GAP + i * (card_image.width + card_gap))
-        y_jitter = random.uniform(-Y_JITTER, Y_JITTER)
-        y_pos = round(Y_START_GAP - calculate_card_y_lift(i, card_amount) + y_jitter)
+        y_pos = round(Y_START_GAP - calculate_card_y_lift(i, card_amount) + y_jitter())
 
         card_image = card_image.rotate(angle, expand=True)
         img.paste(card_image, (x_pos, y_pos), card_image)
 
-        annotations.append(calculate_box_dimensions(
-            card, card_image, x_pos, y_pos
+        annotations.append(CardAnnotation(
+            card=card,
+            box=calculate_box_dimensions(card_image, x_pos, y_pos)
         ))
 
     return RenderedHand(

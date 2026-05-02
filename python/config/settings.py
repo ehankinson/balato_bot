@@ -31,6 +31,7 @@ TRAINING_CONFIG = os.path.join(ROOT_DIR, "json", "training_config.json")
 FOLDER_TRAINING_NAMES = ["rank", "suit", "enhancement", "seal", "edition"]
 
 CARD_ID = 0
+JOKER_ID = 1
 
 RANK_CROP = [0.0, 0.0, 0.42, 0.35]
 SEAL_CROP = [55.0, 35.0, 0.6, 0.45]
