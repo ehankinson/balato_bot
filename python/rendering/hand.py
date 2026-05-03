@@ -1,5 +1,4 @@
 from config.settings import (
-    CARD_ID,
     HAND_HEIGHT,
     HAND_WIDTH,
     X_RATIO_GAP,
@@ -60,7 +59,7 @@ def render_hand(hand: Hand, training: bool = False) -> RenderedHand:
 
         annotations.append(CardAnnotation(
             card=card,
-            box=calculate_box_dimensions(card_image, x_pos, y_pos, CARD_ID)
+            box=calculate_box_dimensions(card_image, x_pos, y_pos, HAND_WIDTH, HAND_HEIGHT)
         ))
 
     return RenderedHand(

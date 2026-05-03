@@ -9,7 +9,7 @@ from ultralytics import YOLO
 
 from utils.files import load_json
 from core.enums import CardFeatureTrainingType
-from config.settings import CURR_DIR, TRAINING_CONFIG, FOLDER_TRAINING_NAMES
+from config.settings import ROOT_DIR, TRAINING_CONFIG, FOLDER_TRAINING_NAMES
 
 
 EPOCHS = 5
@@ -18,8 +18,8 @@ BATCH_SIZE = 64
 
 
 
-def train_card_box():
-    trainer_config = os.path.join(CURR_DIR, "../yaml/card_trainer.yaml")
+def train_card_box(config: str):
+    trainer_config = os.path.join(ROOT_DIR, config)
 
     model = YOLO("yolo11n.pt")
 
@@ -41,6 +41,7 @@ def load_config(key: str) -> dict:
 
 
 def train_model(model_type: str):
+    print("started training")
     model_config = load_config(model_type)
 
     data_dir = model_config["data_dir"]
@@ -78,6 +79,7 @@ def train_model(model_type: str):
 
     # ===== TRAIN LOOP =====
     for epoch in range(EPOCHS):
+        print(f"Started Epoch {epoch+1} |")
         model.train()
 
         total_loss = 0
@@ -102,6 +104,9 @@ def train_model(model_type: str):
 
         acc = correct / total
 
+        print("Finished Training | ")
+        print(f"Train Loss: {total_loss:.3f} | Train Acc: {acc:.3f} | ")
+        
         model.eval()
         val_loss = 0
         val_correct = 0
@@ -122,11 +127,7 @@ def train_model(model_type: str):
 
         val_acc = val_correct / val_total
 
-        print(
-            f"Epoch {epoch+1} | "
-            f"Train Loss: {total_loss:.3f} | Train Acc: {acc:.3f} | "
-            f"Val Loss: {val_loss:.3f} | Val Acc: {val_acc:.3f}"
-        )
+        print(f"Val Loss: {val_loss:.3f} | Val Acc: {val_acc:.3f}")
 
     # ===== SAVE MODEL =====
     output_path = model_config["output_path"]
@@ -142,7 +143,27 @@ def train_model(model_type: str):
 
 
 if __name__ == "__main__":
-    # train_card_box()
-    for t in FOLDER_TRAINING_NAMES:
-        print(f"Training {t}")
-        train_model(t)
+    available_commands = {
+        # "all_card_features": {"function": generate_all_feature_data},
+        # "card_enhancement": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.ENHANCEMENT]},
+        # "card_edition": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.EDITION]},
+        # "card_rank": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.RANK]},
+        # "card_suit": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SUIT]},
+        # "card_seal": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SEAL]},
+        "playing_hands": {"function": train_card_box, "args": ["yaml/card_trainer.yaml"]},
+        "jokers": {"function": train_card_box, "args": ["yaml/joker_trainer.yaml"]},
+        "joker_edition": {"function": train_model, "args": ["joker_edition"]},
+        "joker_type": {"function": train_model, "args": ["joker_type"]}
+    }
+
+    if len(sys.argv) < 2 or sys.argv[1] not in available_commands:
+        print("Sorry that command is invalid please add 1 of the following:")
+        for key in available_commands.keys():
+            print(key)
+
+        exit()
+
+    command = sys.argv[1]
+    function = available_commands[command]["function"]
+    args = available_commands[command].get("args", [])
+    function(*args)

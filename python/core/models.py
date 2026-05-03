@@ -4,6 +4,7 @@ from PIL import Image
 from dataclasses import dataclass
 
 from core.enums import Edition, Rank, Suit, Enhancement, Seal, Jokers
+from core.class_indices import JOKER_TYPE_CLASSES
 from core.hand_stats import HandStats
 from core.scoring import get_initial_card_chips, calculate_lucky
 
@@ -27,9 +28,7 @@ BACKGROUND_JOKERS = {
     Jokers.CANIO_BACKGROUND, Jokers.CHICOT_BACKGROUND, Jokers.PERKEO_BACKGROUND, Jokers.YORICK_BACKGROUND, Jokers.HOLOGRAM_BACKGROUND, Jokers.TRIBOULET_BACKGROUND
 }
 
-RANDOM_JOKERS = [
-    joker for joker in list(Jokers) if "REAL_FACE" not in joker.name
-]
+RANDOM_JOKERS = list(JOKER_TYPE_CLASSES)
 
 @dataclass
 class Card:
@@ -199,6 +198,15 @@ class Joker:
             edition=random.choice(list(Edition))
         )
 
+
+    def __repr__(self):
+        base = self.background_image.name.lower()
+        if self.negative:
+            base = f"negative {base}"
+        elif self.edition != Edition.NONE:
+            base = f"{self.edition.name.lower()} {base}"
+
+        return base
 
 @dataclass
 class CardAnnotation:

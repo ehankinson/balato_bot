@@ -28,16 +28,17 @@ ROOT_DIR = os.path.join(CURR_DIR, "..")
 
 TRAINING_CONFIG = os.path.join(ROOT_DIR, "json", "training_config.json")
 
-FOLDER_TRAINING_NAMES = ["rank", "suit", "enhancement", "seal", "edition"]
+FOLDER_TRAINING_NAMES = ["rank", "suit", "enhancement", "seal", "edition", "joker_type", "joker_edition"]
 
-CARD_ID = 0
-JOKER_ID = 1
+BOX_ID = 0
 
 RANK_CROP = [0.0, 0.0, 0.42, 0.35]
 SEAL_CROP = [55.0, 35.0, 0.6, 0.45]
 SUIT_CROP = [12.0, 45.0, 0.28, 0.32]
 ENHANCEMENT_CROP = [5.0, 75.0, 0.25, 0.85]
 EDITION_CROP = [5.0, 75.0, 0.25, 0.85]
+JOKER_TYPE_CROP = [10.0, 10.0, 0.6, 0.95]
+JOKER_EDITION_CROP = JOKER_TYPE_CROP
 
 BACKGROUND_PALETTES = [
     ((31, 122, 77), (68, 164, 95), (18, 78, 62)),

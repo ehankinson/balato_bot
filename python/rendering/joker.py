@@ -1,7 +1,8 @@
 import os
+from functools import lru_cache
 
-from config.settings import CARD_HEIGHT, CARD_WIDTH, JOKER_ID, ROOT_DIR
-from core.enums import Edition
+from config.settings import CARD_HEIGHT, CARD_WIDTH, ROOT_DIR
+from core.enums import Edition, Jokers
 from core.models import CardAnnotation, Joker, RenderedHand
 from PIL import Image
 from utils.files import load_yaml
@@ -36,16 +37,22 @@ def crop_joker(location: dict[str, int]) -> Image.Image:
     return crop_image(JOKERS, location["x_pos"], location["y_pos"], CARD_WIDTH, CARD_HEIGHT)
 
 
-def render_joker(joker: Joker) -> Image.Image:
-    img = crop_joker(JOKER_LOCATIONS[joker.background_image])
-    if joker.face_image is not None:
-        face = crop_joker(JOKER_LOCATIONS[joker.face_image])
+@lru_cache(maxsize=None)
+def render_joker_cached(
+    background_image: int,
+    face_image: int | None,
+    negative: bool,
+    edition: int,
+) -> Image.Image:
+    img = crop_joker(JOKER_LOCATIONS[background_image])
+    if face_image is not None:
+        face = crop_joker(JOKER_LOCATIONS[face_image])
         img.paste(face, (0, 0), face)
 
-    if joker.negative:
+    if negative:
         img = negative_effect(img)
-    elif joker.edition != Edition.NONE:
-        match joker.edition:
+    elif edition != Edition.NONE:
+        match Edition(edition):
             case Edition.FOIL:
                 img = foil_effect(img)
 
@@ -56,6 +63,15 @@ def render_joker(joker: Joker) -> Image.Image:
                 img = hologram_effect(img)
     
     return resize_card(img)
+
+
+def render_joker(joker: Joker) -> Image.Image:
+    return render_joker_cached(
+        int(joker.background_image),
+        int(joker.face_image) if joker.face_image is not None else None,
+        joker.negative,
+        int(joker.edition),
+    ).copy()
 
 
 def joker_gap(card_amount: int, card_width: int) -> float:
@@ -95,7 +111,7 @@ def render_jokers(jokers: list[Joker], training: bool = False):
 
         annotations.append(CardAnnotation(
             card=joker,
-            box=calculate_box_dimensions(joker_image, x_pos, y_pos, JOKER_ID)
+            box=calculate_box_dimensions(joker_image, x_pos, y_pos, IMAGE_WIDTH, IMAGE_HEIGHT)
         ))
 
     return RenderedHand(
@@ -105,6 +121,7 @@ def render_jokers(jokers: list[Joker], training: bool = False):
 
 
 def main() -> None:
+    print(len(list(Jokers)))
     jokers = [Joker.random() for _ in range(8)]
     render_jokers(jokers, True)
 

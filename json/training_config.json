@@ -28,5 +28,17 @@
         "features": 4,
         "img_size": [92, 32],
         "output_path": "models/edition_model.pt"
+    },
+    "joker_type": {
+        "data_dir": "training_data/joker_type_data",
+        "features": 149,
+        "img_size": [128, 128],
+        "output_path": "models/joker_type_model.pt"
+    },
+    "joker_edition": {
+        "data_dir": "training_data/joker_edition_data",
+        "features": 5,
+        "img_size": [128, 128],
+        "output_path": "models/joker_edition_model.pt"
     }
 }

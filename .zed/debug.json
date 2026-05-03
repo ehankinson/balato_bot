@@ -8,6 +8,16 @@
     "env": {
       "PYTHONPATH": "/home/hank/projects/balato_bot/python"
     }
+  },
+  {
+    "label": "Debug data_generator",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "program": "/home/hank/projects/balato_bot/python/data_generator.py",
+    "cwd": "/home/hank/projects/balato_bot",
+    "env": {
+      "PYTHONPATH": "/home/hank/projects/balato_bot/python"
+    },
+    "args": ["joker_type"]
   }
-
 ]

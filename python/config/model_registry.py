@@ -5,5 +5,5 @@ from ultralytics import YOLO
 from config.settings import ROOT_DIR
 
 
-BOX_MODEL = YOLO(os.path.join(ROOT_DIR, "models/card_selector.pt"))
-
+CARD_BOX_MODEL = YOLO(os.path.join(ROOT_DIR, "models/card_selector.pt"))
+JOKER_BOX_MODEL = YOLO(os.path.join(ROOT_DIR, "models/joker_selector.pt"))

@@ -59,6 +59,11 @@ class CardFeatureTrainingType(IntEnum):
     EDITION = 4
 
 
+class JokerFeatureTrainingType(IntEnum):
+    JOKER_TYPE = 0
+    JOKER_EDITION = 1
+
+
 class PokerHand(IntEnum):
     HIGH_CARD = 1
     PAIR = 2

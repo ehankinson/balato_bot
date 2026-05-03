@@ -3,15 +3,16 @@ import sys
 import random
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable
 
-from typing_extensions import Callable
-
-from core.enums import CardFeatureTrainingType, Edition, Enhancement, Rank, Seal, Suit
-from core.models import Card, Hand, RenderedHand, Joker
-from config.model_registry import BOX_MODEL
+from core.class_indices import NEGATIVE_JOKER_EDITION_ID
+from core.enums import CardFeatureTrainingType, Edition, Enhancement, Rank, Seal, Suit, JokerFeatureTrainingType, Jokers
+from core.models import Card, Hand, RenderedHand, Joker, RANDOM_JOKERS
 from config.settings import (
     ENHANCEMENT_CROP,
     FOLDER_TRAINING_NAMES,
+    JOKER_EDITION_CROP,
+    JOKER_TYPE_CROP,
     RANK_CROP,
     SEAL_CROP,
     SUIT_CROP,
@@ -23,18 +24,23 @@ from rendering.joker import render_jokers
 from tqdm import tqdm
 from utils.files import build_folder, rebuild_folder
 from utils.images import card_crop
-from vision import get_card_locations_in_hand
 
 CUTOFF = 0.9 # split between training and val
 CPU_COUNT = os.cpu_count() if os.cpu_count() is not None else 1
-BATCH_SIZE = 50
+BATCH_SIZE = 10
+CropBox = tuple[int | float, int | float, int | float, int | float]
 
-FEATURE_ENUMS = {
+CARD_FEATURE_ENUMS = {
     CardFeatureTrainingType.RANK: Rank,
     CardFeatureTrainingType.SUIT: Suit,
     CardFeatureTrainingType.ENHANCEMENT: Enhancement,
     CardFeatureTrainingType.SEAL: Seal,
     CardFeatureTrainingType.EDITION: Edition
+}
+
+JOKER_FEATURE_ENUMS = {
+    JokerFeatureTrainingType.JOKER_TYPE: RANDOM_JOKERS,
+    JokerFeatureTrainingType.JOKER_EDITION: list(Edition) + [NEGATIVE_JOKER_EDITION_ID]
 }
 
 
@@ -54,7 +60,6 @@ def random_feature_card_amount() -> int:
     )[0]
 
 
-
 def split_work(total_amount: int, worker_amount: int) -> list[range]:
     chunk_size, extra = divmod(total_amount, worker_amount)
     chunks = []
@@ -65,7 +70,6 @@ def split_work(total_amount: int, worker_amount: int) -> list[range]:
         start = end
 
     return chunks
-
 
 
 def generate_rendered_hand(hand_index: int, cutoff: float, is_feature: bool = False) -> tuple[str, str, RenderedHand]:
@@ -88,8 +92,37 @@ def generate_rendered_jokers(hand_index: int, cutoff: float) -> tuple[str, str, 
     return name, split, jokers_render
 
 
+def build_balanced_joker_type_schedule(samples_per_joker: int) -> list[tuple[Jokers, int, str]]:
+    schedule: list[tuple[Jokers, int, str]] = []
+    train_amount = round(samples_per_joker * CUTOFF)
 
-def feature_info(
+    for joker in RANDOM_JOKERS:
+        for sample_index in range(samples_per_joker):
+            joker_amount = sample_index % 9 + 1
+            split = "train" if sample_index < train_amount else "val"
+            schedule.append((joker, joker_amount, split))
+
+    random.shuffle(schedule)
+    return schedule
+
+
+def generate_targeted_rendered_jokers(
+    sample_index: int,
+    cutoff: float,
+    schedule: list[tuple[Jokers, int, str]],
+) -> tuple[str, str, RenderedHand]:
+    target_joker, joker_amount, split = schedule[sample_index]
+    jokers = [Joker(target_joker)]
+    random_joker_pool = [joker for joker in RANDOM_JOKERS if joker != target_joker]
+    jokers.extend(Joker(random.choice(random_joker_pool)) for _ in range(joker_amount - 1))
+    random.shuffle(jokers)
+
+    jokers_render = render_jokers(jokers, True)
+    name = f"{sample_index}_{int(target_joker)}_{joker_amount}"
+    return name, split, jokers_render
+
+
+def card_feature_info(
     train_type: CardFeatureTrainingType, card_image: Image.Image, card: Card
 ) -> tuple[Rank | Suit | Enhancement | Seal | Edition, tuple[int, int, int, int]]:
     w, h = card_image.size
@@ -108,6 +141,38 @@ def feature_info(
 
         case CardFeatureTrainingType.EDITION:
             return card.edition, card_crop(w, h, EDITION_CROP)
+
+
+def joker_feature_info(
+    train_type: JokerFeatureTrainingType, joker_image: Image.Image, joker: Joker
+) -> tuple[Jokers | Edition | int, CropBox]:
+    w, h = joker_image.size
+
+    match train_type:
+        case JokerFeatureTrainingType.JOKER_TYPE:
+            return joker.background_image, card_crop(w, h, JOKER_TYPE_CROP)
+
+        case JokerFeatureTrainingType.JOKER_EDITION:
+            return NEGATIVE_JOKER_EDITION_ID if joker.negative else joker.edition, card_crop(w, h, JOKER_EDITION_CROP)
+
+
+def yolo_box_to_crop(box: list[float], image: Image.Image) -> tuple[int, int, int, int]:
+    _, center_x, center_y, width, height = box
+    image_width, image_height = image.size
+
+    box_width = width * image_width
+    box_height = height * image_height
+    left = round(center_x * image_width - box_width / 2)
+    top = round(center_y * image_height - box_height / 2)
+    right = round(center_x * image_width + box_width / 2)
+    bottom = round(center_y * image_height + box_height / 2)
+
+    left = max(0, min(left, image_width - 1))
+    top = max(0, min(top, image_height - 1))
+    right = max(left + 1, min(right, image_width))
+    bottom = max(top + 1, min(bottom, image_height))
+
+    return left, top, right, bottom
 
 
 def generate_box_training_data(size: int, data_type: str, function: Callable[..., tuple[str, str, RenderedHand]], is_feature: bool = False) -> None:
@@ -163,91 +228,137 @@ def generate_hand_training_data(hand_amount: int = 5000) -> None:
     generate_box_training_data(hand_amount, "hand_data", generate_rendered_hand)
 
 
-def generate_joker_training_data(joker_amount: int = 25000) -> None:
+def generate_joker_training_data(joker_amount: int = 5000) -> None:
     generate_box_training_data(joker_amount, "joker_data", generate_rendered_jokers)
             
 
-
-def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount: int = 5000) -> None:
-    cutoff = hand_amount * CUTOFF
-    start_path = f"training_data/{FOLDER_TRAINING_NAMES[train_type]}_data"
+def generate_feature_data(
+    train_type: Any,
+    amount: int,
+    start_path: str,
+    features: list[Any],
+    render_function: Callable[..., tuple[str, str, RenderedHand]],
+    feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]],
+    skip_function: Callable[[Any], bool] | None = None,
+) -> None:
+    cutoff = amount * CUTOFF
     rebuild_folder(start_path)
 
     for split in ("train", "val"):
         image_path = f"{start_path}/{split}"
         build_folder(image_path)
 
-        for feature in FEATURE_ENUMS[train_type]:
+        for feature in features:
             build_folder(f"{image_path}/{int(feature)}")
 
-    if hand_amount <= 0:
+    if amount <= 0:
         return
 
-    worker_amount = min(max(1, CPU_COUNT // 2), hand_amount)
-    chunks = split_work(hand_amount, worker_amount)
+    worker_amount = min(max(1, CPU_COUNT - 1), amount)
+    chunks = split_work(amount, worker_amount)
 
     progress_lock = threading.Lock()
 
-    def process_hands(hand_indices: range, progress: tqdm) -> None:
+    def process_items(item_indices: range, progress: tqdm) -> None:
         thread_id = threading.get_ident()
         count = 0
 
-        hand_indices = list(hand_indices)
-        for batch_start in range(0, len(hand_indices), BATCH_SIZE):
-            batch_indices = hand_indices[batch_start:batch_start + BATCH_SIZE]
-            batch_data = []
+        for sample_index in item_indices:
+            _, split, rendered_data = render_function(sample_index, cutoff)
+            image = rendered_data.image
+            item_locations = [
+                yolo_box_to_crop(annotation.box, image)
+                for annotation in rendered_data.annotations
+            ]
+            image_path = f"{start_path}/{split}"
 
-            for hand_index in batch_indices:
-                _, split, hand_render = generate_rendered_hand(hand_index, cutoff, True)
-                batch_data.append((split, hand_render))
+            annotations = rendered_data.annotations
+            if len(item_locations) != len(annotations):
+                with progress_lock:
+                    progress.update(1)
+                continue
 
-            hand_images = [hand_render.image for _, hand_render in batch_data]
-            batch_results = BOX_MODEL(hand_images, verbose=False)
+            for item_index, annotation in enumerate(annotations):
+                item_data = annotation.card
 
-            for (split, hand_render), results in zip(batch_data, batch_results):
-                hand_image = hand_render.image
-                card_locations = get_card_locations_in_hand([results])
-                image_path = f"{start_path}/{split}"
-
-                annotations = hand_render.annotations
-                if len(card_locations) != len(annotations):
+                if skip_function is not None and skip_function(item_data):
                     continue
 
-                for card_index, annotation in enumerate(annotations):
-                    card_data = annotation.card
+                item_image = image.crop((
+                    item_locations[item_index][0],
+                    item_locations[item_index][1],
+                    item_locations[item_index][2],
+                    item_locations[item_index][3]
+                ))
 
-                    is_stone = card_data.enhancement == Enhancement.STONE
-                    if is_stone and train_type != CardFeatureTrainingType.ENHANCEMENT:
-                        continue # skipping stones for not enhamcement cards
+                feature, crop_values = feature_function(train_type, item_image, item_data)
+                feature_label = str(int(feature))
+                feature_image_path = f"{image_path}/{feature_label}"
 
-                    card_image = hand_image.crop((
-                        card_locations[card_index][0],
-                        card_locations[card_index][1],
-                        card_locations[card_index][2],
-                        card_locations[card_index][3]
-                    ))
-
-                    feature, crop_values = feature_info(train_type, card_image, card_data)
-                    feature_label = str(int(feature))
-                    feature_image_path = f"{image_path}/{feature_label}"
-
-                    feature_image = f"{feature_image_path}/{thread_id}_{count}_{feature_label}.png"
-                    crop_feature = card_image.crop((crop_values))
-                    crop_feature.save(feature_image)
-                    count += 1
+                feature_image = f"{feature_image_path}/{thread_id}_{count}_{feature_label}.png"
+                crop_feature = item_image.crop((crop_values))
+                crop_feature.save(feature_image)
+                count += 1
 
             with progress_lock:
-                progress.update(len(batch_data))
+                progress.update(1)
 
-    with tqdm(total=hand_amount) as progress:
+    with tqdm(total=amount) as progress:
         with ThreadPoolExecutor(max_workers=worker_amount) as executor:
-            list(executor.map(lambda chunk: process_hands(chunk, progress), chunks))
+            list(executor.map(lambda chunk: process_items(chunk, progress), chunks))
 
 
+def generate_card_feature_data(train_type: CardFeatureTrainingType, hand_amount: int = 5000) -> None:
+    def should_skip_card(card: Card) -> bool:
+        return card.enhancement == Enhancement.STONE and train_type != CardFeatureTrainingType.ENHANCEMENT
+
+    generate_feature_data(
+        train_type=train_type,
+        amount=hand_amount,
+        start_path=f"training_data/{FOLDER_TRAINING_NAMES[train_type]}_data",
+        features=list(CARD_FEATURE_ENUMS[train_type]),
+        render_function=lambda item_index, cutoff: generate_rendered_hand(item_index, cutoff, True),
+        feature_function=card_feature_info,
+        skip_function=should_skip_card,
+    )
+
+
+def generate_joker_feature_data(train_type: JokerFeatureTrainingType, jokers_amount: int = 5000) -> None:
+    if train_type == JokerFeatureTrainingType.JOKER_TYPE:
+        generate_balanced_joker_type_data()
+        return
+
+    generate_feature_data(
+        train_type=train_type,
+        amount=jokers_amount,
+        start_path=f"training_data/{train_type.name.lower()}_data",
+        features=list(JOKER_FEATURE_ENUMS[train_type]),
+        render_function=generate_rendered_jokers,
+        feature_function=joker_feature_info,
+    )
+
+
+def generate_balanced_joker_type_data(samples_per_joker: int = 100) -> None:
+    schedule = build_balanced_joker_type_schedule(samples_per_joker)
+
+    generate_feature_data(
+        train_type=JokerFeatureTrainingType.JOKER_TYPE,
+        amount=len(schedule),
+        start_path=f"training_data/{JokerFeatureTrainingType.JOKER_TYPE.name.lower()}_data",
+        features=list(JOKER_FEATURE_ENUMS[JokerFeatureTrainingType.JOKER_TYPE]),
+        render_function=lambda sample_index, cutoff: generate_targeted_rendered_jokers(sample_index, cutoff, schedule),
+        feature_function=joker_feature_info,
+    )
+    
 
 def generate_all_feature_data() -> None:
     for training_type in CardFeatureTrainingType:
         generate_card_feature_data(training_type)
+
+
+def generate_all_joker_feature_data() -> None:
+    generate_balanced_joker_type_data()
+    generate_joker_feature_data(JokerFeatureTrainingType.JOKER_EDITION)
 
 
 
@@ -260,17 +371,20 @@ if __name__ == '__main__':
         "card_suit": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SUIT]},
         "card_seal": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SEAL]},
         "playing_hands": {"function": generate_hand_training_data},
-        "jokers": {"function": generate_joker_training_data}
-        # "all_joker_features",
-        # "joker_edition"
+        "jokers": {"function": generate_joker_training_data},
+        "all_joker_features": {"function": generate_all_joker_feature_data},
+        "joker_type": {"function": generate_joker_feature_data, "args": [JokerFeatureTrainingType.JOKER_TYPE]},
+        "joker_edition": {"function": generate_joker_feature_data, "args": [JokerFeatureTrainingType.JOKER_EDITION]},
     }
 
-    command = sys.argv[1]
-    if command not in available_commands:
+    if len(sys.argv) < 2 or sys.argv[1] not in available_commands:
         print("Sorry that command is invalid please add 1 of the following:")
         for key in available_commands.keys():
             print(key)
 
+        exit()
+
+    command = sys.argv[1]
     function = available_commands[command]["function"]
     args = available_commands[command].get("args", [])
     function(*args)
