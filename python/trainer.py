@@ -1,21 +1,18 @@
 import os
 import sys
-import torch
 
+import torch
+from config.settings import FOLDER_TRAINING_NAMES, ROOT_DIR, TRAINING_CONFIG
+from core.enums import CardFeatureTrainingType
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms, models
+from torchvision import datasets, models, transforms
 from ultralytics import YOLO
-
 from utils.files import load_json
-from core.enums import CardFeatureTrainingType
-from config.settings import ROOT_DIR, TRAINING_CONFIG, FOLDER_TRAINING_NAMES
-
 
 EPOCHS = 5
 PATIENCE = 2
 BATCH_SIZE = 64
-
 
 
 def train_card_box(config: str):
@@ -24,20 +21,18 @@ def train_card_box(config: str):
     model = YOLO("yolo11n.pt")
 
     model.train(
-        data     = trainer_config,
-        epochs   = EPOCHS,
-        imgsz    = 640, # scales input to be this square
-        batch    = BATCH_SIZE,
-        device   = "cpu" if sys.platform == "darwin" else 0, # 0 GPU / 1 CPU
-        workers  = 4, # how many threads to use to load the data
-        patience = PATIENCE # after x epchos if no change quite
+        data=trainer_config,
+        epochs=EPOCHS,
+        imgsz=640,  # scales input to be this square
+        batch=BATCH_SIZE,
+        device="cpu" if sys.platform == "darwin" else 0,  # 0 GPU / 1 CPU
+        workers=4,  # how many threads to use to load the data
+        patience=PATIENCE,  # after x epchos if no change quite
     )
-
 
 
 def load_config(key: str) -> dict:
     return load_json(TRAINING_CONFIG)[key]
-
 
 
 def train_model(model_type: str):
@@ -50,17 +45,19 @@ def train_model(model_type: str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ===== TRANSFORMS (image prep) =====
-    transform = transforms.Compose([
-        transforms.Resize((height, width)),    # torchvision uses (height, width)
-        transforms.ToTensor(),                 # convert to numbers
-    ])
+    transform = transforms.Compose(
+        [
+            transforms.Resize((height, width)),  # torchvision uses (height, width)
+            transforms.ToTensor(),  # convert to numbers
+        ]
+    )
 
     # ===== LOAD DATA =====
     train_dataset = datasets.ImageFolder(f"{data_dir}/train", transform=transform)
-    val_dataset   = datasets.ImageFolder(f"{data_dir}/val", transform=transform)
+    val_dataset = datasets.ImageFolder(f"{data_dir}/val", transform=transform)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader   = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 
     # ===== MODEL =====
     model = models.mobilenet_v3_small(
@@ -79,7 +76,7 @@ def train_model(model_type: str):
 
     # ===== TRAIN LOOP =====
     for epoch in range(EPOCHS):
-        print(f"Started Epoch {epoch+1} |")
+        print(f"Started Epoch {epoch + 1} |")
         model.train()
 
         total_loss = 0
@@ -106,7 +103,7 @@ def train_model(model_type: str):
 
         print("Finished Training | ")
         print(f"Train Loss: {total_loss:.3f} | Train Acc: {acc:.3f} | ")
-        
+
         model.eval()
         val_loss = 0
         val_correct = 0
@@ -132,14 +129,22 @@ def train_model(model_type: str):
     # ===== SAVE MODEL =====
     output_path = model_config["output_path"]
 
-    torch.save({
-        "model_type": model_type,
-        "arch": "mobilenet_v3_small",
-        "img_size": [width, height],
-        "num_classes": len(train_dataset.classes),
-        "class_names": train_dataset.classes,
-        "state_dict": model.state_dict(),
-    }, output_path)
+    torch.save(
+        {
+            "model_type": model_type,
+            "arch": "mobilenet_v3_small",
+            "img_size": [width, height],
+            "num_classes": len(train_dataset.classes),
+            "class_names": train_dataset.classes,
+            "state_dict": model.state_dict(),
+        },
+        output_path,
+    )
+
+
+def train_joker_features() -> None:
+    for arg in ["joker_edition", "joker_type"]:
+        train_model(arg)
 
 
 if __name__ == "__main__":
@@ -150,10 +155,14 @@ if __name__ == "__main__":
         # "card_rank": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.RANK]},
         # "card_suit": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SUIT]},
         # "card_seal": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SEAL]},
-        "playing_hands": {"function": train_card_box, "args": ["yaml/card_trainer.yaml"]},
+        "playing_hands": {
+            "function": train_card_box,
+            "args": ["yaml/card_trainer.yaml"],
+        },
         "jokers": {"function": train_card_box, "args": ["yaml/joker_trainer.yaml"]},
         "joker_edition": {"function": train_model, "args": ["joker_edition"]},
-        "joker_type": {"function": train_model, "args": ["joker_type"]}
+        "joker_type": {"function": train_model, "args": ["joker_type"]},
+        "all_joker_features": {"function": train_joker_features},
     }
 
     if len(sys.argv) < 2 or sys.argv[1] not in available_commands:

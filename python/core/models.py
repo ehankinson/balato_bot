@@ -3,7 +3,7 @@ import random
 from PIL import Image
 from dataclasses import dataclass
 
-from core.enums import Edition, Rank, Suit, Enhancement, Seal, Jokers
+from core.enums import Edition, Rank, Suit, Enhancement, Seal, JokersName
 from core.class_indices import JOKER_TYPE_CLASSES
 from core.hand_stats import HandStats
 from core.scoring import get_initial_card_chips, calculate_lucky
@@ -25,7 +25,7 @@ CARD_STRINGS = [
 ]
 
 BACKGROUND_JOKERS = {
-    Jokers.CANIO_BACKGROUND, Jokers.CHICOT_BACKGROUND, Jokers.PERKEO_BACKGROUND, Jokers.YORICK_BACKGROUND, Jokers.HOLOGRAM_BACKGROUND, Jokers.TRIBOULET_BACKGROUND
+    JokersName.CANIO_BACKGROUND, JokersName.CHICOT_BACKGROUND, JokersName.PERKEO_BACKGROUND, JokersName.YORICK_BACKGROUND, JokersName.HOLOGRAM_BACKGROUND, JokersName.TRIBOULET_BACKGROUND
 }
 
 RANDOM_JOKERS = list(JOKER_TYPE_CLASSES)
@@ -176,8 +176,8 @@ class Hand:
 
 @dataclass
 class Joker:
-    background_image: Jokers
-    face_image: Jokers | None = None
+    background_image: JokersName
+    face_image: JokersName | None = None
     negative: bool = False
     edition: Edition = Edition.NONE
 
@@ -188,7 +188,7 @@ class Joker:
 
     def _add_face(self):
         if self.background_image in BACKGROUND_JOKERS:
-            self.face_image = Jokers(int(self.background_image) + 10)
+            self.face_image = JokersName(int(self.background_image) + 10)
 
     @classmethod
     def random(cls):

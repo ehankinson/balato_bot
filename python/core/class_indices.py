@@ -1,8 +1,8 @@
-from core.enums import Edition, Jokers
+from core.enums import Edition, JokersName
 
 
 JOKER_TYPE_CLASSES = tuple(
-    joker for joker in Jokers
+    joker for joker in JokersName
     if "REAL_FACE" not in joker.name
 )
 JOKER_TYPE_CLASS_IDS = tuple(int(joker) for joker in JOKER_TYPE_CLASSES)

@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 
 from config.settings import CARD_HEIGHT, CARD_WIDTH, ROOT_DIR
-from core.enums import Edition, Jokers
+from core.enums import Edition, JokersName
 from core.models import CardAnnotation, Joker, RenderedHand
 from PIL import Image
 from utils.files import load_yaml
@@ -121,9 +121,21 @@ def render_jokers(jokers: list[Joker], training: bool = False):
 
 
 def main() -> None:
-    print(len(list(Jokers)))
-    jokers = [Joker.random() for _ in range(8)]
-    render_jokers(jokers, True)
+    
+    jokers = [
+        Joker(background_image=JokersName.THE_IDOL),
+        Joker(background_image=JokersName.SOCK_AND_BUSKIN),
+        Joker(background_image=JokersName.HANGING_CHAD),
+        Joker(background_image=JokersName.TRIBOULET_BACKGROUND),
+        Joker(background_image=JokersName.BLUEPRINT),
+        Joker(background_image=JokersName.BRAIN_STORM, negative=True),
+        Joker(background_image=JokersName.RID_THE_BUS, negative=True)
+    ]
+    a = render_jokers(jokers)
+
+    img = a.image
+
+    img.save("image.png")
 
 
 if __name__ == '__main__':

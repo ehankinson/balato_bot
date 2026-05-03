@@ -8,7 +8,7 @@ import cv2
 from best_hand import get_best_scoring_hand
 from utils.images import card_crop
 from core.models import Card, Joker
-from core.enums import Edition, Rank, Suit, Enhancement, Seal, Jokers
+from core.enums import Edition, Rank, Suit, Enhancement, Seal, JokersName
 from core.class_indices import NEGATIVE_JOKER_EDITION_ID
 from config.model_registry import CARD_BOX_MODEL, JOKER_BOX_MODEL
 from config.settings import EDITION_CROP, JOKER_TYPE_CROP, RANK_CROP, SUIT_CROP, SEAL_CROP, ENHANCEMENT_CROP
@@ -158,7 +158,7 @@ def get_cards(image: Image.Image) -> list[Card | Joker]:
         is_negative = int_e == NEGATIVE_JOKER_EDITION_ID
         edition = 0 if is_negative else int_e
         detected_cards.append(Joker(
-            background_image=Jokers(int(joker_type)),
+            background_image=JokersName(int(joker_type)),
             negative=is_negative,
             edition=Edition(edition)
         ))
@@ -170,7 +170,7 @@ if __name__ == '__main__':
     args = sys.argv
     image_count = args[1]
     # image = Image.open(f"training_data/real_data/hand_{image_count}.png").convert("RGB")
-    image = Image.open("training_data/3_joker.png").convert("RGB")
+    image = Image.open("/home/hank/projects/balato_bot/training_data/7_joker.png").convert("RGB")
     cards = get_cards(image)
     for c in cards:
         print(c)

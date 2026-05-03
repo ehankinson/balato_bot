@@ -79,7 +79,7 @@ class PokerHand(IntEnum):
     FLUSH_FIVE = 12
 
 
-class Jokers(IntEnum):
+class JokersName(IntEnum):
     JOKER = 0
     CHAOS_THE_CLOWN = 1
     JOLLY_JOKER = 2
