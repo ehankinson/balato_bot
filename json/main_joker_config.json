@@ -1,0 +1,2274 @@
+{
+  "joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 4
+    },
+    "buy_price": 2,
+    "sell_price": 1,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "chaos_the_clown": {
+    "rarity": "common",
+    "shop_effects": ["free_first_reroll_per_shop"],
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "jolly_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 8
+    },
+    "condition": {
+      "hand_type": "pair"
+    },
+    "buy_price": 3,
+    "sell_price": 1,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "zany_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 12
+    },
+    "condition": {
+      "hand_type": "three_of_a_kind"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "mad_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 10
+    },
+    "condition": {
+      "hand_type": "two_pair"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "crazy_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 12
+    },
+    "condition": {
+      "hand_type": "straight"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "droll_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 10
+    },
+    "condition": {
+      "hand_type": "flush"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "half_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 20
+    },
+    "condition": {
+      "cards_played": {
+        "less_or_equal": 3
+      }
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "merry_andy": {
+    "rarity": "uncommon",
+    "discards": 3,
+    "hand_size": -1,
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "stone_joker": {
+    "rarity": "uncommon",
+    "scoring": {
+      "chips_from": {
+        "source": "full_deck_count",
+        "condition": {
+          "enhancement": "stone"
+        },
+        "multiplier": 25
+      }
+    },
+    "condition": {
+      "count": "stone"
+    },
+    "spawn_condition": "Only obtainable if there is at least 1 Stone Card in the player's deck.",
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "juggler": {
+    "rarity": "common",
+    "hand_size": 1,
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "drunkard": {
+    "rarity": "common",
+    "discards": 1,
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "acrobat": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult": 3
+    },
+    "condition": {
+      "hands_left": 1
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "sock_and_buskin": {
+    "rarity": "uncommon",
+    "retrigger": true,
+    "condition": {
+      "rank": "facecard"
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "mime": {
+    "rarity": "uncommon",
+    "retrigger": true,
+    "condition": {
+      "held_in_hand": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Held",
+    "copyable": true
+  },
+  "credit_card": {
+    "rarity": "common",
+    "shop_effects": ["minimum_money_-20"],
+    "buy_price": 1,
+    "sell_price": 1,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "greedy_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 3
+    },
+    "condition": {
+      "suit": "diamonds"
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "lusty_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 3
+    },
+    "condition": {
+      "suit": "hearts"
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "wrathful_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 3
+    },
+    "condition": {
+      "suit": "spades"
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "gluttonous_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 3
+    },
+    "condition": {
+      "suit": "spades"
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "troubadour": {
+    "rarity": "uncommon",
+    "hand_size": 2,
+    "hands": -1,
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "banner": {
+    "rarity": "common",
+    "scoring": {
+      "chips_from": {
+        "source": "remaining_discards",
+        "multiplier": 30
+      }
+    },
+    "condition": {
+      "discard_count": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "mystic_summit": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 15
+    },
+    "condition": {
+      "discard_count_equal": 0
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "marble_joker": {
+    "rarity": "uncommon",
+    "adds": "stone",
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Blind Select",
+    "copyable": true
+  },
+  "loyalty_card": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult": 4
+    },
+    "condition": {
+      "every_x_hands": 6
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "hack": {
+    "rarity": "uncommon",
+    "retrigger": true,
+    "condition": {
+      "rank": "low_card"
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "misprint": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": {
+        "min": 0,
+        "max": 23
+      }
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "steel_joker": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from": {
+        "source": "full_deck_count",
+        "condition": {
+          "enhancement": "steel"
+        },
+        "base": 1,
+        "multiplier": 0.2
+      }
+    },
+    "condition": {
+      "count": "steel"
+    },
+    "spawn_condition": "Only obtainable if there is at least 1 Steel Card in the player's deck.",
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "raised_fist": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 4
+    },
+    "condition": {
+      "lowest_rank": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Held",
+    "copyable": true
+  },
+  "golden_joker": {
+    "rarity": "common",
+    "econ": 4,
+    "condition": {
+      "end_of_round": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "blueprint": {
+    "rarity": "rare",
+    "copy": true,
+    "condition": {
+      "joker": "right"
+    },
+    "buy_price": 10,
+    "sell_price": 5,
+    "copyable": true
+  },
+  "glass_joker": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "count": "glass"
+    },
+    "spawn_condition": "Only obtainable if there is at least 1 Glass Card in the player's deck.",
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "card_destroyed",
+        "stat": "x_mult",
+        "change": 0.75,
+        "condition": {
+          "enhancement": "glass"
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "scary_face": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 30
+    },
+    "condition": {
+      "rank": "facecard"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "abstract_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult_from": {
+        "source": "owned_joker_count",
+        "multiplier": 3
+      }
+    },
+    "condition": {
+      "count": "jokers"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "delayed_gratification": {
+    "rarity": "common",
+    "econ": 2,
+    "condition": {
+      "discard_count": true,
+      "discard_used": 0
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "golden_ticket": {
+    "rarity": "common",
+    "econ": 4,
+    "condition": {
+      "enhancement": "gold"
+    },
+    "spawn_condition": "Only obtainable if there is at least 1 Gold Card in the player's deck.",
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "pareidolia": {
+    "rarity": "uncommon",
+    "cards": "facecard",
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "cartomancer": {
+    "rarity": "uncommon",
+    "generate": "tarot",
+    "condition": {
+      "enter_blind": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Blind Select",
+    "copyable": true
+  },
+  "even_steven": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 4
+    },
+    "condition": {
+      "rank": "evens"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "odd_todd": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 31
+    },
+    "condition": {
+      "rank": "odds"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "scholar": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 20,
+      "add_mult": 4
+    },
+    "condition": {
+      "rank": "ace"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "business_card": {
+    "rarity": "common",
+    "econ": 2,
+    "condition": {
+      "rank": "facecard",
+      "prob": 0.5,
+      "played": true
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "supernova": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult_from": {
+        "source": "run_hand_type_play_count",
+        "hand_type": "current"
+      }
+    },
+    "condition": {
+      "poker_hand_played": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "mr_bones": {
+    "rarity": "uncommon",
+    "death": {
+      "target": 0.75
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "seeing_double": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult": 2
+    },
+    "condition": {
+      "suit": {
+        "req": "club"
+      }
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "the_duo": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 2
+    },
+    "condition": {
+      "hand_type": "pair"
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "the_trio": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 3
+    },
+    "condition": {
+      "hand_type": "three_of_a_kind"
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "the_family": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 4
+    },
+    "condition": {
+      "hand_type": "four_of_a_kind"
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "the_order": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 3
+    },
+    "condition": {
+      "hand_type": "straight"
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "the_tribe": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 2
+    },
+    "condition": {
+      "hand_type": "flush"
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "x8_ball": {
+    "rarity": "common",
+    "generate": "tarot",
+    "condition": {
+      "rank": "eight",
+      "prob": 0.25
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "fibonacci": {
+    "rarity": "uncommon",
+    "scoring": {
+      "add_mult": 8
+    },
+    "condition": {
+      "rank": ["ace", "two", "three", "five", "eight"]
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "joker_stencil": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from": {
+        "source": "empty_joker_slots_including_self",
+        "multiplier": 1
+      }
+    },
+    "condition": {
+      "empty_joker_count": true
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "space_joker": {
+    "rarity": "uncommon",
+    "upgrade": "played_hand",
+    "condition": {
+      "prob": 0.25
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Played",
+    "copyable": true
+  },
+  "matador": {
+    "rarity": "uncommon",
+    "econ": 8,
+    "condition": {
+      "idk": "??"
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "ceremonial_dagger": {
+    "rarity": "uncommon",
+    "scoring": {
+      "add_mult_from_state": "add_mult"
+    },
+    "condition": {
+      "joker": "right",
+      "destroy": true,
+      "sell_count": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "state": {
+      "add_mult": 0
+    },
+    "scaling": [
+      {
+        "event": "blind_selected",
+        "stat": "add_mult",
+        "change_from": {
+          "joker_position": "right",
+          "value": "sell_price",
+          "multiplier": 2
+        },
+        "after": {
+          "destroy_joker_position": "right"
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "showman": {
+    "rarity": "uncommon",
+    "upgrade": "find_jokers",
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "fortune_teller": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult_from": {
+        "source": "run_tarot_cards_used",
+        "multiplier": 1
+      }
+    },
+    "condition": {
+      "tarot_used": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "hit_the_road": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "rank": "jack",
+      "discard_card": true
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Mixed",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "card_discarded",
+        "stat": "x_mult",
+        "change": 0.5,
+        "condition": {
+          "rank": "jack"
+        },
+        "scope": "current_round"
+      }
+    ],
+    "reset": [
+      {
+        "event": "round_started",
+        "state": {
+          "x_mult": 1
+        }
+      }
+    ],
+    "copyable": true
+  },
+  "swashbuckler": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult_from": {
+        "source": "other_owned_jokers_sell_value_sum"
+      }
+    },
+    "condition": {
+      "joker_sell_value": true
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "flower_pot": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult": 3
+    },
+    "condition": {
+      "suit": {
+        "req": ["club", "spade", "heart", "diamond"]
+      }
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "rid_the_bus": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult_from_state": "add_mult"
+    },
+    "condition": {
+      "rank": "not_facecards",
+      "reset": {
+        "played": "facecard"
+      }
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Mixed",
+    "state": {
+      "add_mult": 0
+    },
+    "scaling": [
+      {
+        "event": "hand_played",
+        "stat": "add_mult",
+        "change": 1,
+        "condition": {
+          "scoring_cards": {
+            "rank": {
+              "not": "facecard"
+            }
+          }
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "reset": [
+      {
+        "event": "hand_played",
+        "condition": {
+          "scoring_cards": {
+            "rank": "facecard"
+          }
+        },
+        "state": {
+          "add_mult": 0
+        }
+      }
+    ],
+    "copyable": true
+  },
+  "shoot_the_moon": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 13
+    },
+    "condition": {
+      "rank": "queen",
+      "reset": {
+        "held_in_hand": true
+      }
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Held",
+    "copyable": true
+  },
+  "smeared_joker": {
+    "rarity": "uncommon",
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "oops_all_6s": {
+    "rarity": "uncommon",
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "four_fingers": {
+    "rarity": "uncommon",
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "gros_michel": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 15
+    },
+    "condition": {
+      "destroy_chance": 0.0667
+    },
+    "spawn_condition": "Only obtainable while Gros Michel has not yet gone \"extinct\" during the current run.",
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "stuntman": {
+    "rarity": "rare",
+    "scoring": {
+      "chips": 250
+    },
+    "hand_size": -2,
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "hanging_chad": {
+    "rarity": "common",
+    "retrigger": true,
+    "condition": {
+      "first_played_card": true
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "drivers_license": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 3
+    },
+    "condition": {
+      "full_deck_count": {
+        "enhancement": {
+          "not": "none"
+        },
+        "greater_or_equal": 16
+      }
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "invisible_joker": {
+    "rarity": "rare",
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "N/A (Passive)",
+    "state": {
+      "rounds_held": 0
+    },
+    "scaling": [
+      {
+        "event": "round_ended",
+        "stat": "rounds_held",
+        "change": 1,
+        "scope": "while_owned"
+      }
+    ],
+    "sell_effect": {
+      "condition": {
+        "rounds_held": {
+          "greater_or_equal": 2
+        }
+      },
+      "effect": "duplicate_random_joker",
+      "remove_negative_from_copy": true
+    },
+    "copyable": true
+  },
+  "astronomer": {
+    "rarity": "uncommon",
+    "shop_effects": ["free_planet_cards", "free_celestial_packs"],
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "burnt_joker": {
+    "rarity": "rare",
+    "upgrade": "discarded_hand",
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "On Discard",
+    "copyable": true
+  },
+  "dusk": {
+    "rarity": "uncommon",
+    "retrigger": true,
+    "condition": {
+      "hands_left": "1"
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "throwback": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from": {
+        "source": "run_blinds_skipped",
+        "base": 1,
+        "multiplier": 0.25
+      }
+    },
+    "condition": {
+      "skip_count": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "the_idol": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult": 2
+    },
+    "condition": {
+      "rank": {
+        "req": "rank"
+      },
+      "suit": {
+        "req": "suit"
+      }
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "brainstorm": {
+    "rarity": "rare",
+    "copy": true,
+    "condition": {
+      "joker": "left"
+    },
+    "buy_price": 10,
+    "sell_price": 5,
+    "copyable": true
+  },
+  "satellite": {
+    "rarity": "uncommon",
+    "econ": 1,
+    "condition": {
+      "unique_planet_card_count": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "econ_from": {
+      "source": "unique_planet_cards_used_this_run",
+      "money_per": 1,
+      "event": "round_ended"
+    },
+    "copyable": true
+  },
+  "rough_gem": {
+    "rarity": "uncommon",
+    "econ": 1,
+    "condition": {
+      "suit": {
+        "req": "diamond"
+      }
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "bloodstone": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult": 1.5
+    },
+    "condition": {
+      "suit": {
+        "req": "heart"
+      },
+      "prob": 0.5
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "arrowhead": {
+    "rarity": "uncommon",
+    "scoring": {
+      "chips": 30
+    },
+    "condition": {
+      "suit": {
+        "req": "spades"
+      }
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "onyx_agate": {
+    "rarity": "uncommon",
+    "scoring": {
+      "add_mult": 7
+    },
+    "condition": {
+      "suit": {
+        "req": "clubs"
+      }
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "canio_background": {
+    "rarity": "legendary",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "destroy": "facecard"
+    },
+    "buy_price": 20,
+    "shop_available": false,
+    "buy_price_text": "20 (cannot be found in shop)",
+    "sell_price": 10,
+    "activation": "Mixed",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "card_destroyed",
+        "stat": "x_mult",
+        "change": 1,
+        "condition": {
+          "rank": "facecard"
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "triboulet_background": {
+    "rarity": "legendary",
+    "scoring": {
+      "x_mult": 2
+    },
+    "condition": {
+      "rank": "facecard"
+    },
+    "buy_price": 20,
+    "shop_available": false,
+    "buy_price_text": "20 (cannot be found in shop)",
+    "sell_price": 10,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "yorick_background": {
+    "rarity": "legendary",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "discard_count": 23
+    },
+    "buy_price": 20,
+    "shop_available": false,
+    "buy_price_text": "20 (cannot be found in shop)",
+    "sell_price": 10,
+    "activation": "Mixed",
+    "state": {
+      "x_mult": 1,
+      "discarded_cards_since_gain": 0
+    },
+    "scaling": [
+      {
+        "event": "card_discarded",
+        "counter": "discarded_cards_since_gain",
+        "threshold": 23,
+        "stat": "x_mult",
+        "change": 1,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "chicot_background": {
+    "rarity": "legendary",
+    "buy_price": 20,
+    "shop_available": false,
+    "buy_price_text": "20 (cannot be found in shop)",
+    "sell_price": 10,
+    "activation": "On Blind Select",
+    "copyable": true
+  },
+  "perkeo_background": {
+    "rarity": "legendary",
+    "generate": "tarot",
+    "buy_price": 20,
+    "shop_available": false,
+    "buy_price_text": "20 (cannot be found in shop)",
+    "sell_price": 10,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "certificate": {
+    "rarity": "uncommon",
+    "generate": "seal_card",
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "bootstraps": {
+    "rarity": "uncommon",
+    "scoring": {
+      "add_mult_from": {
+        "source": "money",
+        "per": 5,
+        "multiplier": 2
+      }
+    },
+    "condition": {
+      "money": {
+        "mod": 5
+      }
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "egg": {
+    "rarity": "common",
+    "econ": 2,
+    "condition": {
+      "money": 3,
+      "end_of_round": true
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "burglar": {
+    "rarity": "uncommon",
+    "hands": 3,
+    "discards": 0,
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Blind Select",
+    "copyable": true
+  },
+  "blackboard": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult": 3
+    },
+    "condition": {
+      "suit": {
+        "req_only": ["clubs", "spades"]
+      }
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "runner": {
+    "rarity": "common",
+    "scoring": {
+      "chips_from_state": "chips"
+    },
+    "condition": {
+      "hand_type_count": "straight"
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Mixed",
+    "state": {
+      "chips": 0
+    },
+    "scaling": [
+      {
+        "event": "hand_played",
+        "stat": "chips",
+        "change": 15,
+        "condition": {
+          "hand_contains": ["straight"]
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "ice_cream": {
+    "rarity": "common",
+    "scoring": {
+      "chips_from_state": "chips"
+    },
+    "condition": {
+      "round_used": -5
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "state": {
+      "chips": 100
+    },
+    "scaling": [
+      {
+        "event": "round_ended",
+        "stat": "chips",
+        "change": -5,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "dna": {
+    "rarity": "rare",
+    "clone": true,
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "On Played",
+    "copyable": true
+  },
+  "splash": {
+    "rarity": "common",
+    "buy_price": 3,
+    "sell_price": 1,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "blue_joker": {
+    "rarity": "common",
+    "scoring": {
+      "chips_from": {
+        "source": "remaining_deck_cards",
+        "multiplier": 2
+      }
+    },
+    "condition": {
+      "card_count": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "sixth_sense": {
+    "rarity": "uncommon",
+    "generate": "spectral",
+    "condition": {
+      "rank": "six",
+      "destroy": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "constellation": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "planet_card_count": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "planet_card_used",
+        "stat": "x_mult",
+        "change": 0.1,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "hiker": {
+    "rarity": "uncommon",
+    "scoring": {
+      "card_chips": 5
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "faceless": {
+    "rarity": "common",
+    "econ": 5,
+    "condition": {
+      "rank": "facecard",
+      "card_count": 3
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Discard",
+    "copyable": true
+  },
+  "green_joker": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult_from_state": "add_mult"
+    },
+    "condition": {
+      "hand_played": 1,
+      "discard_count": -1
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Mixed",
+    "state": {
+      "add_mult": 0
+    },
+    "scaling": [
+      {
+        "event": "hand_played",
+        "stat": "add_mult",
+        "change": 1,
+        "scope": "while_owned"
+      },
+      {
+        "event": "discard_used",
+        "stat": "add_mult",
+        "change": -1,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "superposition": {
+    "rarity": "common",
+    "generate": "tarot",
+    "condition": {
+      "hand_type": "straight",
+      "rank": {
+        "req": "ace"
+      }
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "to_do_list": {
+    "rarity": "common",
+    "econ": 4,
+    "condition": {
+      "hand_type_played": true
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Played",
+    "copyable": true
+  },
+  "cavendish": {
+    "rarity": "common",
+    "scoring": {
+      "x_mult": 3
+    },
+    "condition": {
+      "destroy_chance": 0.001
+    },
+    "spawn_condition": "Only obtainable if Gros Michel ({{mult|+15}}<br>{{hl|green|1 in 6}} chance this card is destroyed at end of round Common Additive Mult Independent Gros Michel.png) has gone \"extinct\" during the current run.",
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "card_sharp": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult": 3
+    },
+    "condition": {
+      "hand_type_played": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "red_card": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult_from_state": "add_mult"
+    },
+    "condition": {
+      "pack_skip_count": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "state": {
+      "add_mult": 0
+    },
+    "scaling": [
+      {
+        "event": "booster_pack_skipped",
+        "stat": "add_mult",
+        "change": 3,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "madness": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "joker_destroyed_count": true
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "Independent",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "blind_selected",
+        "stat": "x_mult",
+        "change": 0.5,
+        "condition": {
+          "blind_type": ["small_blind", "big_blind"]
+        },
+        "after": {
+          "destroy_random_joker": true
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "square_joker": {
+    "rarity": "common",
+    "scoring": {
+      "chips_from_state": "chips"
+    },
+    "condition": {
+      "hand_played_size": 4
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Mixed",
+    "state": {
+      "chips": 0
+    },
+    "scaling": [
+      {
+        "event": "hand_played",
+        "stat": "chips",
+        "change": 4,
+        "condition": {
+          "cards_played": {
+            "equals": 4
+          }
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "seance": {
+    "rarity": "uncommon",
+    "generate": "spectral",
+    "condition": {
+      "hand_type_played": "straight_flush"
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "riff_raff": {
+    "rarity": "uncommon",
+    "generate": "jokers",
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Blind Select",
+    "copyable": true
+  },
+  "vampire": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "enhancement_destroyed": true
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "Mixed",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "card_scored",
+        "stat": "x_mult",
+        "change": 0.1,
+        "condition": {
+          "enhancement": {
+            "not": "none"
+          }
+        },
+        "after": {
+          "remove_enhancement": true
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "shortcut": {
+    "rarity": "uncommon",
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "hologram_background": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "card_count_above": true
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "Independent",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "playing_card_added_to_deck",
+        "stat": "x_mult",
+        "change": 0.25,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "vagabond": {
+    "rarity": "rare",
+    "generate": "tarot",
+    "condition": {
+      "money_below": true
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "baron": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 1.5
+    },
+    "condition": {
+      "rank": "king",
+      "held_in_hand": true
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "On Held",
+    "copyable": true
+  },
+  "cloud_9": {
+    "rarity": "uncommon",
+    "econ": 1,
+    "condition": {
+      "rank": "nine"
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "econ_from": {
+      "source": "full_deck_count",
+      "condition": {
+        "rank": "nine"
+      },
+      "money_per": 1,
+      "event": "round_ended"
+    },
+    "copyable": true
+  },
+  "rocket": {
+    "rarity": "uncommon",
+    "econ": 1,
+    "condition": {
+      "rank": "nine"
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": false
+  },
+  "obelisk": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "most_played_hand": false
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "Mixed",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "hand_played",
+        "stat": "x_mult",
+        "change": 0.2,
+        "condition": {
+          "hand_type": {
+            "not": "most_played_hand"
+          }
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "reset": [
+      {
+        "event": "hand_played",
+        "condition": {
+          "hand_type": "most_played_hand"
+        },
+        "state": {
+          "x_mult": 1
+        }
+      }
+    ],
+    "copyable": true
+  },
+  "midas_mask": {
+    "rarity": "uncommon",
+    "generate": "gold",
+    "condition": {
+      "rank": "facecard"
+    },
+    "buy_price": 7,
+    "sell_price": 3,
+    "activation": "On Played",
+    "copyable": true
+  },
+  "luchador": {
+    "rarity": "uncommon",
+    "condition": {
+      "sell": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "photograph": {
+    "rarity": "common",
+    "scoring": {
+      "x_mult": 2
+    },
+    "condition": {
+      "rank": "facecard",
+      "first_played_facecard": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "gift_card": {
+    "rarity": "uncommon",
+    "econ": 1,
+    "condition": {
+      "sell_value": {
+        "jokers": true,
+        "consumable": true
+      }
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "turtle_bean": {
+    "rarity": "uncommon",
+    "hand_size": 5,
+    "condition": {
+      "round_used": 5
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "state": {
+      "hand_size": 5
+    },
+    "hand_size_from_state": "hand_size",
+    "scaling": [
+      {
+        "event": "round_ended",
+        "stat": "hand_size",
+        "change": -1,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "erosion": {
+    "rarity": "uncommon",
+    "scoring": {
+      "add_mult_from": {
+        "source": "cards_below_starting_deck_size",
+        "multiplier": 4
+      }
+    },
+    "condition": {
+      "card_count_below": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "reserved_parking": {
+    "rarity": "common",
+    "econ": 1,
+    "condition": {
+      "rank": "facecard",
+      "held_in_hand": true,
+      "prob": 0.5
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Held",
+    "copyable": true
+  },
+  "mail_in_rebate": {
+    "rarity": "uncommon",
+    "econ": 5,
+    "condition": {
+      "rank": {
+        "req": "rank"
+      },
+      "suit": {
+        "req": "suit"
+      }
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Discard",
+    "copyable": true
+  },
+  "to_the_moon": {
+    "rarity": "uncommon",
+    "econ": 1,
+    "condition": {
+      "econ_greater_than_5": 5
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "hallucination": {
+    "rarity": "common",
+    "generate": "tarot",
+    "condition": {
+      "open_consumable": true,
+      "prob": 0.5
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "sly_joker": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 50
+    },
+    "condition": {
+      "hand_type": "pair"
+    },
+    "buy_price": 3,
+    "sell_price": 1,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "wily_joker": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 100
+    },
+    "condition": {
+      "hand_type": "three_of_a_kind"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "clever_joker": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 80
+    },
+    "condition": {
+      "hand_type": "two_pair"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "devious_joker": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 100
+    },
+    "condition": {
+      "hand_type": "straight"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "crafty_joker": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 80
+    },
+    "condition": {
+      "hand_type": "flush"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "lucky_cat": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "lucky_hit_count": true
+    },
+    "spawn_condition": "Only obtainable if there is at least 1 Lucky Card in the player's deck.",
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Mixed",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "lucky_card_success",
+        "stat": "x_mult",
+        "change": 0.25,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "baseball_card": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 1.5
+    },
+    "condition": {
+      "uncommon_joker_count": true
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "On Other Jokers",
+    "copyable": true
+  },
+  "bull": {
+    "rarity": "uncommon",
+    "scoring": {
+      "chips_from": {
+        "source": "money",
+        "per": 1,
+        "multiplier": 2
+      }
+    },
+    "condition": {
+      "econ": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Independent",
+    "copyable": true
+  },
+  "diet_cola": {
+    "rarity": "uncommon",
+    "condition": {
+      "sell": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "N/A (Passive)",
+    "copyable": true
+  },
+  "trading_card": {
+    "rarity": "uncommon",
+    "econ": 3,
+    "condition": {
+      "discard_card": true
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Discard",
+    "copyable": true
+  },
+  "flash_card": {
+    "rarity": "uncommon",
+    "scoring": {
+      "add_mult_from_state": "add_mult"
+    },
+    "condition": {
+      "reroll_count": true
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "state": {
+      "add_mult": 0
+    },
+    "scaling": [
+      {
+        "event": "shop_reroll",
+        "stat": "add_mult",
+        "change": 2,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "popcorn": {
+    "rarity": "uncommon",
+    "scoring": {
+      "add_mult_from_state": "add_mult"
+    },
+    "condition": {
+      "round_used": -4
+    },
+    "buy_price": 5,
+    "sell_price": 2,
+    "activation": "Independent",
+    "state": {
+      "add_mult": 20
+    },
+    "scaling": [
+      {
+        "event": "round_ended",
+        "stat": "add_mult",
+        "change": -4,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "ramen": {
+    "rarity": "uncommon",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "discard_count": -0.01
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Mixed",
+    "state": {
+      "x_mult": 2
+    },
+    "scaling": [
+      {
+        "event": "card_discarded",
+        "stat": "x_mult",
+        "change": -0.01,
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "seltzer": {
+    "rarity": "uncommon",
+    "retrigger": true,
+    "condition": {
+      "hand_played": -1
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "spare_trousers": {
+    "rarity": "uncommon",
+    "scoring": {
+      "add_mult_from_state": "add_mult"
+    },
+    "condition": {
+      "hand_type": "two_pair"
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Mixed",
+    "state": {
+      "add_mult": 0
+    },
+    "scaling": [
+      {
+        "event": "hand_played",
+        "stat": "add_mult",
+        "change": 2,
+        "condition": {
+          "hand_contains": ["two_pair"]
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "copyable": true
+  },
+  "campfire": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult_from_state": "x_mult"
+    },
+    "condition": {
+      "sell_count": true,
+      "reset": "end_of_ante"
+    },
+    "buy_price": 9,
+    "sell_price": 4,
+    "activation": "Independent",
+    "state": {
+      "x_mult": 1
+    },
+    "scaling": [
+      {
+        "event": "card_sold",
+        "stat": "x_mult",
+        "change": 0.25,
+        "scope": "while_owned"
+      }
+    ],
+    "reset": [
+      {
+        "event": "boss_blind_defeated",
+        "state": {
+          "x_mult": 1
+        }
+      }
+    ],
+    "copyable": true
+  },
+  "smiley_face": {
+    "rarity": "common",
+    "scoring": {
+      "add_mult": 5
+    },
+    "condition": {
+      "rank": "facecard"
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "ancient_joker": {
+    "rarity": "rare",
+    "scoring": {
+      "x_mult": 1.5
+    },
+    "condition": {
+      "rank": {
+        "req": true
+      }
+    },
+    "buy_price": 8,
+    "sell_price": 4,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "walkie_talkie": {
+    "rarity": "common",
+    "scoring": {
+      "chips": 10,
+      "add_mult": 4
+    },
+    "condition": {
+      "rank": ["ten", "four"]
+    },
+    "buy_price": 4,
+    "sell_price": 2,
+    "activation": "On Scored",
+    "copyable": true
+  },
+  "castle": {
+    "rarity": "uncommon",
+    "scoring": {
+      "chips_from_state": "chips"
+    },
+    "condition": {
+      "rank": {
+        "req": true
+      }
+    },
+    "buy_price": 6,
+    "sell_price": 3,
+    "activation": "Mixed",
+    "state": {
+      "chips": 0,
+      "target_suit": "round_suit"
+    },
+    "scaling": [
+      {
+        "event": "card_discarded",
+        "stat": "chips",
+        "change": 3,
+        "condition": {
+          "suit": "target_suit"
+        },
+        "scope": "while_owned"
+      }
+    ],
+    "dynamic_target": {
+      "target_suit": {
+        "changes": "every_round"
+      }
+    },
+    "copyable": true
+  }
+}

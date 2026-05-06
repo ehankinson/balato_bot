@@ -1,9 +1,9 @@
 import time
 from itertools import combinations, permutations, product
 
-from core.enums import Edition, Enhancement, PokerHand, Rank, Seal, Suit
+from core.enums import Edition, Enhancement, PokerHand, Rank, Seal, Suit, JokerNames
 from core.hand_stats import HandStats
-from core.models import Card
+from core.models import Card, Joker
 from config.poker_hands import HAND_STATS
 
 

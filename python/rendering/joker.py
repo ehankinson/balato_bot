@@ -128,7 +128,7 @@ def main() -> None:
         Joker(background_image=JokersName.HANGING_CHAD),
         Joker(background_image=JokersName.TRIBOULET_BACKGROUND),
         Joker(background_image=JokersName.BLUEPRINT),
-        Joker(background_image=JokersName.BRAIN_STORM, negative=True),
+        Joker(background_image=JokersName.BRAINSTORM, negative=True),
         Joker(background_image=JokersName.RID_THE_BUS, negative=True)
     ]
     a = render_jokers(jokers)

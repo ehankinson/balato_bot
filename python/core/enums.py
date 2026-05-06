@@ -120,7 +120,7 @@ class JokersName(IntEnum):
     CARTOMANCER = 37
     EVEN_STEVEN = 38
     ODD_TODD = 39
-    SCHOLER = 40
+    SCHOLAR = 40
     BUSINESS_CARD = 41
     SUPERNOVA = 42
     MR_BONES = 43
@@ -151,12 +151,12 @@ class JokersName(IntEnum):
     HANGING_CHAD = 69
     DRIVERS_LICENSE = 70
     INVISIBLE_JOKER = 71
-    ASTONOMER = 72
+    ASTRONOMER = 72
     BURNT_JOKER = 73
     DUSK = 74
     THROWBACK = 75
     THE_IDOL = 76
-    BRAIN_STORM = 77
+    BRAINSTORM = 77
     SATELLITE = 78
     ROUGH_GEM = 79
     BLOODSTONE = 80
@@ -226,7 +226,7 @@ class JokersName(IntEnum):
     DIET_COLA = 148
     TRADING_CARD = 149
     FLASH_CARD = 150
-    POP_CORN = 151
+    POPCORN = 151
     RAMEN = 152
     SELTZER = 153
     SPARE_TROUSERS = 154
