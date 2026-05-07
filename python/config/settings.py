@@ -1,7 +1,6 @@
 import os
 import sys
 
-
 if sys.platform == "darwin":
     hand_dimenstions = [845, 224]
 elif sys.platform.startswith("linux"):
@@ -27,8 +26,17 @@ CURR_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT_DIR = os.path.join(CURR_DIR, "..")
 
 TRAINING_CONFIG = os.path.join(ROOT_DIR, "json", "training_config.json")
+JOKER_CONFIG = os.path.join(ROOT_DIR, "json", "main_joker_config.json")
 
-FOLDER_TRAINING_NAMES = ["rank", "suit", "enhancement", "seal", "edition", "joker_type", "joker_edition"]
+FOLDER_TRAINING_NAMES = [
+    "rank",
+    "suit",
+    "enhancement",
+    "seal",
+    "edition",
+    "joker_type",
+    "joker_edition",
+]
 
 BOX_ID = 0
 
@@ -48,4 +56,3 @@ BACKGROUND_PALETTES = [
     ((84, 52, 135), (135, 82, 186), (48, 34, 86)),
 ]
 BACKGROUND_POOL_SIZE = 32
-

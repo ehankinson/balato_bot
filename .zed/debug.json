@@ -13,11 +13,10 @@
     "label": "Debug data_generator",
     "adapter": "Debugpy",
     "request": "launch",
-    "program": "/home/hank/projects/balato_bot/python/data_generator.py",
-    "cwd": "/home/hank/projects/balato_bot",
+    "program": "~/projects/balato_bot/python/best_hand.py",
+    "cwd": "~/projects/balato_bot",
     "env": {
-      "PYTHONPATH": "/home/hank/projects/balato_bot/python"
-    },
-    "args": ["joker_type"]
+      "PYTHONPATH": "~/projects/balato_bot/python"
+    }
   }
 ]

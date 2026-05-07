@@ -1,7 +1,7 @@
 import time
 from itertools import combinations, permutations, product
 
-from core.enums import Edition, Enhancement, PokerHand, Rank, Seal, Suit, JokerNames
+from core.enums import Edition, Enhancement, PokerHand, Rank, Seal, Suit, JokersName
 from core.hand_stats import HandStats
 from core.models import Card, Joker
 from config.poker_hands import HAND_STATS
@@ -319,14 +319,20 @@ def get_best_scoring_hand(cards: list[Card]) -> tuple[float, list[list[Card]]]:
 
 if __name__ == "__main__":
     cards = [
-        Card(Rank.KING, Suit.CLUBS, Enhancement.GLASS, Seal.RED, Edition.NONE),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
-        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
-        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
-        Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.TEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.ACE, Suit.CLUBS, Enhancement.GLASS, Seal.GOLD, Edition.NONE),
+        Card(Rank.ACE, Suit.SPADES, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.KING, Suit.SPADES, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.QUEEN, Suit.SPADES, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.JACK, Suit.SPADES, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.TEN, Suit.SPADES, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+    ]
+
+    jokers = [
+        Joker(JokersName.ZANY_JOKER),
+        Joker(JokersName.WILY_JOKER),
+        Joker(JokersName.TRIBOULET_BACKGROUND)
     ]
 
     # hand = Hand.random_hand(8)
