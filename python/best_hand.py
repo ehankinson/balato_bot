@@ -1,10 +1,10 @@
 import time
 from itertools import combinations, permutations, product
 
-from core.enums import Edition, Enhancement, PokerHand, Rank, Seal, Suit, JokersName
+from config.poker_hands import HAND_STATS
+from core.enums import Edition, Enhancement, JokersName, PokerHand, Rank, Seal, Suit
 from core.hand_stats import HandStats
 from core.models import Card, Joker
-from config.poker_hands import HAND_STATS
 
 
 def get_stone_cards(cards: list[Card]) -> list[Card]:
@@ -38,7 +38,9 @@ def is_straight(cards: list[Card]) -> bool:
     return True
 
 
-def generate_individual_x_of_a_kind(hand_size: int, cards: list[Card]) -> list[list[Card]]:
+def generate_individual_x_of_a_kind(
+    hand_size: int, cards: list[Card]
+) -> list[list[Card]]:
     return [list(val) for val in permutations(cards, hand_size)]
 
 
@@ -207,7 +209,7 @@ def get_full_house(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
                 hands.append(triple + pair)
 
     return hands
-    
+
 
 def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
     hands: list[list[Card]] = []
@@ -237,7 +239,7 @@ def get_hand_type(hand: list[Card]) -> HandStats:
         case 5:
             flush = is_flush(hand)
             straight = is_straight(list(hand))
-            
+
             checks = [
                 (flush and all_same_rank, PokerHand.FLUSH_FIVE),
                 (flush and has_two_ranks and not straight, PokerHand.FLUSH_HOUSE),
@@ -247,7 +249,7 @@ def get_hand_type(hand: list[Card]) -> HandStats:
                 (flush and not straight, PokerHand.FLUSH),
                 (straight, PokerHand.STRAIGHT),
             ]
-        
+
             for condition, hand_type in checks:
                 if condition:
                     return HAND_STATS[hand_type]
@@ -260,8 +262,9 @@ def get_hand_type(hand: list[Card]) -> HandStats:
         case _:
             return HAND_STATS[PokerHand(hand_len)]
 
-    raise ValueError(f"The current hand: {hand} does not have a possible hand, This hand is impossible")
-
+    raise ValueError(
+        f"The current hand: {hand} does not have a possible hand, This hand is impossible"
+    )
 
 
 def calculate_score(
@@ -309,7 +312,6 @@ def calculate_score(
     return best_score, best_hand
 
 
-
 def get_best_scoring_hand(cards: list[Card]) -> tuple[float, list[list[Card]]]:
     hands = generate_playable_hands(cards)
     stone_cards = get_stone_cards(cards)
@@ -332,7 +334,7 @@ if __name__ == "__main__":
     jokers = [
         Joker(JokersName.ZANY_JOKER),
         Joker(JokersName.WILY_JOKER),
-        Joker(JokersName.TRIBOULET_BACKGROUND)
+        Joker(JokersName.TRIBOULET_BACKGROUND),
     ]
 
     # hand = Hand.random_hand(8)

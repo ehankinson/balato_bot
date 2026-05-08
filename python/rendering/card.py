@@ -1,17 +1,18 @@
 import os
 from functools import lru_cache
 
-from core.enums import Edition, Enhancement
-from core.models import Card
 from config.settings import (
     CARD_HEIGHT,
     CARD_WIDTH,
     CURR_DIR,
 )
+from core.enums import Edition, Enhancement
+from core.models import Card
 from PIL import Image
-from rendering.effects import foil_effect, hologram_effect, polychrome_effect
 from utils.files import load_yaml
 from utils.images import crop_image, resize_card
+
+from rendering.effects import foil_effect, hologram_effect, polychrome_effect
 
 PLAYING_CARDS = Image.open(
     os.path.join(CURR_DIR, "../game_images/8BitDeck.png")
@@ -27,7 +28,9 @@ ENHANCEMENT_LOCATIONS = load_yaml(
 
 def get_background(enhancement: Enhancement) -> Image.Image:
     locations = ENHANCEMENT_LOCATIONS["enhancements"][enhancement]
-    return crop_image(ENHANCEMENTS, locations["x_pos"], locations["y_pos"], CARD_WIDTH, CARD_HEIGHT)
+    return crop_image(
+        ENHANCEMENTS, locations["x_pos"], locations["y_pos"], CARD_WIDTH, CARD_HEIGHT
+    )
 
 
 def get_card(img: Image.Image, rank: int, suit: int) -> Image.Image:
@@ -78,19 +81,23 @@ def render_card_cached(
     rank: int, suit: int, enhancement: int, seal: int, edition: int
 ) -> Image.Image:
     img = get_background(Enhancement(enhancement))
-    
+
     if enhancement != Enhancement.STONE:
         img = get_card(img, rank, suit)
 
     img = add_edition(img, edition)
     img = add_seal(img, seal)
-    
+
     return resize_card(img)
 
 
 def render_card(card: Card) -> Image.Image:
     return render_card_cached(
-        int(card.rank), int(card.suit), int(card.enhancement), int(card.seal), int(card.edition)
+        int(card.rank),
+        int(card.suit),
+        int(card.enhancement),
+        int(card.seal),
+        int(card.edition),
     ).copy()
 
 

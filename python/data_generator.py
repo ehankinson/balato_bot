@@ -304,7 +304,7 @@ def generate_feature_data(
         return
 
     cpu_count = CPU_COUNT if CPU_COUNT is not None else 1
-    worker_amount = min(max(1, cpu_count - 1), amount)
+    worker_amount = min(max(1, cpu_count // 2), amount)
     chunks = split_work(amount, worker_amount)
 
     progress_lock = threading.Lock()

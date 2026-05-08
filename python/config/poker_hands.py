@@ -1,7 +1,6 @@
 from core.enums import PokerHand
 from core.hand_stats import HandStats
 
-
 HAND_STATS: dict[PokerHand, HandStats] = {
     PokerHand.FLUSH_FIVE: HandStats(160, 16),
     PokerHand.FLUSH_HOUSE: HandStats(140, 14),
@@ -16,4 +15,3 @@ HAND_STATS: dict[PokerHand, HandStats] = {
     PokerHand.PAIR: HandStats(10, 2),
     PokerHand.HIGH_CARD: HandStats(5, 1),
 }
-

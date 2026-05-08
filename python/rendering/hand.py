@@ -10,8 +10,8 @@ from core.models import CardAnnotation, Hand, RenderedHand
 from rendering.backgrounds import render_background
 from rendering.card import render_card
 from rendering.layout import (
-    calculate_box_dimensions,
     calculate_angle,
+    calculate_box_dimensions,
     calculate_card_y_lift,
     y_jitter,
 )
@@ -22,7 +22,6 @@ TOTAL_HAND_WIDTH_RATIO: float = 1372 / 1445
 TOTAL_HAND_WIDTH = TOTAL_HAND_WIDTH_RATIO * HAND_WIDTH
 
 
-
 def calculate_card_gap(card_amount: int, card_width: int) -> float:
     if card_amount <= 1:
         return 0.0
@@ -31,9 +30,6 @@ def calculate_card_gap(card_amount: int, card_width: int) -> float:
     shift_space = TOTAL_HAND_WIDTH - total_card_space
     shift_per_card = shift_space / (card_amount - 1)
     return shift_per_card
-
-
-
 
 
 def render_hand(hand: Hand, training: bool = False) -> RenderedHand:
@@ -57,16 +53,16 @@ def render_hand(hand: Hand, training: bool = False) -> RenderedHand:
         card_image = card_image.rotate(angle, expand=True)
         img.paste(card_image, (x_pos, y_pos), card_image)
 
-        annotations.append(CardAnnotation(
-            card=card,
-            box=calculate_box_dimensions(card_image, x_pos, y_pos, HAND_WIDTH, HAND_HEIGHT)
-        ))
+        annotations.append(
+            CardAnnotation(
+                card=card,
+                box=calculate_box_dimensions(
+                    card_image, x_pos, y_pos, HAND_WIDTH, HAND_HEIGHT
+                ),
+            )
+        )
 
-    return RenderedHand(
-        image=img,
-        annotations=annotations
-    )
-
+    return RenderedHand(image=img, annotations=annotations)
 
 
 def main() -> None:
@@ -75,5 +71,5 @@ def main() -> None:
     img.save("out.png")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

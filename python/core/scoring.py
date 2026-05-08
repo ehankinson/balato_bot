@@ -22,4 +22,3 @@ def calculate_lucky() -> list[int]:
         final[0] = 20
 
     return final
-

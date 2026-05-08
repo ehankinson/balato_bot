@@ -49,10 +49,9 @@ def _hue_channel(s, t, h):
 
     out[lt_1] = (t[lt_1] - s[lt_1]) * hs[lt_1] + s[lt_1]
     out[between_1_3] = t[between_1_3]
-    out[between_3_4] = (
-        (t[between_3_4] - s[between_3_4]) * (4.0 - hs[between_3_4])
-        + s[between_3_4]
-    )
+    out[between_3_4] = (t[between_3_4] - s[between_3_4]) * (4.0 - hs[between_3_4]) + s[
+        between_3_4
+    ]
     out[hs >= 4.0] = s[hs >= 4.0]
     return out
 
@@ -73,9 +72,7 @@ def _hsl_to_rgb(hsl):
     return rgb
 
 
-def negative_effect(
-    img: Image.Image
-) -> Image.Image:
+def negative_effect(img: Image.Image) -> Image.Image:
     negative_y = _random_phase()
     negative_shine_r = _random_phase()
     invert_lightness = negative_y != 0.0
@@ -166,18 +163,14 @@ def _apply_negative_shine(tex, negative_shine_r):
     )
     shine_rgb[..., 2] = shine_rgb[..., 2] - delta + delta * maxfac * 0.7 - 0.1
 
-    alpha_factor = (
-        0.5
-        * np.maximum(
-            np.minimum(
-                1.0,
-                np.maximum(0.0, 0.3 * np.maximum(low * 0.2, delta))
-                + np.minimum(np.maximum(maxfac * 0.1, 0.0), 0.4),
-            ),
-            0.0,
-        )
-        + 0.15 * maxfac * (0.1 + delta)
-    )
+    alpha_factor = 0.5 * np.maximum(
+        np.minimum(
+            1.0,
+            np.maximum(0.0, 0.3 * np.maximum(low * 0.2, delta))
+            + np.minimum(np.maximum(maxfac * 0.1, 0.0), 0.4),
+        ),
+        0.0,
+    ) + 0.15 * maxfac * (0.1 + delta)
     shine_alpha = alpha * alpha_factor
 
     return np.dstack([shine_rgb, shine_alpha])
@@ -290,7 +283,8 @@ def foil_effect(
     delta = np.minimum(high, np.maximum(0.5, 1.0 - low))
 
     fac = (
-        2.0 * np.sin(
+        2.0
+        * np.sin(
             (length_90 + foil_r * 2.0)
             + 3.0 * (1.0 + 0.8 * np.cos(length_113 - foil_r * 3.121))
         )
@@ -309,7 +303,8 @@ def foil_effect(
     angle = dot / np.maximum(rot_len * uv_len, 1e-8)
 
     fac2 = (
-        5.0 * np.cos(
+        5.0
+        * np.cos(
             foil_g * 0.3
             + angle * 3.14 * (2.2 + 0.9 * np.sin(foil_r * 1.65 + 0.2 * foil_g))
         )
@@ -319,21 +314,15 @@ def foil_effect(
     fac2 = np.maximum(np.minimum(fac2, 1.0), 0.0)
 
     fac3 = 0.3 * (
-        2.0 * np.sin(
-            foil_r * 5.0
-            + uvx * 3.0
-            + 3.0 * (1.0 + 0.5 * np.cos(foil_r * 7.0))
-        )
+        2.0
+        * np.sin(foil_r * 5.0 + uvx * 3.0 + 3.0 * (1.0 + 0.5 * np.cos(foil_r * 7.0)))
         - 1.0
     )
     fac3 = np.maximum(np.minimum(fac3, 1.0), -1.0)
 
     fac4 = 0.3 * (
-        2.0 * np.sin(
-            foil_r * 6.66
-            + uvy * 3.8
-            + 3.0 * (1.0 + 0.5 * np.cos(foil_r * 3.414))
-        )
+        2.0
+        * np.sin(foil_r * 6.66 + uvy * 3.8 + 3.0 * (1.0 + 0.5 * np.cos(foil_r * 3.414)))
         - 1.0
     )
     fac4 = np.maximum(np.minimum(fac4, 1.0), -1.0)
@@ -371,9 +360,7 @@ def foil_effect(
     return Image.fromarray((out * 255).astype(np.uint8), "RGBA")
 
 
-def polychrome_effect(
-    img: Image.Image
-) -> Image.Image:
+def polychrome_effect(img: Image.Image) -> Image.Image:
     polychrome_x = _random_phase()
     polychrome_y = _random_phase()
     time = _random_phase()

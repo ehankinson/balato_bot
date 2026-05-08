@@ -1,11 +1,10 @@
-from PIL import Image
 import mss
 import pyscreenshot
-
 from config.settings import HAND_HEIGHT, HAND_WIDTH
-
+from PIL import Image
 
 count = 0
+
 
 def primary_monitor_bbox() -> tuple[int, int, int, int]:
     with mss.MSS() as screen_capture:
@@ -18,7 +17,6 @@ def primary_monitor_bbox() -> tuple[int, int, int, int]:
     return left, top, right, bottom
 
 
-
 def screenshot_primary(filename: str | None = None) -> Image.Image:
     image = pyscreenshot.grab(bbox=primary_monitor_bbox()).convert("RGB")
     if filename is not None:
@@ -27,10 +25,8 @@ def screenshot_primary(filename: str | None = None) -> Image.Image:
     return image
 
 
-
 def crop_play_hand(img: Image.Image, left: int, top: int) -> Image.Image:
     return img.crop((left, top, left + HAND_WIDTH, top + HAND_HEIGHT))
-
 
 
 def get_hand() -> Image.Image:

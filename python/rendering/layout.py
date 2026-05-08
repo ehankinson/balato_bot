@@ -8,6 +8,7 @@ Y_JITTER = 5
 MAX_Y_LIFT = 18
 ANGLE_JITTER = 0.5
 
+
 def calculate_angle(card_index: int, card_amount: int) -> float:
     mid = (card_amount - 1) / 2
     if mid == 0:

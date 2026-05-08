@@ -23,7 +23,9 @@ from rendering.layout import (
 )
 
 JOKERS = Image.open(os.path.join(ROOT_DIR, "game_images/Jokers.png")).convert("RGBA")
-JOKER_LOCATIONS: dict[int, dict[str, int]] = load_yaml(os.path.join(ROOT_DIR, "yaml/joker_locations.yaml"))
+JOKER_LOCATIONS: dict[int, dict[str, int]] = load_yaml(
+    os.path.join(ROOT_DIR, "yaml/joker_locations.yaml")
+)
 
 
 IMAGE_WIDTH = 1150
@@ -34,7 +36,9 @@ JOKERS_HEIGHT = 220
 
 
 def crop_joker(location: dict[str, int]) -> Image.Image:
-    return crop_image(JOKERS, location["x_pos"], location["y_pos"], CARD_WIDTH, CARD_HEIGHT)
+    return crop_image(
+        JOKERS, location["x_pos"], location["y_pos"], CARD_WIDTH, CARD_HEIGHT
+    )
 
 
 @lru_cache(maxsize=None)
@@ -61,7 +65,7 @@ def render_joker_cached(
 
             case Edition.HOLOGRAPHIC:
                 img = hologram_effect(img)
-    
+
     return resize_card(img)
 
 
@@ -77,24 +81,30 @@ def render_joker(joker: Joker) -> Image.Image:
 def joker_gap(card_amount: int, card_width: int) -> float:
     total_card_space = card_amount * card_width
     shift_space = JOKERS_WIDTH - total_card_space
-    return shift_space // (card_amount + 1) \
-        if card_amount <= 2 \
-            else shift_space / (card_amount - 1)
+    return (
+        shift_space // (card_amount + 1)
+        if card_amount <= 2
+        else shift_space / (card_amount - 1)
+    )
 
 
-def calculate_x_pos(card_gap: float, image_width: int, card_amount: int, card_index: int) -> int:
-    return int((card_index + 1) * card_gap + image_width * card_index) \
-        if card_amount <= 2 \
-            else int(card_index * (image_width + card_gap)) 
+def calculate_x_pos(
+    card_gap: float, image_width: int, card_amount: int, card_index: int
+) -> int:
+    return (
+        int((card_index + 1) * card_gap + image_width * card_index)
+        if card_amount <= 2
+        else int(card_index * (image_width + card_gap))
+    )
 
 
 def render_jokers(jokers: list[Joker], training: bool = False):
     background = render_background(IMAGE_WIDTH, IMAGE_HEIGHT, training)
-    
+
     card_gap: float = 0.0
     joker_count = len(jokers)
     annotations: list[CardAnnotation] = []
-    
+
     for i, joker in enumerate(jokers):
         joker_image = render_joker(joker)
         image_width = joker_image.width
@@ -109,19 +119,20 @@ def render_jokers(jokers: list[Joker], training: bool = False):
         joker_image = joker_image.rotate(angle, expand=True)
         background.paste(joker_image, (x_pos, y_pos), joker_image)
 
-        annotations.append(CardAnnotation(
-            card=joker,
-            box=calculate_box_dimensions(joker_image, x_pos, y_pos, IMAGE_WIDTH, IMAGE_HEIGHT)
-        ))
+        annotations.append(
+            CardAnnotation(
+                card=joker,
+                box=calculate_box_dimensions(
+                    joker_image, x_pos, y_pos, IMAGE_WIDTH, IMAGE_HEIGHT
+                ),
+            )
+        )
 
-    return RenderedHand(
-        image=background,
-        annotations=annotations
-    )
+    return RenderedHand(image=background, annotations=annotations)
 
 
 def main() -> None:
-    
+
     jokers = [
         Joker(background_image=JokersName.THE_IDOL),
         Joker(background_image=JokersName.SOCK_AND_BUSKIN),
@@ -129,7 +140,7 @@ def main() -> None:
         Joker(background_image=JokersName.TRIBOULET_BACKGROUND),
         Joker(background_image=JokersName.BLUEPRINT),
         Joker(background_image=JokersName.BRAINSTORM, negative=True),
-        Joker(background_image=JokersName.RID_THE_BUS, negative=True)
+        Joker(background_image=JokersName.RID_THE_BUS, negative=True),
     ]
     a = render_jokers(jokers)
 
@@ -138,5 +149,5 @@ def main() -> None:
     img.save("image.png")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
