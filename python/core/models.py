@@ -196,6 +196,7 @@ class JokerConfig:
 @dataclass
 class Joker:
     background_image: JokersName
+    joker_id = -1
     face_image: JokersName | None = None
     negative: bool = False
     edition: Edition = Edition.NONE

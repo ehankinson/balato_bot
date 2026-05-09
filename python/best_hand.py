@@ -15,7 +15,7 @@ from core.enums import (
 )
 from core.models import Card, Joker
 
-JOKER_CACHE: dict[Card, dict[Joker, tuple[int, int, float]]] = {}
+JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
 
 
 def get_per_card_jokers(jokers: list[Joker]) -> list[Joker]:
@@ -77,8 +77,8 @@ def calculate_score(
 
     for card in hand:
         condition_args["card"] = card
-        # if card not in JOKER_CACHE:
-            # JOKER_CACHE[]
+        if card.card_id not in JOKER_CACHE:
+            JOKER_CACHE[card.card_id] = {}
 
         trigger = card.trigger
         for _ in range(trigger, 0, -1):
@@ -87,12 +87,17 @@ def calculate_score(
             mult *= card.play_x_mult
 
             for joker in per_hand_jokers:
-                joker_chips, joker_add_mult, joker_x_mult = calculate_joker_scoring(
-                    joker, condition_args
-                )
-                chips += joker_chips
-                mult += joker_add_mult
-                mult *= joker_x_mult
+                if joker.background_image not in JOKER_CACHE[card.card_id]:
+                    joker_chips, joker_add_mult, joker_x_mult = calculate_joker_scoring(
+                        joker, condition_args
+                    )
+                    JOKER_CACHE[card.card_id][joker.background_image] = (joker_chips, joker_add_mult, joker_x_mult)
+
+                j_chips, j_add_mult, j_x_mult = JOKER_CACHE[card.card_id][joker.background_image]
+                    
+                chips += j_chips
+                mult += j_add_mult
+                mult *= j_x_mult
 
     for joker in after_hand_joker:
         joker_chips, joker_add_mult, joker_x_mutl = calculate_joker_scoring(
@@ -116,7 +121,14 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
         after_hand_jokers = get_after_hand_jokers(joker_linup)
         per_hand_jokers = get_per_card_jokers(joker_linup)
         for hand in all_possible_hands:
-            if len(hand) == 5 and hand[0].rank == Rank.KING and hand[1  ].rank == Rank.QUEEN and hand[2].rank == Rank.FOUR and hand[3].rank == Rank.FOUR and hand[4].rank == Rank.FOUR :
+            if (
+                len(hand) == 5
+                and hand[0].rank == Rank.KING
+                and hand[1].rank == Rank.QUEEN
+                and hand[2].rank == Rank.FOUR
+                and hand[3].rank == Rank.FOUR
+                and hand[4].rank == Rank.FOUR
+            ):
                 a = 5
             score = calculate_score(hand, after_hand_jokers, per_hand_jokers)
             if score > best_score:
@@ -129,7 +141,7 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
     print(best_joker)
     for card in best_hand:
         print(card)
-    
+
     return
 
 
