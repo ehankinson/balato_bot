@@ -1,8 +1,13 @@
 import time
 from itertools import permutations
 
-from calculation.joker_generation import get_after_hand_jokers, get_retrigger_jokers, get_per_card_jokers
-from calculation.joker_generation import generate_possible_jokers
+from calculation.joker_generation import (
+    generate_possible_jokers,
+    get_after_hand_jokers,
+    get_per_card_jokers,
+    get_retrigger_jokers,
+)
+from calculation.joker_retrigger import calculate_joker_retrigger
 from calculation.joker_scoring import calculate_joker_scoring
 from calculation.poker_eval import get_hand_type
 from calculation.poker_generation import generate_playable_hands
@@ -18,9 +23,6 @@ from core.enums import (
 from core.models import Card, Joker
 
 JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
-
-
-
 
 
 def filter_steel(hand_steel_cards: list[Card], steel_cards: list[Card]) -> list[int]:
@@ -65,10 +67,13 @@ def calculate_score(
 
     for i, card in enumerate(hand):
         condition_args["card"] = card
+        condition_args["card_pos"] = i
         if card.card_id not in JOKER_CACHE:
             JOKER_CACHE[card.card_id] = {}
 
         trigger = card.trigger
+        for joker in retrigger_jokers:
+            trigger += calculate_joker_retrigger(joker, condition_args)
 
         for _ in range(trigger, 0, -1):
             chips += card.chips
@@ -117,8 +122,9 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
         per_hand_jokers = get_per_card_jokers(joker_linup)
         retrigger_jokers = get_retrigger_jokers(joker_linup)
         for hand in all_possible_hands:
-
-            score = calculate_score(hand, retrigger_jokers, after_hand_jokers, per_hand_jokers)
+            score = calculate_score(
+                hand, retrigger_jokers, after_hand_jokers, per_hand_jokers
+            )
             if score > best_score:
                 best_score = score
                 best_hand = hand

@@ -13,20 +13,22 @@ def get_per_card_jokers(jokers: list[Joker]) -> list[Joker]:
     return [
         joker
         for joker in jokers
-        if joker.scoring.trigger == JokerTriggers.ON_PLAYED_CARDS
+        if joker.scoring is not None
+        and joker.scoring.trigger == JokerTriggers.ON_PLAYED_CARDS
     ]
 
 
 def get_after_hand_jokers(jokers: list[Joker]) -> list[Joker]:
     return [
-        joker for joker in jokers if joker.scoring.trigger == JokerTriggers.AFTER_HAND
+        joker
+        for joker in jokers
+        if joker.scoring is not None
+        and joker.scoring.trigger == JokerTriggers.AFTER_HAND
     ]
 
 
 def get_retrigger_jokers(jokers: list[Joker]) -> list[Joker]:
-    return [
-        joker for joker in jokers if joker.retrigger is not None
-    ]
+    return [joker for joker in jokers if joker.retrigger is not None]
 
 
 def get_mult_jokers(jokers: list[Joker]) -> list[Joker]:
