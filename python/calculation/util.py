@@ -1,10 +1,18 @@
 from collections.abc import Callable, Iterable
+from itertools import combinations, permutations
 from typing import TypeVar
 
 from core.enums import Enhancement, Rank, Suit
 from core.models import Card
 
 K = TypeVar("K")
+
+def add_combination(iter: list, size: int) -> list:
+    return [list(val) for val in combinations(iter, size)]
+
+
+def add_permutation(iter: list, size: int) -> list:
+    return [list(val) for val in permutations(iter, size)]
 
 
 def unique_cards(cards: list[Card]) -> int:
