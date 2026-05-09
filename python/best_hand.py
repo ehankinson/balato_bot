@@ -157,7 +157,7 @@ if __name__ == "__main__":
         Joker(JokersName.HANGING_CHAD),
         Joker(JokersName.ZANY_JOKER),
         Joker(JokersName.WILY_JOKER),
-        Joker(JokersName.TRIBOULET_BACKGROUND),
+        Joker(JokersName.ONYX_AGATE),
         ancient_jokers,
     ]
 
