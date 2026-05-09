@@ -10,7 +10,7 @@
     }
   },
   {
-    "label": "Debug data_generator",
+    "label": "Debug best_hand",
     "adapter": "Debugpy",
     "request": "launch",
     "program": "~/projects/balato_bot/python/best_hand.py",

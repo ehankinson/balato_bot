@@ -1,13 +1,12 @@
 import random
 from dataclasses import dataclass, field
-from typing import Any
 
 from config.settings import JOKER_CONFIG
 from PIL import Image
 from utils.files import load_json
 
 from core.class_indices import JOKER_TYPE_CLASSES
-from core.enums import Edition, Enhancement, JokersName, Rank, Seal, Suit
+from core.enums import Edition, Enhancement, JokerTriggers, JokersName, Rank, Seal, Suit
 from core.scoring import calculate_lucky, get_initial_card_chips
 
 CONFIG = load_json(JOKER_CONFIG)
@@ -35,15 +34,18 @@ class Card:
     edition: Edition
     chips: int = 0
     add_mult: int = 0
-    play_times_mult: float = 1
-    hand_times_mult: float = 1
+    trigger: int = 1
+    play_x_mult: float = 1
+    hand_x_mult: float = 1
     card_id: int = 0
     econ: int = 0
     card_score: int = 0
     # For cards like steel or gold, they need to be held in hand to activate
     in_hand: bool = False
+    is_facecard: bool = False
 
     def __post_init__(self):
+        self.is_facecard = self.rank > Rank.TEN and self.rank < Rank.ACE
         self.chips = get_initial_card_chips(self.rank)
         self.add_enhancement()
         self.add_edition()
@@ -76,15 +78,13 @@ class Card:
                 return
 
             case Enhancement.LUCKY:
-                mult_gain, econ_gain = calculate_lucky()
-                self.add_mult += mult_gain
-                self.econ += econ_gain
+                return
 
             case Enhancement.GLASS:
-                self.play_times_mult = 2
+                self.play_x_mult = 2
 
             case Enhancement.STEEL:
-                self.hand_times_mult = 1.5
+                self.hand_x_mult = 1.5
                 self.in_hand = True
 
     def add_edition(self) -> None:
@@ -96,14 +96,11 @@ class Card:
                 self.add_mult += 10
 
             case Edition.POLYCHROME:
-                self.play_times_mult *= 1.5
+                self.play_x_mult *= 1.5
 
     def add_seal(self) -> None:
         if self.seal == Seal.RED:
-            self.chips *= 2
-            self.add_mult *= 2
-            self.play_times_mult *= self.play_times_mult
-            self.hand_times_mult *= self.hand_times_mult
+            self.trigger += 1
 
     def score(self) -> int:
         val = self.rank & 0b1111
@@ -141,26 +138,13 @@ class Card:
         return base
 
 
-@dataclass
-class Hand:
-    cards: list[Card]
-
-    @classmethod
-    def random_hand(cls, card_amount: int):
-        return cls(cards=[Card.random() for _ in range(card_amount)])
-
-    def sort_by_rank(self):
-        self.cards = sorted(self.cards, key=lambda x: (x.rank, x.suit), reverse=True)
-
-    def sort_by_suit(self):
-        self.cards = sorted(self.cards, key=lambda x: (x.suit, x.rank), reverse=True)
-
 
 @dataclass
 class JokerScoring:
-    chips: int | dict = 0
-    add_mult: int | dict = 0
-    x_mult: float | dict = 1
+    trigger: JokerTriggers
+    chips: int | dict | None = None
+    add_mult: int | dict | None = None
+    x_mult: float | dict | None = None
     condition: dict | None = None
 
 
@@ -201,19 +185,6 @@ class JokerUpgrade:
     condition: dict | str | None = None
 
 
-@dataclass(frozen=True)
-class JokerScaling:
-    event: str
-    stat: str | None = None
-    change: int | float = 0
-    condition: dict[str, Any] = field(default_factory=dict)
-    while_owned: bool = False
-    counter: str | None = None
-    threshold: int | float | None = None
-    change_from: dict[str, Any] | None = None
-    after: dict[str, Any] = field(default_factory=dict)
-
-
 @dataclass
 class JokerConfig:
     rarity: str
@@ -234,7 +205,7 @@ class Joker:
     econ: JokerEcon | None = None
     upgrade: JokerUpgrade | None = None
     game_modifier: JokerGameModifier | None = None
-    state: dict[str, Any] = field(default_factory=dict)
+    req: dict[str, int] | None = None
 
     def __post_init__(self):
         self._add_face()
@@ -253,6 +224,10 @@ class Joker:
         self._build_joker_upgrade(joker_data)
         self._build_joker_game_modifier(joker_data)
 
+        if joker_key in {JokersName.ANCIENT_JOKER, JokersName.THE_IDOL}:
+            # will need to use vision functions to figure that out 0_0
+            pass
+
     def _build_joker_config(self, joker_data: dict) -> None:
         self.config = JokerConfig(
             rarity=joker_data["rarity"],
@@ -267,10 +242,11 @@ class Joker:
 
         scoring_data = joker_data["scoring"]
         self.scoring = JokerScoring(
-            chips=scoring_data.get("chips", 0),
-            add_mult=scoring_data.get("add_mult", 0),
-            x_mult=scoring_data.get("x_mult", 1),
+            chips=scoring_data.get("chips", None),
+            add_mult=scoring_data.get("add_mult", None),
+            x_mult=scoring_data.get("x_mult", None),
             condition=scoring_data.get("condition", None),
+            trigger=JokerTriggers(scoring_data.get("trigger"))
         )
 
     def _build_joker_retrigger(self, joker_data: dict) -> None:

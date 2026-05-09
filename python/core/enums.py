@@ -79,6 +79,12 @@ class PokerHand(IntEnum):
     FLUSH_FIVE = 12
 
 
+class JokerTriggers(IntEnum):
+    ON_PLAYED_CARDS = 0
+    AFTER_HAND = 1
+    ON_HELD_CARDS = 2
+
+
 class JokersName(IntEnum):
     JOKER = 0
     CHAOS_THE_CLOWN = 1
