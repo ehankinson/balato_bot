@@ -19,10 +19,10 @@
     "jolly_joker": {
         "rarity": "common",
         "scoring": {
+            "trigger": 1,
             "add_mult": 8,
             "condition": {
-                "hand_type": 2,
-                "trigger": 1
+                "hand_type": 2
             }
         },
         "buy_price": 3,
@@ -228,8 +228,8 @@
     "banner": {
         "rarity": "common",
         "scoring": {
+            "trigger": 1,
             "chips": {
-                "trigger": 1,
                 "count": "remaining_discards",
                 "each": 30
             }
@@ -332,12 +332,9 @@
     },
     "blueprint": {
         "rarity": "rare",
-        "copy": true,
-        "buy_price": 10,
         "copyable": true,
-        "copy_condition": {
-            "joker": "right"
-        }
+        "buy_price": 10,
+        "copy": true
     },
     "glass_joker": {
         "rarity": "uncommon",
@@ -922,12 +919,9 @@
     },
     "brainstorm": {
         "rarity": "rare",
-        "copy": true,
-        "buy_price": 10,
         "copyable": true,
-        "copy_condition": {
-            "joker": "left"
-        }
+        "buy_price": 10,
+        "copy": false
     },
     "satellite": {
         "rarity": "uncommon",

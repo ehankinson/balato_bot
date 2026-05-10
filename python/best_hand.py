@@ -3,8 +3,7 @@ from collections import Counter
 
 from calculation.joker_generation import (
     generate_possible_jokers,
-    get_after_hand_jokers,
-    get_per_card_jokers,
+    get_trigger_jokers,
     get_retrigger_jokers,
 )
 from calculation.joker_retrigger import calculate_joker_retrigger
@@ -14,6 +13,7 @@ from calculation.poker_generation import generate_playable_hands
 from core.enums import (
     Edition,
     Enhancement,
+    JokerTriggers,
     JokersName,
     Rank,
     Seal,
@@ -53,7 +53,7 @@ def calculate_score(
     steel_cards: list[Card],
     retrigger_jokers: list[Joker],
     after_hand_joker: list[Joker],
-    per_hand_jokers: list[Joker],
+    per_card_jokers: list[Joker],
 ) -> float:
     hand_stats = get_hand_type(hand)
     chips, mult = hand_stats.chips, hand_stats.mult
@@ -76,7 +76,7 @@ def calculate_score(
             mult += card.add_mult
             mult *= card.play_x_mult
 
-            for joker in per_hand_jokers:
+            for joker in per_card_jokers:
                 if joker.background_image not in JOKER_CACHE[card.card_id]:
                     joker_chips, joker_add_mult, joker_x_mult = calculate_joker_scoring(
                         joker, condition_args
@@ -119,17 +119,17 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
     best_hand = []
     best_joker = []
     for joker_linup in all_possible_jokers:
-        after_hand_jokers = get_after_hand_jokers(joker_linup)
-        per_hand_jokers = get_per_card_jokers(joker_linup)
+        after_hand_jokers = get_trigger_jokers(joker_linup, JokerTriggers.AFTER_HAND)
+        per_card_jokers = get_trigger_jokers(joker_linup, JokerTriggers.ON_PLAYED_CARDS)
         retrigger_jokers = get_retrigger_jokers(joker_linup)
         for hand in all_possible_hands:
             if (
                 len(hand) == 5
                 and hand[0].rank == Rank.QUEEN
                 and hand[1].rank == Rank.FOUR
-                and hand[2].rank == Rank.FOUR
+                and hand[2].rank == Rank.KING
                 and hand[3].rank == Rank.FOUR
-                and hand[4].rank == Rank.KING
+                and hand[4].rank == Rank.FOUR
             ):
                 a = 5
 
@@ -139,7 +139,7 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
                 held_steel_cards,
                 retrigger_jokers,
                 after_hand_jokers,
-                per_hand_jokers,
+                per_card_jokers,
             )
             if score > best_score:
                 best_score = score
@@ -157,24 +157,29 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
 
 if __name__ == "__main__":
     cards = [
-        Card(Rank.ACE, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
-        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.TEN, Suit.CLUBS, Enhancement.MULT, Seal.NONE, Edition.NONE),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.ACE, Suit.SPADES, Enhancement.WILD, Seal.NONE, Edition.NONE),
+        Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED, Edition.NONE),
+        Card(Rank.QUEEN, Suit.SPADES, Enhancement.WILD, Seal.NONE, Edition.NONE),
+        Card(Rank.JACK, Suit.SPADES, Enhancement.WILD, Seal.NONE, Edition.NONE),
+        Card(Rank.TEN, Suit.SPADES, Enhancement.MULT, Seal.NONE, Edition.NONE),
+        Card(Rank.FOUR, Suit.SPADES, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.SPADES, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.SPADES, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
     ]
 
-    ancient_jokers = Joker(JokersName.ANCIENT_JOKER)
-    ancient_jokers.req = {"suit": Suit.CLUBS}
+    # ancient_jokers = Joker(JokersName.ANCIENT_JOKER)
+    # ancient_jokers.req = {"suit": Suit.CLUBS}
+    banner = Joker(JokersName.BANNER)
+    banner.scoring.chip = 120
     jokers = [
-        Joker(JokersName.HANGING_CHAD),
-        Joker(JokersName.ZANY_JOKER),
+        Joker(JokersName.BLUEPRINT),
+        # ancient_jokers,
+        Joker(JokersName.ARROWHEAD),
+        banner,
+        Joker(JokersName.ONYX_AGATE),
         Joker(JokersName.TRIBOULET_BACKGROUND),
-        ancient_jokers,
-        Joker(JokersName.SOCK_AND_BUSKIN),
+        Joker(JokersName.WILY_JOKER),
+        Joker(JokersName.JOLLY_JOKER)
     ]
 
     # hand = Hand.random_hand(8)

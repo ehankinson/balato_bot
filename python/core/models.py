@@ -44,6 +44,7 @@ class Card:
     in_hand: bool = False
     is_facecard: bool = False
     is_low_card: bool = False
+    is_any_suit: bool = False
 
     def __post_init__(self):
         self.is_facecard = self.rank > Rank.TEN and self.rank < Rank.ACE
@@ -63,10 +64,6 @@ class Card:
                 self.chips = 50
 
             case Enhancement.GOLD:
-                # if Joker.GOLDEN_TICKET in jokers:
-                #     self.econ = 4
-                # Needs to wait for Jokers to be added
-
                 self.in_hand = True
                 self.econ += 3
 
@@ -77,7 +74,7 @@ class Card:
                 self.add_mult += 4
 
             case Enhancement.WILD:
-                return
+                self.is_any_suit = True
 
             case Enhancement.LUCKY:
                 return
@@ -210,6 +207,7 @@ class Joker:
     econ: JokerEcon | None = None
     upgrade: JokerUpgrade | None = None
     game_modifier: JokerGameModifier | None = None
+    copy: bool | None = None
     req: dict[str, int] | None = None
 
     def __post_init__(self):
@@ -228,6 +226,7 @@ class Joker:
         self._build_joker_econ(joker_data)
         self._build_joker_upgrade(joker_data)
         self._build_joker_game_modifier(joker_data)
+        self.copy = joker_data["copy"] if "copy" in joker_data else None
 
         if joker_key in {JokersName.ANCIENT_JOKER, JokersName.THE_IDOL}:
             # will need to use vision functions to figure that out 0_0

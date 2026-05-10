@@ -27,7 +27,7 @@ def calculate_scoring_condition(
                 if value == "suit" and joker.req is not None:
                     return joker.req["suit"] == condition_args["card"].suit
 
-                return condition_args["card"].suit == value
+                return condition_args["card"].suit == value or condition_args["card"].is_any_suit
 
     raise ValueError(f"This condition key {condition_key} does not exist")
 

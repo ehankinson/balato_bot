@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterable
+from functools import reduce
 from itertools import combinations, permutations
 from typing import TypeVar
 
@@ -6,6 +7,7 @@ from core.enums import Enhancement, Rank, Suit
 from core.models import Card
 
 K = TypeVar("K")
+
 
 def add_combination(iter: list, size: int) -> list:
     return [list(val) for val in combinations(iter, size)]
@@ -37,6 +39,13 @@ def bucket_rank(cards: Iterable[Card]) -> dict[Rank, list[Card]]:
 
 def bucket_suit(cards: Iterable[Card]) -> dict[Suit, list[Card]]:
     return bucket_by(cards, lambda card: card.suit, skip_stones=True)
+
+
+def nested_getattr(obj, attr_path, default=None):
+    try:
+        return reduce(getattr, attr_path.split("."), obj)
+    except AttributeError:
+        return default
 
 
 def bucket_by(
