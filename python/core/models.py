@@ -6,8 +6,8 @@ from PIL import Image
 from utils.files import load_json
 
 from core.class_indices import JOKER_TYPE_CLASSES
-from core.enums import Edition, Enhancement, JokerTriggers, JokersName, Rank, Seal, Suit
-from core.scoring import calculate_lucky, get_initial_card_chips
+from core.enums import Edition, Enhancement, JokersName, JokerTriggers, Rank, Seal, Suit
+from core.scoring import get_initial_card_chips
 
 CONFIG = load_json(JOKER_CONFIG)
 
@@ -43,9 +43,11 @@ class Card:
     # For cards like steel or gold, they need to be held in hand to activate
     in_hand: bool = False
     is_facecard: bool = False
+    is_low_card: bool = False
 
     def __post_init__(self):
         self.is_facecard = self.rank > Rank.TEN and self.rank < Rank.ACE
+        self.is_low_card = self.rank < Rank.SIX
         self.chips = get_initial_card_chips(self.rank)
         self.add_enhancement()
         self.add_edition()
@@ -137,6 +139,8 @@ class Card:
 
         return base
 
+    def __hash__(self):
+        return self.card_id
 
 
 @dataclass
@@ -247,7 +251,7 @@ class Joker:
             add_mult=scoring_data.get("add_mult", None),
             x_mult=scoring_data.get("x_mult", None),
             condition=scoring_data.get("condition", None),
-            trigger=JokerTriggers(scoring_data.get("trigger"))
+            trigger=JokerTriggers(scoring_data.get("trigger")),
         )
 
     def _build_joker_retrigger(self, joker_data: dict) -> None:

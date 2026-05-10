@@ -1023,7 +1023,7 @@
             "trigger": 0,
             "x_mult": 2,
             "condition": {
-                "rank": "facecard"
+                "rank": [11, 10]
             }
         },
         "buy_price": 20,

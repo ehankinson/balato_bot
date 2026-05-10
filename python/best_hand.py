@@ -1,5 +1,5 @@
 import time
-from itertools import permutations
+from collections import Counter
 
 from calculation.joker_generation import (
     generate_possible_jokers,
@@ -15,7 +15,6 @@ from core.enums import (
     Edition,
     Enhancement,
     JokersName,
-    JokerTriggers,
     Rank,
     Seal,
     Suit,
@@ -25,14 +24,10 @@ from core.models import Card, Joker
 JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
 
 
-def filter_steel(hand_steel_cards: list[Card], steel_cards: list[Card]) -> list[int]:
-    min_length = min(len(hand_steel_cards), len(steel_cards))
-    skip_index = []
-    for i in range(min_length):
-        if hand_steel_cards[i] == steel_cards[i]:
-            skip_index.append(i)
-
-    return skip_index
+def filter_steel(steel_cards: list[Card], hand: list[Card]) -> list[Card]:
+    hand_steel = [card for card in hand if card.enhancement == Enhancement.STEEL]
+    not_played_steel = list((Counter(steel_cards) - Counter(hand_steel)).elements())
+    return not_played_steel
 
 
 def filter_cards(played_cards: list[Card], cards_in_hand: list[Card]) -> list[Card]:
@@ -55,6 +50,7 @@ def filter_cards(played_cards: list[Card], cards_in_hand: list[Card]) -> list[Ca
 
 def calculate_score(
     hand: list[Card],
+    steel_cards: list[Card],
     retrigger_jokers: list[Joker],
     after_hand_joker: list[Joker],
     per_hand_jokers: list[Joker],
@@ -99,6 +95,10 @@ def calculate_score(
                 mult += j_add_mult
                 mult *= j_x_mult
 
+    for card in steel_cards:
+        trigger = card.trigger
+        mult *= card.hand_x_mult**trigger
+
     for joker in after_hand_joker:
         joker_chips, joker_add_mult, joker_x_mutl = calculate_joker_scoring(
             joker, condition_args
@@ -113,6 +113,7 @@ def calculate_score(
 def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
     all_possible_hands = generate_playable_hands(cards)
     all_possible_jokers = generate_possible_jokers(jokers)
+    steel_cards = [card for card in cards if card.enhancement == Enhancement.STEEL]
 
     best_score = 0
     best_hand = []
@@ -122,8 +123,23 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
         per_hand_jokers = get_per_card_jokers(joker_linup)
         retrigger_jokers = get_retrigger_jokers(joker_linup)
         for hand in all_possible_hands:
+            if (
+                len(hand) == 5
+                and hand[0].rank == Rank.QUEEN
+                and hand[1].rank == Rank.FOUR
+                and hand[2].rank == Rank.FOUR
+                and hand[3].rank == Rank.FOUR
+                and hand[4].rank == Rank.KING
+            ):
+                a = 5
+
+            held_steel_cards = filter_steel(steel_cards, hand)
             score = calculate_score(
-                hand, retrigger_jokers, after_hand_jokers, per_hand_jokers
+                hand,
+                held_steel_cards,
+                retrigger_jokers,
+                after_hand_jokers,
+                per_hand_jokers,
             )
             if score > best_score:
                 best_score = score
@@ -156,9 +172,9 @@ if __name__ == "__main__":
     jokers = [
         Joker(JokersName.HANGING_CHAD),
         Joker(JokersName.ZANY_JOKER),
-        Joker(JokersName.WILY_JOKER),
-        Joker(JokersName.ONYX_AGATE),
+        Joker(JokersName.TRIBOULET_BACKGROUND),
         ancient_jokers,
+        Joker(JokersName.SOCK_AND_BUSKIN),
     ]
 
     # hand = Hand.random_hand(8)
