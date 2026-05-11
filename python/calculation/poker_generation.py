@@ -1,12 +1,14 @@
 from itertools import combinations, permutations, product
+from math import perm
 
+from calculation.util import bucket_rank, bucket_suit
 from core.enums import Enhancement, Rank, Suit
 from core.models import Card
-from calculation.util import bucket_rank, bucket_suit
 
 
 def generate_same_rank_groups(hand_size: int, cards: list[Card]) -> list[list[Card]]:
-    return [list(val) for val in permutations(cards, hand_size)]
+    func = permutations if calculate_order(cards) else combinations
+    return [list(val) for val in func(cards, hand_size)]
 
 
 def generate_n_of_a_kind(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
@@ -22,7 +24,8 @@ def generate_flushes(bucket: dict[Suit, list[Card]]) -> list[list[Card]]:
     flushes: list[list[Card]] = []
     for card_values in bucket.values():
         if len(card_values) > 4:
-            flushes.extend([list(val) for val in permutations(card_values, 5)])
+            func = permutations if calculate_order(card_values) else combinations
+            flushes.extend([list(val) for val in func(card_values, 5)])
 
     return flushes
 
@@ -103,9 +106,27 @@ def generate_straights(cards: list[Card]) -> list[list[Card]]:
             buckets.append(matching_cards)
         else:
             for straight in product(*buckets):
-                straights.extend([list(val) for val in permutations(straight, 5)])
+                func = permutations if calculate_order(list(straight)) else combinations
+                straights.extend([list(val) for val in func(straight, 5)])
 
     return straights
+
+
+def calculate_order(cards: list[Card]) -> bool:
+    add = []
+    mul = []
+
+    for card in cards:
+        if card.add_mult > 0:
+            add.append(card)
+
+        if card.play_x_mult > 1:
+            mul.append(card)
+
+    # if both list are > 0 that means the order matters so we need permutations
+    # if one is 0 and the other isn't or both are 0, then the order doesn't matter so we can just use the
+    # combination instead of permutation
+    return len(add) > 0 and len(mul) > 0
 
 
 def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:

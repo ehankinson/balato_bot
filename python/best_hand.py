@@ -139,14 +139,14 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
 
 if __name__ == "__main__":
     cards = [
-        Card(Rank.ACE, Suit.SPADES, Enhancement.WILD, Seal.NONE, Edition.NONE),
-        Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED, Edition.NONE),
-        Card(Rank.QUEEN, Suit.SPADES, Enhancement.WILD, Seal.NONE, Edition.NONE),
-        Card(Rank.JACK, Suit.SPADES, Enhancement.WILD, Seal.NONE, Edition.NONE),
-        Card(Rank.TEN, Suit.SPADES, Enhancement.MULT, Seal.NONE, Edition.NONE),
-        Card(Rank.FOUR, Suit.SPADES, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FOUR, Suit.SPADES, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FOUR, Suit.SPADES, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.ACE, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
+        Card(Rank.JACK, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
+        Card(Rank.TEN, Suit.CLUBS, Enhancement.MULT, Seal.NONE, Edition.NONE),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
     ]
 
     # ancient_jokers = Joker(JokersName.ANCIENT_JOKER)
@@ -154,14 +154,10 @@ if __name__ == "__main__":
     banner = Joker(JokersName.BANNER)
     banner.scoring.chips = 120
     jokers = [
-        Joker(JokersName.BLUEPRINT),
-        # ancient_jokers,
-        Joker(JokersName.ARROWHEAD),
         Joker(JokersName.HACK),
         Joker(JokersName.ONYX_AGATE),
-        Joker(JokersName.TRIBOULET_BACKGROUND),
         Joker(JokersName.HANGING_CHAD),
-        Joker(JokersName.SOCK_AND_BUSKIN)
+        Joker(JokersName.BLUEPRINT)
     ]
 
     # hand = Hand.random_hand(8)
