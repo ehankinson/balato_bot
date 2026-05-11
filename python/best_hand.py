@@ -30,24 +30,6 @@ def filter_steel(steel_cards: list[Card], hand: list[Card]) -> list[Card]:
     return not_played_steel
 
 
-def filter_cards(played_cards: list[Card], cards_in_hand: list[Card]) -> list[Card]:
-    hand_card_count = bucket_id(cards_in_hand)
-    played_card_count = bucket_id(played_cards)
-
-    cards_held_in_hand: list[Card] = []
-    for key, curr_cards in hand_card_count.items():
-        hand_cards = played_card_count.get(key, [])
-
-        # if we played this card
-        if len(curr_cards) == len(hand_cards):
-            continue
-
-        diff = len(curr_cards) - len(hand_cards)
-        cards_held_in_hand.extend(curr_cards[:diff])
-
-    return cards_held_in_hand
-
-
 def calculate_score(
     hand: list[Card],
     steel_cards: list[Card],
@@ -170,16 +152,16 @@ if __name__ == "__main__":
     # ancient_jokers = Joker(JokersName.ANCIENT_JOKER)
     # ancient_jokers.req = {"suit": Suit.CLUBS}
     banner = Joker(JokersName.BANNER)
-    banner.scoring.chip = 120
+    banner.scoring.chips = 120
     jokers = [
         Joker(JokersName.BLUEPRINT),
         # ancient_jokers,
         Joker(JokersName.ARROWHEAD),
-        banner,
+        Joker(JokersName.HACK),
         Joker(JokersName.ONYX_AGATE),
         Joker(JokersName.TRIBOULET_BACKGROUND),
-        Joker(JokersName.WILY_JOKER),
-        Joker(JokersName.JOLLY_JOKER)
+        Joker(JokersName.HANGING_CHAD),
+        Joker(JokersName.SOCK_AND_BUSKIN)
     ]
 
     # hand = Hand.random_hand(8)

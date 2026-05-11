@@ -38,14 +38,14 @@ def get_jokers_with(jokers: list[Joker], *checks: str) -> list[Joker]:
     ]
 
 
-def generate_copy_chip(
-    copy_jokers: list[Joker], chip_jokers: list[Joker]
+def insert_copy_joker(
+    copy_jokers: list[Joker], insert_jokers: list[Joker]
 ) -> list[list[Joker]]:
     chips = []
     for copy in copy_jokers:
-        for i in range(len(chip_jokers)):
+        for i in range(len(insert_jokers)):
             val = []
-            for j, chip in enumerate(chip_jokers):
+            for j, chip in enumerate(insert_jokers):
                 if j == i:
                     val.extend([copy, chip])
                 else:
@@ -102,14 +102,14 @@ def generate_with_copy_joker(
     copy_jokers: list[Joker],
     mult_jokers: list[Joker],
     after_hand_combos: list[list[Joker]],
-    per_hand_combos: list[list[Joker]],
+    per_card_combos: list[list[Joker]],
 ):
     final_jokers = []
     chip_jokers = get_jokers_with(jokers, "scoring.chips")
 
     if len(chip_jokers) > 0:
-        chip_combos = generate_copy_chip(copy_jokers, chip_jokers)
-        if len(after_hand_combos) > 0 or len(per_hand_combos) > 0:
+        chip_combos = insert_copy_joker(copy_jokers, chip_jokers)
+        if len(after_hand_combos) > 0 or len(per_card_combos) > 0:
             other_jokers = [
                 joker
                 for joker in jokers
@@ -119,7 +119,7 @@ def generate_with_copy_joker(
             ]
 
             for chip_order, after_order, per_card_order in product(
-                chip_combos, after_hand_combos, per_hand_combos
+                chip_combos, after_hand_combos, per_card_combos
             ):
                 final_jokers.append(
                     other_jokers + chip_order + list(after_order) + list(per_card_order)
@@ -144,15 +144,30 @@ def generate_with_copy_joker(
         for copy in copy_jokers:
             for i in range(2):
                 arg, opp = (
-                    (after_hand_combos, per_hand_combos)
+                    (after_hand_combos, per_card_combos)
                     if i == 0
-                    else (per_hand_combos, after_hand_combos)
+                    else (per_card_combos, after_hand_combos)
                 )
                 with_copy = add_copy_joker(copy, arg)
 
-                for a, b in product(with_copy, opp):
-                    final_jokers.append(a + b + other_jokers)
+                for val_with_copy, original_val in product(with_copy, opp):
+                    final_jokers.append(val_with_copy + original_val + other_jokers)
 
+    retrigger_jokers = [joker for joker in jokers if joker.retrigger is not None]
+    if len(retrigger_jokers) > 0:
+        trigger_combos = insert_copy_joker(copy_jokers, retrigger_jokers)
+        other_jokers = [
+            joker
+            for joker in jokers
+            if joker not in retrigger_jokers
+            and joker not in mult_jokers
+            and joker not in copy_jokers
+        ]
+
+        for retrigger, afterhand, percard in product(
+            trigger_combos, after_hand_combos, per_card_combos
+        ):
+            final_jokers.append(retrigger + afterhand + percard + other_jokers)
     return final_jokers
 
 

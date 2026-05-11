@@ -26,7 +26,7 @@ def is_same_rank(cards: list[Card]) -> bool:
 
 def contain_n_of_a_kind(n: int, cards: list[Card]):
     bucket = bucket_rank(cards)
-    return any(len(val) == n for val in bucket.values())
+    return any(len(val) >= n for val in bucket.values())
 
 
 def get_hand_type(hand: list[Card]) -> HandStats:

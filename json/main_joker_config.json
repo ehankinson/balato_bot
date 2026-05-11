@@ -174,7 +174,7 @@
             "trigger": 0,
             "add_mult": 3,
             "condition": {
-                "suit": "diamonds"
+                "suit": 1
             }
         },
         "buy_price": 5,
@@ -186,7 +186,7 @@
             "trigger": 0,
             "add_mult": 3,
             "condition": {
-                "suit": "hearts"
+                "suit": 0
             }
         },
         "buy_price": 5,
@@ -198,7 +198,7 @@
             "trigger": 0,
             "add_mult": 3,
             "condition": {
-                "suit": "spades"
+                "suit": 3
             }
         },
         "buy_price": 5,
@@ -210,7 +210,7 @@
             "trigger": 0,
             "add_mult": 3,
             "condition": {
-                "suit": "spades"
+                "suit": 3
             }
         },
         "buy_price": 5,
@@ -229,10 +229,11 @@
         "rarity": "common",
         "scoring": {
             "trigger": 1,
-            "chips": {
-                "count": "remaining_discards",
-                "each": 30
-            }
+            "chips": 0
+        },
+        "update": {
+            "count": "remaining_discards",
+            "each": 30
         },
         "buy_price": 5,
         "copyable": true
@@ -766,8 +767,8 @@
         "copyable": true,
         "game_modifier": {
             "suit_groups": [
-                ["hearts", "diamonds"],
-                ["clubs", "spades"]
+                [0, 1],
+                [2, 3]
             ]
         }
     },
@@ -968,10 +969,10 @@
         "rarity": "uncommon",
         "scoring": {
             "trigger": 0,
-            "chips": 30,
+            "chips": 50,
             "condition": {
                 "suit": {
-                    "req": "spades"
+                    "req": 3
                 }
             }
         },
@@ -985,7 +986,7 @@
             "add_mult": 7,
             "condition": {
                 "suit": {
-                    "req": "clubs"
+                    "req": 2
                 }
             }
         },
@@ -1112,7 +1113,7 @@
             "x_mult": 3,
             "condition": {
                 "suit": {
-                    "req_only": ["clubs", "spades"]
+                    "req_only": [2, 3]
                 }
             }
         },
