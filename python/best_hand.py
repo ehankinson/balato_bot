@@ -105,16 +105,6 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
         per_card_jokers = get_trigger_jokers(joker_linup, JokerTriggers.ON_PLAYED_CARDS)
         retrigger_jokers = get_retrigger_jokers(joker_linup)
         for hand in all_possible_hands:
-            if (
-                len(hand) == 5
-                and hand[0].rank == Rank.QUEEN
-                and hand[1].rank == Rank.FOUR
-                and hand[2].rank == Rank.KING
-                and hand[3].rank == Rank.FOUR
-                and hand[4].rank == Rank.FOUR
-            ):
-                a = 5
-
             held_steel_cards = filter_steel(steel_cards, hand)
             score = calculate_score(
                 hand,
@@ -146,7 +136,9 @@ if __name__ == "__main__":
         Card(Rank.TEN, Suit.CLUBS, Enhancement.MULT, Seal.NONE, Edition.NONE),
         Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
         Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FIVE, Suit.CLUBS, Enhancement.WILD, Seal.GOLD, Edition.NONE),
+        Card(Rank.FIVE, Suit.CLUBS, Enhancement.STEEL, Seal.GOLD, Edition.NONE),
     ]
 
     # ancient_jokers = Joker(JokersName.ANCIENT_JOKER)

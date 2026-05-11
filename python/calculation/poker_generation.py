@@ -1,14 +1,37 @@
 from itertools import combinations, permutations, product
-from math import perm
 
 from calculation.util import bucket_rank, bucket_suit
 from core.enums import Enhancement, Rank, Suit
 from core.models import Card
 
 
+def is_same_enhancement(cards: list[Card]) -> bool:
+    check = cards[0].enhancement
+    return all(card.enhancement == check for card in cards)
+
+
+def is_same_edition(cards: list[Card]) -> bool:
+    check = cards[0].edition
+    return all(card.edition == check for card in cards)
+
+
 def generate_same_rank_groups(hand_size: int, cards: list[Card]) -> list[list[Card]]:
-    func = permutations if calculate_order(cards) else combinations
-    return [list(val) for val in func(cards, hand_size)]
+    if is_same_enhancement(cards) and is_same_edition(cards):
+        return [cards[:hand_size]]
+
+    final_results = []
+    options = [list(val) for val in combinations(cards, hand_size)]
+    seen: set[tuple[int, ...]] = set()
+
+    for opt in options:
+        order = calculate_order(opt)
+        for possible_hand in order:
+            hash_obj = tuple(card.card_id for card in possible_hand)
+            if hash_obj not in seen:
+                seen.add(hash_obj)
+                final_results.append(possible_hand)
+
+    return final_results
 
 
 def generate_n_of_a_kind(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
@@ -24,8 +47,10 @@ def generate_flushes(bucket: dict[Suit, list[Card]]) -> list[list[Card]]:
     flushes: list[list[Card]] = []
     for card_values in bucket.values():
         if len(card_values) > 4:
-            func = permutations if calculate_order(card_values) else combinations
-            flushes.extend([list(val) for val in func(card_values, 5)])
+            combos = [list(flush) for flush in combinations(card_values, 5)]
+            for com in combos:
+                order = calculate_order(com)
+                flushes.extend(order)
 
     return flushes
 
@@ -37,11 +62,18 @@ def generate_2_pair(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
         if len(cards) >= 2
     }
 
-    return [
-        pair1 + pair2
-        for rank1, rank2 in combinations(pair_options.keys(), 2)
-        for pair1, pair2 in product(pair_options[rank1], pair_options[rank2])
-    ]
+    seen: set[tuple[int, ...]] = set()
+    final_results: list[list[Card]] = []
+    for rank1, rank2 in combinations(pair_options.keys(), 2):
+        for pair1, pair2 in product(pair_options[rank1], pair_options[rank2]):
+            order = calculate_order(pair1 + pair2)
+            for ord in order:
+                hash_obj = tuple(card.card_id for card in pair1 + pair2)
+                if hash_obj not in seen:
+                    seen.add(hash_obj)
+                    final_results.append(ord)
+
+    return final_results
 
 
 def generate_full_house(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
@@ -106,27 +138,50 @@ def generate_straights(cards: list[Card]) -> list[list[Card]]:
             buckets.append(matching_cards)
         else:
             for straight in product(*buckets):
-                func = permutations if calculate_order(list(straight)) else combinations
-                straights.extend([list(val) for val in func(straight, 5)])
+                order = calculate_order(list(straight))
+                straights.extend(order)
 
     return straights
 
 
-def calculate_order(cards: list[Card]) -> bool:
-    add = []
-    mul = []
+def calculate_order(cards: list[Card]) -> list[list[Card]]:
+    double_cards = []
+    add_cards = []
+    mul_cards = []
+    none_cards = []
 
     for card in cards:
-        if card.add_mult > 0:
-            add.append(card)
+        if card.play_x_mult > 1 and card.add_mult > 0:
+            double_cards.append(card)
+        # x_mult has higher priority
+        elif card.play_x_mult > 1:
+            mul_cards.append(card)
 
-        if card.play_x_mult > 1:
-            mul.append(card)
+        elif card.add_mult > 0:
+            add_cards.append(card)
 
-    # if both list are > 0 that means the order matters so we need permutations
-    # if one is 0 and the other isn't or both are 0, then the order doesn't matter so we can just use the
-    # combination instead of permutation
-    return len(add) > 0 and len(mul) > 0
+        else:
+            none_cards.append(card)
+
+    add_len = len(add_cards)
+    mul_len = len(mul_cards)
+    double_len = len(double_cards)
+
+    need_permutations = (
+        # We need order since the double means add + x_mult which can throw things off
+        (double_len > 0 and (add_len > 0 or mul_len > 0))
+        or (add_len > 0 and mul_len > 0)
+    )
+
+    possible_options = []
+    if need_permutations:
+        perm = [list(val) for val in permutations(double_cards + add_cards + mul_cards)]
+        for p in perm:
+            possible_options.append(none_cards + p)
+    else:
+        possible_options.append(cards)
+
+    return possible_options
 
 
 def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
@@ -142,5 +197,7 @@ def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
     hands.extend(generate_flushes(suit_bucket))
     hands.extend(generate_2_pair(rank_bucket))
     hands.extend(generate_full_house(rank_bucket))
+
+    print(f"There are {len(hands)} to check")
 
     return hands
