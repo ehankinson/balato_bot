@@ -163,25 +163,14 @@ def calculate_order(cards: list[Card]) -> list[list[Card]]:
         else:
             none_cards.append(card)
 
-    add_len = len(add_cards)
-    mul_len = len(mul_cards)
-    double_len = len(double_cards)
-
-    need_permutations = (
-        # We need order since the double means add + x_mult which can throw things off
-        (double_len > 0 and (add_len > 0 or mul_len > 0))
-        or (add_len > 0 and mul_len > 0)
+    # The doulbes need sorting since a luck polychrome (x + 20) * 1.5 is greater
+    # then a hologram glass (x + 10) * 2
+    double_cards.sort(
+        key=lambda c: c.add_mult / (c.play_x_mult - 1),
+        reverse=True
     )
 
-    possible_options = []
-    if need_permutations:
-        perm = [list(val) for val in permutations(double_cards + add_cards + mul_cards)]
-        for p in perm:
-            possible_options.append(none_cards + p)
-    else:
-        possible_options.append(cards)
-
-    return possible_options
+    return [none_cards + add_cards + double_cards + mul_cards]
 
 
 def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
@@ -197,7 +186,5 @@ def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
     hands.extend(generate_flushes(suit_bucket))
     hands.extend(generate_2_pair(rank_bucket))
     hands.extend(generate_full_house(rank_bucket))
-
-    print(f"There are {len(hands)} to check")
 
     return hands

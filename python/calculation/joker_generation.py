@@ -80,21 +80,13 @@ def check_for_order(jokers: list[Joker]) -> list[list[Joker]]:
     for joker in jokers:
         if joker.scoring.x_mult is not None:
             mul.append(joker)
-
-        if joker.scoring.add_mult is not None or joker.scoring.chips is not None:
+        else:
             add.append(joker)
 
-    final_jokers: list[list[Joker]] = []
-    if len(mul) > 0 and len(add) == 0:
-        final_jokers.extend(add_combination(mul, len(mul)))
-
-    elif len(add) > 0 and len(mul) == 0:
-        final_jokers.extend(add_combination(add, len(add)))
-
-    else:
-        final_jokers.extend(add_permutation(jokers, len(jokers)))
-
-    return final_jokers
+    # since add will always be played before x_mult it is never better
+    # to play x_mult first
+    return [add + mul]
+   
 
 
 def generate_with_copy_joker(

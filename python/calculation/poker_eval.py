@@ -19,6 +19,16 @@ def is_straight(cards: list[Card]) -> bool:
     return True
 
 
+def contains_2_pair(cards: list[Card]) -> bool:
+    bucket = bucket_rank(cards)
+    count = 0
+    for value in bucket.values():
+        if len(value) >= 2:
+            count += 1
+
+    return count > 1
+
+
 def is_same_rank(cards: list[Card]) -> bool:
     initial_rank = cards[0].rank
     return all(card.rank == initial_rank for card in cards)

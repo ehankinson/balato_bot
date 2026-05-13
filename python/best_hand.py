@@ -3,8 +3,8 @@ from collections import Counter
 
 from calculation.joker_generation import (
     generate_possible_jokers,
-    get_trigger_jokers,
     get_retrigger_jokers,
+    get_trigger_jokers,
 )
 from calculation.joker_retrigger import calculate_joker_retrigger
 from calculation.joker_scoring import calculate_joker_scoring
@@ -13,8 +13,8 @@ from calculation.poker_generation import generate_playable_hands
 from core.enums import (
     Edition,
     Enhancement,
-    JokerTriggers,
     JokersName,
+    JokerTriggers,
     Rank,
     Seal,
     Suit,
@@ -24,23 +24,27 @@ from core.models import Card, Joker
 JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
 
 
+def filter_cards(main_cards: list[Card], filter_cards: list[Card]) -> list[Card]:
+    return list((Counter(main_cards) - Counter(filter_cards)).elements())
+
+
 def filter_steel(steel_cards: list[Card], hand: list[Card]) -> list[Card]:
     hand_steel = [card for card in hand if card.enhancement == Enhancement.STEEL]
-    not_played_steel = list((Counter(steel_cards) - Counter(hand_steel)).elements())
-    return not_played_steel
+    return filter_cards(steel_cards, hand_steel)
 
 
 def calculate_score(
     hand: list[Card],
     steel_cards: list[Card],
-    retrigger_jokers: list[Joker],
-    after_hand_joker: list[Joker],
+    cards_not_played: list[Card],
     per_card_jokers: list[Joker],
+    after_hand_joker: list[Joker],
+    retrigger_jokers: list[Joker]
 ) -> float:
     hand_stats = get_hand_type(hand)
     chips, mult = hand_stats.chips, hand_stats.mult
     condition_args: dict = {}
-
+    condition_args["cards_not_played"] = cards_not_played
     condition_args["hand"] = hand
 
     for i, card in enumerate(hand):
@@ -105,13 +109,15 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
         per_card_jokers = get_trigger_jokers(joker_linup, JokerTriggers.ON_PLAYED_CARDS)
         retrigger_jokers = get_retrigger_jokers(joker_linup)
         for hand in all_possible_hands:
+            card_not_played = filter_cards(cards, hand)
             held_steel_cards = filter_steel(steel_cards, hand)
             score = calculate_score(
                 hand,
                 held_steel_cards,
-                retrigger_jokers,
-                after_hand_jokers,
+                card_not_played,
                 per_card_jokers,
+                after_hand_jokers,
+                retrigger_jokers,
             )
             if score > best_score:
                 best_score = score
@@ -129,28 +135,19 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
 
 if __name__ == "__main__":
     cards = [
-        Card(Rank.ACE, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
+        Card(Rank.ACE, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
         Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
-        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
-        Card(Rank.JACK, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
         Card(Rank.TEN, Suit.CLUBS, Enhancement.MULT, Seal.NONE, Edition.NONE),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.POLYCHROME),
         Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FIVE, Suit.CLUBS, Enhancement.WILD, Seal.GOLD, Edition.NONE),
-        Card(Rank.FIVE, Suit.CLUBS, Enhancement.STEEL, Seal.GOLD, Edition.NONE),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
     ]
 
-    # ancient_jokers = Joker(JokersName.ANCIENT_JOKER)
-    # ancient_jokers.req = {"suit": Suit.CLUBS}
-    banner = Joker(JokersName.BANNER)
-    banner.scoring.chips = 120
-    jokers = [
-        Joker(JokersName.HACK),
-        Joker(JokersName.ONYX_AGATE),
-        Joker(JokersName.HANGING_CHAD),
-        Joker(JokersName.BLUEPRINT)
-    ]
+    joker = Joker(JokersName.RAISED_FIST)
+    # joker.scoring.x_mult = 3
+    jokers = [joker]
 
     # hand = Hand.random_hand(8)
     # cards = hand.cards

@@ -105,7 +105,7 @@ class Card:
         val = self.rank & 0b1111
         val = (val << 2) | (self.suit & 0b11)
         val = (val << 4) | (self.enhancement & 0b1111)
-        val = (val << 3) | (self.suit & 0b111)
+        val = (val << 3) | (self.seal & 0b111)
         val = (val << 2) | (self.edition & 0b11)
         return val
 

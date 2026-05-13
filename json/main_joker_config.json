@@ -79,12 +79,10 @@
     "half_joker": {
         "rarity": "common",
         "scoring": {
+            "trigger": 1,
             "add_mult": 20,
             "condition": {
-                "trigger": 1,
-                "cards_played": {
-                    "less_or_equal": 3
-                }
+                "cards_played": 3
             }
         },
         "buy_price": 5,
@@ -103,11 +101,11 @@
         "rarity": "uncommon",
         "scoring": {
             "trigger": 1,
-            "chips": {
-                "count": "stone_cards",
-                "scope": "full_deck",
-                "each": 25
-            }
+            "chips": 0
+        },
+        "update": {
+            "count": "stone_cards",
+            "target": "scoring.chips"
         },
         "buy_price": 6,
         "copyable": true
@@ -132,10 +130,15 @@
         "rarity": "uncommon",
         "scoring": {
             "trigger": 1,
-            "x_mult": 3,
+            "x_mult": 1
+        },
+        "update": {
             "condition": {
-                "hands_left": 1
-            }
+                "hand_left": 1
+            },
+            "target": "scoring.x_mult",
+            "value": 3,
+            "default": 1
         },
         "buy_price": 6,
         "copyable": true
@@ -210,7 +213,7 @@
             "trigger": 0,
             "add_mult": 3,
             "condition": {
-                "suit": 3
+                "suit": 2
             }
         },
         "buy_price": 5,
@@ -242,10 +245,15 @@
         "rarity": "common",
         "scoring": {
             "trigger": 1,
-            "add_mult": 15,
+            "add_mult": 0
+        },
+        "update": {
             "condition": {
                 "discard_count_equal": 0
-            }
+            },
+            "target": "scoring.add_mult",
+            "value": 15,
+            "default": 0
         },
         "buy_price": 5,
         "copyable": true
@@ -264,10 +272,16 @@
         "rarity": "uncommon",
         "scoring": {
             "trigger": 1,
-            "x_mult": 4,
+            "x_mult": 1
+        },
+        "update": {
             "condition": {
                 "every_x_hands": 6
-            }
+            },
+            "target": "scoring.x_mult",
+            "value": 4,
+            "default": 1,
+            "hands_played": 0
         },
         "buy_price": 5,
         "copyable": true
@@ -298,12 +312,14 @@
         "rarity": "uncommon",
         "scoring": {
             "trigger": 1,
-            "x_mult": {
-                "base": 1,
-                "count": "steel_cards",
-                "scope": "full_deck",
-                "each": 0.2
-            }
+            "x_mult": 1
+        },
+        "update": {
+            "base": 1,
+            "count": "steel_cards",
+            "operation": "add",
+            "each": 0.2,
+            "target": "scoring.x_mult"
         },
         "buy_price": 7,
         "copyable": true
@@ -312,10 +328,7 @@
         "rarity": "common",
         "scoring": {
             "trigger": 1,
-            "add_mult": {
-                "count": "lowest_rank_held_in_hand",
-                "each": 2
-            }
+            "add_mult": "smallest_card_in_hand"
         },
         "buy_price": 5,
         "copyable": true
@@ -971,9 +984,7 @@
             "trigger": 0,
             "chips": 50,
             "condition": {
-                "suit": {
-                    "req": 3
-                }
+                "suit": 3
             }
         },
         "buy_price": 7,
