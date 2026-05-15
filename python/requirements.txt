@@ -5,5 +5,5 @@ opencv-python
 torch
 torchvision
 tqdm
-pyscreenshots
+pyscreenshot
 keyboard
