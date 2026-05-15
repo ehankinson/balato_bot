@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     joker = Joker(JokersName.RAISED_FIST)
     # joker.scoring.x_mult = 3
-    jokers = [joker, Joker(JokersName.MIME)]
+    jokers = [joker, Joker(JokersName.MIME), Joker(JokersName.BLUEPRINT)]
 
     # hand = Hand.random_hand(8)
     # cards = hand.cards
