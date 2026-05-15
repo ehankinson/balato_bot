@@ -24,22 +24,73 @@ from core.models import Card, Joker
 JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
 
 
-def filter_cards(main_cards: list[Card], filter_cards: list[Card]) -> list[Card]:
-    return list((Counter(main_cards) - Counter(filter_cards)).elements())
+def filter_cards(
+    jokers: list[Joker], main_cards: list[Card], filter_cards: list[Card]
+) -> list[Card]:
+    cards_not_played = list((Counter(main_cards) - Counter(filter_cards)).elements())
+
+    important_cards = []
+    if any(joker.background_image == JokersName.RAISED_FIST for joker in jokers):
+        lowest_rank = min(cards_not_played, key=lambda card: card.rank)
+        important_cards.append(lowest_rank)
+
+    if any(joker.background_image == JokersName.SHOOT_THE_MOON for joker in jokers):
+        queen_cards = [card for card in cards_not_played if card.rank == Rank.QUEEN]
+        important_cards.extend(queen_cards)
+
+    if any(joker.background_image == JokersName.BARON for joker in jokers):
+        king_cards = [card for card in cards_not_played if card.rank == Rank.KING]
+        important_cards.extend(king_cards)
+
+    steel_cards = [
+        card
+        for card in cards_not_played
+        if card not in important_cards and card.enhancement == Enhancement.STEEL
+    ]
+    important_cards.extend(steel_cards)
+
+    important_cards = sorted(important_cards, key=lambda card: card.rank)
+    return important_cards
 
 
-def filter_steel(steel_cards: list[Card], hand: list[Card]) -> list[Card]:
-    hand_steel = [card for card in hand if card.enhancement == Enhancement.STEEL]
-    return filter_cards(steel_cards, hand_steel)
+def add_to_joker_cache(card_id: int, condition_args: dict) -> tuple[int, int, float]:
+    if joker.background_image not in JOKER_CACHE[card_id]:
+        joker_chips, joker_add_mult, joker_x_mult = calculate_joker_scoring(
+            joker, condition_args
+        )
+        JOKER_CACHE[card_id][joker.background_image] = (
+            joker_chips,
+            joker_add_mult,
+            joker_x_mult,
+        )
+
+    return JOKER_CACHE[card_id][joker.background_image]
+
+
+def calculate_playing_card_score(
+    chips: int,
+    mult: float,
+    card: Card,
+    retrigger_jokers: list[Joker],
+    condition_args: dict,
+) -> None:
+    trigger = card.trigger
+    for joker in retrigger_jokers:
+        trigger += calculate_joker_retrigger(joker, condition_args)
+
+    for _ in range(trigger, 0, -1):
+        chips += card.chips
+        mult += card.add_mult
+        mult *= card.play_x_mult
 
 
 def calculate_score(
     hand: list[Card],
-    steel_cards: list[Card],
     cards_not_played: list[Card],
-    per_card_jokers: list[Joker],
+    on_held_card_jokers: list[Joker],
+    on_played_card_jokers: list[Joker],
     after_hand_joker: list[Joker],
-    retrigger_jokers: list[Joker]
+    retrigger_jokers: list[Joker],
 ) -> float:
     hand_stats = get_hand_type(hand)
     chips, mult = hand_stats.chips, hand_stats.mult
@@ -47,6 +98,12 @@ def calculate_score(
     condition_args["cards_not_played"] = cards_not_played
     condition_args["hand"] = hand
 
+    played_card_retrigger_jokers = [
+        joker for joker in retrigger_jokers if joker.background_image != JokersName.MIME
+    ]
+    helded_card_retrigger_jokers = [
+        joker for joker in retrigger_jokers if joker.background_image == JokersName.MIME
+    ]
     for i, card in enumerate(hand):
         condition_args["card"] = card
         condition_args["card_pos"] = i
@@ -54,7 +111,7 @@ def calculate_score(
             JOKER_CACHE[card.card_id] = {}
 
         trigger = card.trigger
-        for joker in retrigger_jokers:
+        for joker in played_card_retrigger_jokers:
             trigger += calculate_joker_retrigger(joker, condition_args)
 
         for _ in range(trigger, 0, -1):
@@ -62,28 +119,30 @@ def calculate_score(
             mult += card.add_mult
             mult *= card.play_x_mult
 
-            for joker in per_card_jokers:
-                if joker.background_image not in JOKER_CACHE[card.card_id]:
-                    joker_chips, joker_add_mult, joker_x_mult = calculate_joker_scoring(
-                        joker, condition_args
-                    )
-                    JOKER_CACHE[card.card_id][joker.background_image] = (
-                        joker_chips,
-                        joker_add_mult,
-                        joker_x_mult,
-                    )
-
-                j_chips, j_add_mult, j_x_mult = JOKER_CACHE[card.card_id][
-                    joker.background_image
-                ]
+            for joker in on_played_card_jokers:
+                j_chips, j_add_mult, j_x_mult = add_to_joker_cache(
+                    card.card_id, condition_args
+                )
 
                 chips += j_chips
                 mult += j_add_mult
                 mult *= j_x_mult
 
-    for card in steel_cards:
+    for card in cards_not_played:
+        condition_args["card"] = card
+
         trigger = card.trigger
-        mult *= card.hand_x_mult**trigger
+        # there is only mime which retriggers once and if we copy that is just mime + copys
+        trigger += len(helded_card_retrigger_jokers)
+
+        for _ in range(trigger, 0, -1):
+            mult *= card.hand_x_mult
+
+            for joker in on_held_card_jokers:
+                _, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
+
+                mult += j_add_mult
+                mult *= j_x_mult
 
     for joker in after_hand_joker:
         joker_chips, joker_add_mult, joker_x_mutl = calculate_joker_scoring(
@@ -99,23 +158,28 @@ def calculate_score(
 def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
     all_possible_hands = generate_playable_hands(cards)
     all_possible_jokers = generate_possible_jokers(jokers)
-    steel_cards = [card for card in cards if card.enhancement == Enhancement.STEEL]
 
     best_score = 0
     best_hand = []
     best_joker = []
+
     for joker_linup in all_possible_jokers:
-        after_hand_jokers = get_trigger_jokers(joker_linup, JokerTriggers.AFTER_HAND)
-        per_card_jokers = get_trigger_jokers(joker_linup, JokerTriggers.ON_PLAYED_CARDS)
         retrigger_jokers = get_retrigger_jokers(joker_linup)
+        after_hand_jokers = get_trigger_jokers(joker_linup, JokerTriggers.AFTER_HAND)
+        on_held_cards_jokers = get_trigger_jokers(
+            joker_linup, JokerTriggers.ON_HELD_CARDS
+        )
+        on_played_cards_jokers = get_trigger_jokers(
+            joker_linup, JokerTriggers.ON_PLAYED_CARDS
+        )
+
         for hand in all_possible_hands:
-            card_not_played = filter_cards(cards, hand)
-            held_steel_cards = filter_steel(steel_cards, hand)
+            card_not_played = filter_cards(joker_linup, cards, hand)
             score = calculate_score(
                 hand,
-                held_steel_cards,
                 card_not_played,
-                per_card_jokers,
+                on_held_cards_jokers,
+                on_played_cards_jokers,
                 after_hand_jokers,
                 retrigger_jokers,
             )
@@ -147,12 +211,13 @@ if __name__ == "__main__":
 
     joker = Joker(JokersName.RAISED_FIST)
     # joker.scoring.x_mult = 3
-    jokers = [joker]
+    jokers = [joker, Joker(JokersName.MIME)]
 
     # hand = Hand.random_hand(8)
     # cards = hand.cards
 
     start_time = time.perf_counter()
+    # for _ in range(10_000):
     get_best_scoring_hand(cards, jokers)
     end_time = time.perf_counter()
 

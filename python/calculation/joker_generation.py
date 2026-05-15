@@ -86,7 +86,6 @@ def check_for_order(jokers: list[Joker]) -> list[list[Joker]]:
     # since add will always be played before x_mult it is never better
     # to play x_mult first
     return [add + mul]
-   
 
 
 def generate_with_copy_joker(
@@ -172,10 +171,16 @@ def generate_possible_jokers(jokers: list[Joker]) -> list[list[Joker]]:
 
     none_scoring_jokers = [joker for joker in jokers if joker not in mult_jokers]
     after_hand_jokers = get_scoring_type_joker(JokerTriggers.AFTER_HAND, mult_jokers)
-    per_card_jokers = get_scoring_type_joker(JokerTriggers.ON_PLAYED_CARDS, mult_jokers)
+    played_card_jokers = get_scoring_type_joker(
+        JokerTriggers.ON_PLAYED_CARDS, mult_jokers
+    )
+    helded_card_jokers = get_scoring_type_joker(
+        JokerTriggers.ON_HELD_CARDS, mult_jokers
+    )
 
     possible_after_hand_jokers = check_for_order(after_hand_jokers)
-    possible_per_hand_jokers = check_for_order(per_card_jokers)
+    possible_played_card_jokers = check_for_order(played_card_jokers)
+    possible_helded_card_jokers = check_for_order(helded_card_jokers)
 
     copy_jokers = get_jokers_with(jokers, "copy")
     if len(copy_jokers) > 0:
@@ -184,12 +189,17 @@ def generate_possible_jokers(jokers: list[Joker]) -> list[list[Joker]]:
             copy_jokers,
             mult_jokers,
             possible_after_hand_jokers,
-            possible_per_hand_jokers,
+            possible_played_card_jokers,
         )
 
     return [
-        none_scoring_jokers + list(after_hand_order) + list(per_card_order)
-        for after_hand_order, per_card_order in product(
-            possible_after_hand_jokers, possible_per_hand_jokers
+        none_scoring_jokers
+        + list(after_hand_order)
+        + list(played_card_order)
+        + list(held_card_order)
+        for after_hand_order, played_card_order, held_card_order in product(
+            possible_after_hand_jokers,
+            possible_played_card_jokers,
+            possible_helded_card_jokers,
         )
     ]

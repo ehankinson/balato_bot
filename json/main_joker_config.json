@@ -156,9 +156,7 @@
     "mime": {
         "rarity": "uncommon",
         "retrigger": {
-            "times": 1,
-            "condition": "held_in_hand",
-            "played_card": false
+            "times": 2
         },
         "buy_price": 5,
         "copyable": true
@@ -327,7 +325,7 @@
     "raised_fist": {
         "rarity": "common",
         "scoring": {
-            "trigger": 1,
+            "trigger": 2,
             "add_mult": "smallest_card_in_hand"
         },
         "buy_price": 5,
@@ -766,9 +764,10 @@
     "shoot_the_moon": {
         "rarity": "common",
         "scoring": {
+            "trigger": 2,
             "add_mult": 13,
             "condition": {
-                "rank": "queen"
+                "rank": 10
             }
         },
         "buy_price": 5,
@@ -1475,8 +1474,7 @@
             "trigger": 2,
             "x_mult": 1.5,
             "condition": {
-                "rank": "king",
-                "held_in_hand": true
+                "rank": 11
             }
         },
         "buy_price": 8,

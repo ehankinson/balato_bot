@@ -4,6 +4,7 @@ from calculation.poker_eval import (
     is_flush,
     is_straight,
 )
+from core.enums import Rank
 from core.models import Card, Joker
 
 
@@ -35,7 +36,9 @@ def calculate_scoring_condition(
 
             if condition_value == "facecard":
                 return condition_args["card"].is_facecard
-
+            else:
+                return condition_args["card"].rank == condition_value
+    
         case "suit":
             value = condition["suit"]
 
@@ -76,15 +79,19 @@ def calculate_joker_scoring(
 
     if scoring_data.add_mult is not None:
         if isinstance(scoring_data.add_mult, str):
-            lowest_rank = float('inf') 
-            lowest_card: Card = Card.random()
-            for card in condition_args["cards_not_played"]:
-                if card.rank < lowest_rank:
-                    lowest_card = card
-                    lowest_rank = card.rank
-                
-            rank = lowest_card.rank + 2 if not lowest_card.is_facecard else 10
-            add_mult += rank * 2
+            lowest_card = condition_args["cards_not_played"][
+                0
+            ]  # this will always be the lowest card
+
+            if lowest_card == condition_args["card"]:
+                rank = (
+                    11
+                    if lowest_card.rank == Rank.ACE
+                    else lowest_card.rank + 2
+                    if not lowest_card.is_facecard
+                    else 10
+                )
+                add_mult += rank * 2
 
         elif isinstance(scoring_data.add_mult, int):
             add_mult += scoring_data.add_mult
