@@ -200,18 +200,18 @@ def get_best_scoring_hand(cards: list[Card], jokers: list[Joker]) -> None:
 if __name__ == "__main__":
     cards = [
         Card(Rank.ACE, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
         Card(Rank.QUEEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
         Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.TEN, Suit.CLUBS, Enhancement.MULT, Seal.NONE, Edition.NONE),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.TEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
     ]
 
-    joker = Joker(JokersName.RAISED_FIST)
-    # joker.scoring.x_mult = 3
-    jokers = [joker, Joker(JokersName.MIME), Joker(JokersName.BLUEPRINT)]
+    jokers = [
+        Joker(JokersName.WILY_JOKER),
+    ]
 
     # hand = Hand.random_hand(8)
     # cards = hand.cards

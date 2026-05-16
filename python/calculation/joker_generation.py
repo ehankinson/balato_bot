@@ -13,10 +13,6 @@ def generate_blueprint_permutations(
         new_list = jokers[:i] + [copy_joker] + jokers[i:]
         final_list.append(new_list)
 
-    for combo in final_list:
-        copy_index = combo.index(copy_joker)
-        combo[copy_index] = combo[copy_index + 1]
-
     return final_list
 
 
@@ -107,20 +103,20 @@ def check_for_order(jokers: list[Joker]) -> list[list[Joker]]:
 
 
 def generate_copy_combos(
-    jokers: list[Joker], mult_jokers: list[Joker], copy_jokers: list[Joker]
+    jokers: list[Joker], edit_jokers: list[Joker], copy_jokers: list[Joker]
 ) -> list[list[Joker]]:
     final_list: list[list[Joker]] = []
     other_jokers = [
         joker
         for joker in jokers
-        if joker not in mult_jokers and joker not in copy_jokers
+        if joker not in edit_jokers and joker not in copy_jokers
     ]
 
     copy_combinations: list[list[Joker]] = []
     if len(copy_jokers) == 1:
         copy_joker = copy_jokers[0]
         function = COPY_FUNCTION[copy_joker.background_image]
-        copy_combinations = function(mult_jokers, copy_joker)
+        copy_combinations = function(edit_jokers, copy_joker)
 
     final_list.extend([copy_combo + other_jokers for copy_combo in copy_combinations])
     return final_list
@@ -134,34 +130,11 @@ def build_copy_combos(
     per_card_combos: list[list[Joker]],
 ):
     final_jokers = []
+    
     chip_jokers = get_jokers_with(jokers, "scoring.chips")
-
     if len(chip_jokers) > 0:
-        chip_combos = insert_copy_joker(copy_jokers, chip_jokers)
-        if len(after_hand_combos) > 0 or len(per_card_combos) > 0:
-            other_jokers = [
-                joker
-                for joker in jokers
-                if joker not in chip_jokers
-                and joker not in mult_jokers
-                and joker not in copy_jokers
-            ]
-
-            for chip_order, after_order, per_card_order in product(
-                chip_combos, after_hand_combos, per_card_combos
-            ):
-                final_jokers.append(
-                    other_jokers + chip_order + list(after_order) + list(per_card_order)
-                )
-        else:
-            other_jokers = [
-                joker
-                for joker in jokers
-                if joker not in chip_jokers and joker not in copy_jokers
-            ]
-
-            for chip in chip_combos:
-                final_jokers.append(other_jokers + chip)
+        chip_combos = generate_copy_combos(jokers, mult_jokers, copy_jokers)
+        final_jokers.extend(chip_combos)
 
     if len(mult_jokers) > 0:
         mult_combos = generate_copy_combos(jokers, mult_jokers, copy_jokers)
@@ -182,7 +155,7 @@ def generate_possible_jokers(jokers: list[Joker]) -> list[list[Joker]]:
 
     mult_jokers = get_jokers_with(jokers, "scoring.add_mult", "scoring.x_mult")
 
-    none_scoring_jokers = [joker for joker in jokers if joker not in mult_jokers]
+    none_mult_jokers = [joker for joker in jokers if joker not in mult_jokers]
     after_hand_jokers = get_scoring_type_joker(JokerTriggers.AFTER_HAND, mult_jokers)
     played_card_jokers = get_scoring_type_joker(
         JokerTriggers.ON_PLAYED_CARDS, mult_jokers
@@ -212,7 +185,7 @@ def generate_possible_jokers(jokers: list[Joker]) -> list[list[Joker]]:
         )
 
     return [
-        none_scoring_jokers
+        none_mult_jokers
         + list(after_hand_order)
         + list(played_card_order)
         + list(held_card_order)

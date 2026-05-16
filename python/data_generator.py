@@ -5,6 +5,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
+from PIL import Image
+from tqdm import tqdm
+
 from config.settings import (
     EDITION_CROP,
     ENHANCEMENT_CROP,
@@ -26,11 +29,9 @@ from core.enums import (
     Seal,
     Suit,
 )
-from core.models import RANDOM_JOKERS, Card, Hand, Joker, RenderedHand
-from PIL import Image
+from core.models import RANDOM_JOKERS, Card, Joker, RenderedHand
 from rendering.hand import render_hand
 from rendering.joker import render_jokers
-from tqdm import tqdm
 from utils.files import build_folder, rebuild_folder
 from utils.images import card_crop
 
@@ -85,12 +86,12 @@ def generate_rendered_hand(
     card_amount = (
         random_full_card_amount() if not is_feature else random_feature_card_amount()
     )
-    hand = Hand.random_hand(card_amount)
-    hand_render = render_hand(hand, True)
+    # hand = Hand.random_hand(card_amount)
+    # hand_render = render_hand(hand, True)
 
     name = f"{hand_index}_{card_amount}"
     split = "train" if hand_index < cutoff else "val"
-    return name, split, hand_render
+    return name, split, None
 
 
 def generate_rendered_jokers(
