@@ -1,13 +1,13 @@
 import random
 from dataclasses import dataclass, field
 
-from config.settings import JOKER_CONFIG
 from PIL import Image
-from utils.files import load_json
 
+from config.settings import JOKER_CONFIG
 from core.class_indices import JOKER_TYPE_CLASSES
 from core.enums import Edition, Enhancement, JokersName, JokerTriggers, Rank, Seal, Suit
 from core.scoring import get_initial_card_chips
+from utils.files import load_json
 
 CONFIG = load_json(JOKER_CONFIG)
 
@@ -151,7 +151,7 @@ class JokerScoring:
 
 @dataclass
 class JokerRetrigger:
-    played_card: bool
+    trigger: JokerTriggers
     times: int
     condition: str | None = None
 
@@ -192,6 +192,12 @@ class JokerConfig:
     buy_price: int
     copyable: bool
     life: int | None = None
+
+
+@dataclass
+class CardBucket:
+    count: int
+    cards: list[Card]
 
 
 @dataclass
@@ -259,9 +265,9 @@ class Joker:
 
         retrigger_data = joker_data["retrigger"]
         self.retrigger = JokerRetrigger(
+            trigger=retrigger_data.get("trigger"),
             times=retrigger_data.get("times", 1),
-            played_card=retrigger_data.get("played_card", True),
-            condition=retrigger_data.get("condition"),
+            condition=retrigger_data.get("condition", None),
         )
 
     def _build_joker_econ(self, joker_data: dict) -> None:
@@ -332,6 +338,15 @@ class Joker:
             base = f"{self.edition.name.lower()} {base}"
 
         return base
+
+
+@dataclass
+class JokerPlan:
+    on_played: list[Joker]
+    on_held: list[Joker]
+    after_hand: list[Joker]
+    played_retrigger: list[Joker]
+    held_retrigger: list[Joker]
 
 
 @dataclass

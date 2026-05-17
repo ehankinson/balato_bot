@@ -148,7 +148,7 @@
         "retrigger": {
             "times": 1,
             "condition": "facecard",
-            "played_card": true
+            "trigger": 1
         },
         "buy_price": 6,
         "copyable": true
@@ -156,7 +156,8 @@
     "mime": {
         "rarity": "uncommon",
         "retrigger": {
-            "times": 2
+            "trigger": 2,
+            "times": 1
         },
         "buy_price": 5,
         "copyable": true
@@ -289,7 +290,7 @@
         "retrigger": {
             "times": 1,
             "condition": "low_card",
-            "played_card": true
+            "trigger": 1
         },
         "buy_price": 6,
         "copyable": true
@@ -830,7 +831,7 @@
         "retrigger": {
             "times": 2,
             "condition": "first_played_card",
-            "played_card": true
+            "trigger": 1
         },
         "buy_price": 4,
         "copyable": true
@@ -894,7 +895,7 @@
         "retrigger": {
             "times": 1,
             "condition": "final_hand",
-            "played_card": true
+            "trigger": 1
         },
         "buy_price": 5,
         "copyable": true
@@ -995,9 +996,7 @@
             "trigger": 0,
             "add_mult": 7,
             "condition": {
-                "suit": {
-                    "req": 2
-                }
+                "suit": 2
             }
         },
         "buy_price": 7,
@@ -1910,9 +1909,7 @@
             "trigger": 0,
             "x_mult": 1.5,
             "condition": {
-                "suit": {
-                    "req": "suit"
-                }
+                "suit": "suit"
             }
         },
         "buy_price": 8,

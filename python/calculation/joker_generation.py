@@ -10,7 +10,7 @@ def generate_blueprint_permutations(
 ) -> list[list[Joker]]:
     final_list: list[list[Joker]] = []
     for i in range(len(jokers)):
-        new_list = jokers[:i] + [copy_joker] + jokers[i:]
+        new_list = jokers[:i] + [jokers[i]] + jokers[i:]
         final_list.append(new_list)
 
     return final_list
@@ -40,16 +40,23 @@ def get_trigger_jokers(jokers: list[Joker], trigger: JokerTriggers) -> list[Joke
     return return_list
 
 
-def get_retrigger_jokers(jokers: list[Joker]) -> list[Joker]:
-    return [joker for joker in jokers if joker.retrigger is not None]
-
-
 def get_jokers_with(jokers: list[Joker], *checks: str) -> list[Joker]:
     return [
         joker
         for joker in jokers
         if any(nested_getattr(joker, check) is not None for check in checks)
     ]
+
+
+def update_copy_joker(jokers: list[Joker]) -> None:
+    for i, joker in enumerate(jokers):
+        if joker.copy is None:
+            continue
+
+        if joker.background_image == JokersName.BLUEPRINT:
+            jokers[i] = jokers[i + 1]
+        else:  # BRAINSTORM
+            jokers[i] = jokers[0]
 
 
 def insert_copy_joker(
@@ -87,19 +94,20 @@ def add_copy_joker(copy: Joker, values: list[list[Joker]]) -> list[list[Joker]]:
     return final_combos
 
 
-def check_for_order(jokers: list[Joker]) -> list[list[Joker]]:
-    mul = []
-    add = []
+def build_mult_jokers(jokers: list[Joker]) -> list[Joker]:
+    mult_jokers = get_jokers_with(jokers, "scoring.add_mult", "scoring.x_mult")
 
-    for joker in jokers:
-        if joker.scoring.x_mult is not None:
-            mul.append(joker)
-        else:
-            add.append(joker)
+    add_mult = []
+    x_mult = []
+    for joker in mult_jokers:
+        add_list = add_mult if joker.scoring.add_mult is not None else x_mult
+        add_list.append(joker)
 
-    # since add_mult will always be played before x_mult
-    # because ganruteed higher score 0_0
-    return [add + mul]
+    add_mult = sorted(add_mult, key=lambda joker: joker.scoring.trigger)
+    x_mult = sorted(x_mult, key=lambda joker: joker.scoring.trigger)
+
+    mult_jokers = add_mult + x_mult
+    return mult_jokers
 
 
 def generate_copy_combos(
@@ -123,14 +131,10 @@ def generate_copy_combos(
 
 
 def build_copy_combos(
-    jokers: list[Joker],
-    copy_jokers: list[Joker],
-    mult_jokers: list[Joker],
-    after_hand_combos: list[list[Joker]],
-    per_card_combos: list[list[Joker]],
+    jokers: list[Joker], copy_jokers: list[Joker], mult_jokers: list[Joker]
 ):
     final_jokers = []
-    
+
     chip_jokers = get_jokers_with(jokers, "scoring.chips")
     if len(chip_jokers) > 0:
         chip_combos = generate_copy_combos(jokers, mult_jokers, copy_jokers)
@@ -140,7 +144,7 @@ def build_copy_combos(
         mult_combos = generate_copy_combos(jokers, mult_jokers, copy_jokers)
         final_jokers.extend(mult_combos)
 
-    retrigger_jokers = [joker for joker in jokers if joker.retrigger is not None]
+    retrigger_jokers = get_jokers_with(jokers, "retrigger")
     if len(retrigger_jokers) > 0:
         retrigger_combos = generate_copy_combos(jokers, retrigger_jokers, copy_jokers)
         final_jokers.extend(retrigger_combos)
@@ -153,20 +157,7 @@ def generate_possible_jokers(jokers: list[Joker]) -> list[list[Joker]]:
     if len(scoring_jokers) == 0:
         return [jokers]
 
-    mult_jokers = get_jokers_with(jokers, "scoring.add_mult", "scoring.x_mult")
-
-    none_mult_jokers = [joker for joker in jokers if joker not in mult_jokers]
-    after_hand_jokers = get_scoring_type_joker(JokerTriggers.AFTER_HAND, mult_jokers)
-    played_card_jokers = get_scoring_type_joker(
-        JokerTriggers.ON_PLAYED_CARDS, mult_jokers
-    )
-    helded_card_jokers = get_scoring_type_joker(
-        JokerTriggers.ON_HELD_CARDS, mult_jokers
-    )
-
-    possible_after_hand_jokers = check_for_order(after_hand_jokers)
-    possible_played_card_jokers = check_for_order(played_card_jokers)
-    possible_helded_card_jokers = check_for_order(helded_card_jokers)
+    mult_jokers = build_mult_jokers(scoring_jokers)
 
     copy_jokers = get_jokers_with(jokers, "copy")
     if len(copy_jokers) > 0:
@@ -176,22 +167,6 @@ def generate_possible_jokers(jokers: list[Joker]) -> list[list[Joker]]:
         # when we have 2 brainstroms, ummm
         # when we have both blueprint and brainstorme, ummmmmmmmmmmmmmmmmmmmmmmmmmm
 
-        return build_copy_combos(
-            jokers,
-            copy_jokers,
-            mult_jokers,
-            possible_after_hand_jokers,
-            possible_played_card_jokers,
-        )
+        return build_copy_combos(jokers, copy_jokers, mult_jokers)
 
-    return [
-        none_mult_jokers
-        + list(after_hand_order)
-        + list(played_card_order)
-        + list(held_card_order)
-        for after_hand_order, played_card_order, held_card_order in product(
-            possible_after_hand_jokers,
-            possible_played_card_jokers,
-            possible_helded_card_jokers,
-        )
-    ]
+    return [mult_jokers]

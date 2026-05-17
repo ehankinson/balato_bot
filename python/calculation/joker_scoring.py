@@ -42,7 +42,7 @@ def calculate_scoring_condition(
         case "suit":
             value = condition["suit"]
 
-            if isinstance(value, dict):
+            if isinstance(value, str):
                 if value == "suit" and joker.req is not None:
                     return joker.req["suit"] == condition_args["card"].suit
 
