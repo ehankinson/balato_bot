@@ -509,9 +509,7 @@
             "trigger": 1,
             "x_mult": 2,
             "condition": {
-                "suit": {
-                    "req": "club"
-                }
+                "suit": 2
             }
         },
         "buy_price": 6,
@@ -721,9 +719,7 @@
             "trigger": 1,
             "x_mult": 3,
             "condition": {
-                "suit": {
-                    "req": ["club", "spade", "heart", "diamond"]
-                }
+                "suit": [0, 1, 2, 3]
             }
         },
         "buy_price": 6,
@@ -920,12 +916,8 @@
             "trigger": 0,
             "x_mult": 2,
             "condition": {
-                "rank": {
-                    "req": "rank"
-                },
-                "suit": {
-                    "req": "suit"
-                }
+                "rank": "rank",
+                "suit": "suit"
             }
         },
         "buy_price": 6,
@@ -955,9 +947,7 @@
         "econ": {
             "money": 1,
             "condition": {
-                "suit": {
-                    "req": "diamond"
-                }
+                "suit": 1
             }
         },
         "buy_price": 7,
@@ -969,9 +959,7 @@
             "trigger": 0,
             "x_mult": 1.5,
             "condition": {
-                "suit": {
-                    "req": "heart"
-                },
+                "suit": 0,
                 "prob": 0.5
             }
         },
@@ -1121,9 +1109,8 @@
             "trigger": 1,
             "x_mult": 3,
             "condition": {
-                "suit": {
-                    "req_only": [2, 3]
-                }
+                "suit": [2, 3],
+                "forced": true
             }
         },
         "buy_price": 6,
@@ -1632,12 +1619,8 @@
         "econ": {
             "money": 5,
             "condition": {
-                "rank": {
-                    "req": "rank"
-                },
-                "suit": {
-                    "req": "suit"
-                }
+                "rank": "rank",
+                "suit": "suit"
             }
         },
         "buy_price": 4,

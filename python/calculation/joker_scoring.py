@@ -4,7 +4,7 @@ from calculation.poker_eval import (
     is_flush,
     is_straight,
 )
-from core.enums import Rank
+from core.enums import Enhancement, Rank, Suit
 from core.models import Card, Joker
 
 
@@ -38,18 +38,42 @@ def calculate_scoring_condition(
                 return condition_args["card"].is_facecard
             else:
                 return condition_args["card"].rank == condition_value
-    
+
         case "suit":
             value = condition["suit"]
-
             if isinstance(value, str):
-                if value == "suit" and joker.req is not None:
-                    return joker.req["suit"] == condition_args["card"].suit
+                return joker.req["suit"] == condition_args["card"].suit
 
-            return (
-                condition_args["card"].suit == value
-                or condition_args["card"].is_any_suit
-            )
+            elif isinstance(value, int):
+                return (
+                    condition_args["card"].is_any_suit
+                    or condition_args["cards"].suit == value
+                )
+
+            else:
+                if "forced" in condition:
+                    cards_not_played = condition_args["cards_not_played"]
+                    # Blackboard activates when there are also no cards held in hand
+                    if len(cards_not_played) == 0:
+                        return True
+
+                    # take all the None Spade/Club cards,
+                    heart_diamond_cards = [
+                        card
+                        for card in cards_not_played
+                        if card.enhancement != Enhancement.STONE
+                        and card.suit not in [Suit.SPADES, Suit.CLUBS]
+                    ]
+                    for card in heart_diamond_cards:
+                        if len(condition_args["hand"])< 5 and card not in condition_args["hand"]:
+                            condition_args["hand"].append(card)
+                            cards_not_played.remove(card)
+
+                    return all(card.suit in [Suit.CLUBS, Suit.SPADES] for card in cards_not_played)
+
+                else:
+                    played_suits = {card.suit for card in condition_args["hand"]}
+                    return len(played_suits) == len(value)
 
         case "cards_played":
             return len(condition_args["hand"]) <= condition_value
@@ -69,6 +93,7 @@ def calculate_joker_scoring(
         all(
             calculate_scoring_condition(key, value, condition_args, condition, joker)
             for key, value in condition.items()
+            if key != "forced"
         )
         if condition is not None
         else True

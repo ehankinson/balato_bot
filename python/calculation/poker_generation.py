@@ -1,8 +1,8 @@
 from itertools import combinations, permutations, product
 
 from calculation.util import bucket_rank, bucket_suit
-from core.enums import Enhancement, Rank, Suit
-from core.models import Card
+from core.enums import Enhancement, JokersName, Rank, Suit
+from core.models import Card, Joker
 
 
 def is_same_enhancement(cards: list[Card]) -> bool:
@@ -165,10 +165,7 @@ def calculate_order(cards: list[Card]) -> list[list[Card]]:
 
     # The doulbes need sorting since a luck polychrome (x + 20) * 1.5 is greater
     # then a hologram glass (x + 10) * 2
-    double_cards.sort(
-        key=lambda c: c.add_mult / (c.play_x_mult - 1),
-        reverse=True
-    )
+    double_cards.sort(key=lambda c: c.add_mult / (c.play_x_mult - 1), reverse=True)
 
     return [none_cards + add_cards + double_cards + mul_cards]
 
@@ -186,5 +183,5 @@ def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
     hands.extend(generate_flushes(suit_bucket))
     hands.extend(generate_2_pair(rank_bucket))
     hands.extend(generate_full_house(rank_bucket))
-
+            
     return hands
