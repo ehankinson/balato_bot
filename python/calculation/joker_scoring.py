@@ -47,7 +47,7 @@ def calculate_scoring_condition(
             elif isinstance(value, int):
                 return (
                     condition_args["card"].is_any_suit
-                    or condition_args["cards"].suit == value
+                    or condition_args["card"].suit == value
                 )
 
             else:

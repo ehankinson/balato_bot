@@ -1,7 +1,9 @@
 from itertools import combinations, permutations, product
 
+from calculation.poker_eval import get_hand_type
 from calculation.util import bucket_rank, bucket_suit
 from core.enums import Enhancement, JokersName, Rank, Suit
+from core.hand_stats import HandStats
 from core.models import Card, Joker
 
 
@@ -171,7 +173,10 @@ def calculate_order(cards: list[Card]) -> list[list[Card]]:
 
 
 def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
+    stone_cards = [card for card in cards if card.enhancement == Enhancement.STONE]
     hands: list[list[Card]] = []
+
+    # Makes highcard
     hands.extend([[card] for card in cards])
 
     hands.extend(generate_straights(cards))
@@ -183,5 +188,16 @@ def generate_playable_hands(cards: list[Card]) -> list[list[Card]]:
     hands.extend(generate_flushes(suit_bucket))
     hands.extend(generate_2_pair(rank_bucket))
     hands.extend(generate_full_house(rank_bucket))
-            
+
+    hand_types: list[tuple[list[Card], HandStats]] = []
+    for hand in hands:
+        hand_types.append((hand, get_hand_type(hand)))
+
+    for hand, _ in hand_types:
+        if len(hand) < 5:
+            for card in stone_cards:
+                hand.append(card)
+                if len(hand) == 5:
+                    break
+
     return hands

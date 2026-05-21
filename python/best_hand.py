@@ -8,7 +8,6 @@ from calculation.joker_retrigger import calculate_joker_retrigger
 from calculation.joker_scoring import calculate_joker_scoring
 from calculation.poker_eval import get_hand_type
 from calculation.poker_generation import generate_playable_hands
-from calculation.util import blackboard_helper
 from core.enums import (
     Edition,
     Enhancement,
@@ -35,12 +34,42 @@ def filter_cards(
         cards_not_played.extend(values.cards[: values.count])
         values.count = len(values.cards)
 
-    steel_cards = [card for card in cards_not_played if card.enhancement == Enhancement.STEEL]
-    other_cards = [card for card in cards_not_played if card.enhancement != Enhancement.STEEL]
+    # since we need all the cards we just need to return it
+    if any(joker.background_image == JokersName.BLACKBOARD for joker in jokers):
+        steel_cards, other_cards = [], []
+        for card in cards_not_played:
+            if card.enhancement == Enhancement.STEEL:
+                steel_cards.append(card)
+            else:
+                other_cards.append(card)
 
-    other_cards = sorted(other_cards, key=lambda card: card.rank)
-    steel_cards = sorted(steel_cards, key=lambda card: card.rank)
-    return other_cards + steel_cards
+        steel_cards = sorted(steel_cards, key=lambda card: card.rank)
+        other_cards = sorted(other_cards, key=lambda card: card.rank)
+
+        return other_cards + steel_cards
+
+    important_cards = []
+    if any(joker.background_image == JokersName.RAISED_FIST for joker in jokers):
+        lowest_rank = min(cards_not_played, key=lambda card: card.rank)
+        important_cards.append(lowest_rank)
+
+    if any(joker.background_image == JokersName.SHOOT_THE_MOON for joker in jokers):
+        queen_cards = [card for card in cards_not_played if card.rank == Rank.QUEEN]
+        important_cards.extend(queen_cards)
+
+    if any(joker.background_image == JokersName.BARON for joker in jokers):
+        king_cards = [card for card in cards_not_played if card.rank == Rank.KING]
+        important_cards.extend(king_cards)
+
+    steel_cards = [
+        card
+        for card in cards_not_played
+        if card not in important_cards and card.enhancement == Enhancement.STEEL
+    ]
+    important_cards.extend(steel_cards)
+
+    important_cards = sorted(important_cards, key=lambda card: card.rank)
+    return important_cards
 
 
 def build_joker_plan(jokers: list[Joker]) -> JokerPlan:
@@ -180,7 +209,11 @@ def get_best_scoring_hand(
         main_bucket[card.card_id].cards.append(card)
 
     hand_cache = [
-        (hand, get_hand_type(hand), filter_cards(main_bucket, hand))  # jokers, main_bucket, hand))
+        (
+            hand,
+            get_hand_type(hand),
+            filter_cards(main_bucket, hand),
+        )
         for hand in all_possible_hands
     ]
     joker_plan_cache = [
@@ -192,13 +225,7 @@ def get_best_scoring_hand(
     best_joker = []
 
     for hand, hand_stats, cards_not_played in hand_cache:
-        if (
-            len(hand) == 3
-            and hand[0].rank == Rank.KING
-            and hand[1].rank == Rank.KING
-            and hand[2].rank == Rank.KING
-        ):
-            a = 5
+        a = 5
         for joker_index, joker_lineup in enumerate(all_possible_jokers):
             joker_plan = joker_plan_cache[joker_index]
 
@@ -235,30 +262,45 @@ if __name__ == "__main__":
     #     Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
     #     Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
     # ]
-    #
 
     cards = [
-        Card(Rank.KING, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.KING, Suit.HEARTS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.KING, Suit.SPADES, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.JACK, Suit.DIAMONDS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-        Card(Rank.TWO, Suit.HEARTS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.FOIL),
+        Card(Rank.KING, Suit.SPADES, Enhancement.MULT, Seal.NONE, Edition.NONE),
+        Card(Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.PURPLE, Edition.POLYCHROME),
+    
+        Card(Rank.QUEEN, Suit.SPADES, Enhancement.BONUS, Seal.GOLD, Edition.HOLOGRAPHIC),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STONE, Seal.NONE, Edition.NONE),
+    
+        Card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, Seal.BLUE, Edition.NONE),
+        Card(Rank.JACK, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
+    
+        Card(Rank.TEN, Suit.SPADES, Enhancement.STEEL, Seal.NONE, Edition.NONE),
     ]
 
     ancient = Joker(JokersName.ANCIENT_JOKER)
     ancient.req = {"suit": Suit.CLUBS}
 
+    # jokers = [
+    #     Joker(JokersName.BLACKBOARD),
+    #     Joker(JokersName.BLUEPRINT),
+    #     # Joker(JokersName.MIME),
+    #     Joker(JokersName.RAISED_FIST),
+    #     # Joker(JokersName.THE_TRIO),
+    #     Joker(JokersName.ZANY_JOKER),
+    #     # ancient,
+    #     # Joker(JokersName.ONYX_AGATE),
+    #     Joker(JokersName.BARON),
+    # ]
+    # 
     jokers = [
-        Joker(JokersName.BLACKBOARD)
-        # Joker(JokersName.BLUEPRINT),
-        # Joker(JokersName.MIME),
-        # Joker(JokersName.RAISED_FIST),
-        # Joker(JokersName.THE_TRIO),
-        # Joker(JokersName.ZANY_JOKER),
-        # ancient,
-        # Joker(JokersName.ONYX_AGATE),
-        # Joker(JokersName.BARON),
+        Joker(JokersName.BLACKBOARD),
+        Joker(JokersName.BLUEPRINT),      # copy Blackboard if placed correctly
+        Joker(JokersName.RAISED_FIST),
+        Joker(JokersName.THE_TRIO),
+        Joker(JokersName.ZANY_JOKER),
+        Joker(JokersName.BARON),
+        Joker(JokersName.MIME),
+        Joker(JokersName.ONYX_AGATE),
     ]
 
     # hand = Hand.random_hand(8)
