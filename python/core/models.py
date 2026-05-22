@@ -6,6 +6,7 @@ from PIL import Image
 from config.settings import JOKER_CONFIG
 from core.class_indices import JOKER_TYPE_CLASSES
 from core.enums import Edition, Enhancement, JokersName, JokerTriggers, Rank, Seal, Suit
+from core.hand_stats import HandStats
 from core.scoring import get_initial_card_chips
 from utils.files import load_json
 
@@ -45,6 +46,12 @@ class Card:
     is_facecard: bool = False
     is_low_card: bool = False
     is_any_suit: bool = False
+
+
+    @classmethod
+    def build_dummy(cls) -> Card:
+        return Card(Rank.ACE, Suit.HEARTS, Enhancement.NONE, Seal.NONE, Edition.NONE)
+
 
     def __post_init__(self):
         self.is_facecard = self.rank > Rank.TEN and self.rank < Rank.ACE
@@ -141,6 +148,26 @@ class Card:
 
 
 @dataclass
+class HandScoring:
+    hand_stats: HandStats
+    scored_played: list[Card]
+    unscored_played: list[Card]
+    scored_held: list[Card]
+    unscored_held: list[Card]
+
+
+@dataclass
+class JokerScoringConditions:
+    card: Card = Card.build_dummy()
+    card_index: int = -1
+    hands_left: int = -1
+    scoring_held: list[Card] = field(default_factory=list)
+    unscoring_held: list[Card] = field(default_factory=list)
+    scoring_played: list[Card] = field(default_factory=list)
+
+
+
+@dataclass
 class JokerScoring:
     trigger: JokerTriggers
     chips: int | dict | None = None
@@ -225,6 +252,7 @@ class Joker:
             else self.background_image.name.split("_BACKGROUND")[0].lower()
         )
         joker_data = CONFIG[joker_key]
+        self.copy = joker_data["copy"] if "copy" in joker_data else None
 
         self._build_joker_config(joker_data)
         self._build_joker_scoring(joker_data)
@@ -232,7 +260,6 @@ class Joker:
         self._build_joker_econ(joker_data)
         self._build_joker_upgrade(joker_data)
         self._build_joker_game_modifier(joker_data)
-        self.copy = joker_data["copy"] if "copy" in joker_data else None
 
         if joker_key in {JokersName.ANCIENT_JOKER, JokersName.THE_IDOL}:
             # will need to use vision functions to figure that out 0_0
