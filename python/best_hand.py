@@ -44,41 +44,6 @@ def build_joker_plan(jokers: list[Joker]) -> JokerPlan:
     return plan
 
 
-def add_to_joker_cache(
-    card_id: int,
-    joker: Joker,
-    condition_args: JokerScoringConditions,
-) -> tuple[int, int, float]:
-    if joker.background_image not in JOKER_CACHE[card_id]:
-        joker_chips, joker_add_mult, joker_x_mult = calculate_joker_scoring(
-            joker, condition_args
-        )
-        JOKER_CACHE[card_id][joker.background_image] = (
-            joker_chips,
-            joker_add_mult,
-            joker_x_mult,
-        )
-
-    return JOKER_CACHE[card_id][joker.background_image]
-
-
-def calculate_playing_card_score(
-    chips: int,
-    mult: float,
-    card: Card,
-    retrigger_jokers: list[Joker],
-    condition_args: JokerScoringConditions,
-) -> None:
-    trigger = card.trigger
-    for joker in retrigger_jokers:
-        trigger += calculate_joker_retrigger(joker, condition_args)
-
-    for _ in range(trigger, 0, -1):
-        chips += card.chips
-        mult += card.add_mult
-        mult *= card.play_x_mult
-
-
 def calculate_score(
     hand_scoring: HandScoring,
     joker_plan: JokerPlan,
@@ -88,36 +53,44 @@ def calculate_score(
     scoring_held = hand_scoring.scored_held
     scoring_played = hand_scoring.scored_played
 
-    chips, mult = hand_stats.chips, hand_stats.mult
-
     condition_args.scoring_held = scoring_held
     condition_args.scoring_played = scoring_played
     condition_args.unscoring_held = hand_scoring.unscored_held
+
+    chips, mult = hand_stats.chips, hand_stats.mult
+    joker_cache = JOKER_CACHE
 
     for i, card in enumerate(scoring_played):
         condition_args.card = card
         condition_args.card_index = i
 
-        if card.card_id not in JOKER_CACHE:
-            JOKER_CACHE[card.card_id] = {}
+        card_cache = joker_cache.get(card.card_id)
+        if card_cache is None:
+            card_cache = joker_cache[card.card_id] = {}
 
         trigger = card.trigger
         for joker in joker_plan.played_retrigger:
             trigger += calculate_joker_retrigger(joker, condition_args)
-
+    
         for _ in range(trigger, 0, -1):
             chips += card.chips
             mult += card.add_mult
             mult *= card.play_x_mult
-
+    
             for joker in joker_plan.on_played:
-                j_chips, j_add_mult, j_x_mult = add_to_joker_cache(
-                    card.card_id, joker, condition_args
-                )
+                joker_key = joker.background_image
+                cached = card_cache.get(joker_key)
+
+                if cached is None:
+                    cached = calculate_joker_scoring(joker, condition_args)
+                    card_cache[joker_key] = cached
+
+                j_chips, j_add_mult, j_x_mult = cached
 
                 chips += j_chips
                 mult += j_add_mult
                 mult *= j_x_mult
+
 
     for card in scoring_held:
         condition_args.card = card
@@ -136,12 +109,11 @@ def calculate_score(
                 mult *= j_x_mult
 
     for joker in joker_plan.after_hand:
-        joker_chips, joker_add_mult, joker_x_mutl = calculate_joker_scoring(
-            joker, condition_args
-        )
-        chips += joker_chips
-        mult += joker_add_mult
-        mult *= joker_x_mutl
+        j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
+
+        chips += j_chips
+        mult += j_add_mult
+        mult *= j_x_mult
 
     return chips * mult
 
