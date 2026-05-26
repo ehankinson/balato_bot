@@ -201,59 +201,59 @@ def get_best_scoring_hand(
 
 if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else None
-    # cards = [
-    #     Card(Rank.ACE, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-    #     Card(Rank.KING, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-    #     Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
-    #     Card(Rank.QUEEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-    #     Card(Rank.QUEEN, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.NONE),
-    #     Card(Rank.QUEEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-    #     Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
-    #     Card(Rank.TEN, Suit.CLUBS, Enhancement.MULT, Seal.NONE, Edition.NONE),
-    #     Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
-    #     Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
-    #     Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
-    # ]
-
     cards = [
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.FOIL),
-        Card(Rank.KING, Suit.SPADES, Enhancement.MULT, Seal.NONE, Edition.NONE),
-        Card(
-            Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.PURPLE, Edition.POLYCHROME
-        ),
-        Card(
-            Rank.QUEEN, Suit.SPADES, Enhancement.BONUS, Seal.GOLD, Edition.HOLOGRAPHIC
-        ),
-        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STONE, Seal.NONE, Edition.NONE),
-        Card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, Seal.BLUE, Edition.NONE),
-        Card(Rank.JACK, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
-        Card(Rank.TEN, Suit.SPADES, Enhancement.STEEL, Seal.NONE, Edition.NONE),
+        Card(Rank.ACE, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.NONE),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.LUCKY, Seal.RED, Edition.NONE),
+        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.JACK, Suit.CLUBS, Enhancement.NONE, Seal.NONE, Edition.NONE),
+        Card(Rank.TEN, Suit.CLUBS, Enhancement.MULT, Seal.NONE, Edition.NONE),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.FOUR, Suit.CLUBS, Enhancement.MULT, Seal.RED, Edition.POLYCHROME),
     ]
+
+    # cards = [
+    #     Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.FOIL),
+    #     Card(Rank.KING, Suit.SPADES, Enhancement.MULT, Seal.NONE, Edition.NONE),
+    #     Card(
+    #         Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.PURPLE, Edition.POLYCHROME
+    #     ),
+    #     Card(
+    #         Rank.QUEEN, Suit.SPADES, Enhancement.BONUS, Seal.GOLD, Edition.HOLOGRAPHIC
+    #     ),
+    #     Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STONE, Seal.NONE, Edition.NONE),
+    #     Card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, Seal.BLUE, Edition.NONE),
+    #     Card(Rank.JACK, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
+    #     Card(Rank.TEN, Suit.SPADES, Enhancement.STEEL, Seal.NONE, Edition.NONE),
+    # ]
 
     ancient = Joker(JokersName.ANCIENT_JOKER)
     ancient.req = {"suit": Suit.CLUBS}
 
-    # jokers = [
-    #     Joker(JokersName.BLACKBOARD),
-    #     Joker(JokersName.BLUEPRINT),
-    #     Joker(JokersName.MIME),
-    #     Joker(JokersName.RAISED_FIST),
-    #     Joker(JokersName.THE_TRIO),
-    #     Joker(JokersName.ZANY_JOKER),
-    #     ancient,
-    #     Joker(JokersName.ONYX_AGATE),
-    #     Joker(JokersName.BARON),
-    # ]
-    #
     jokers = [
         Joker(JokersName.BLACKBOARD),
         Joker(JokersName.BLUEPRINT),
+        Joker(JokersName.MIME),
         Joker(JokersName.RAISED_FIST),
         Joker(JokersName.THE_TRIO),
-        Joker(JokersName.BARON),
-        Joker(JokersName.MIME),
+        Joker(JokersName.ZANY_JOKER),
+        ancient,
         Joker(JokersName.ONYX_AGATE),
+        Joker(JokersName.BARON),
     ]
+    #
+    # jokers = [
+    #     Joker(JokersName.BLACKBOARD),
+    #     Joker(JokersName.BLUEPRINT),
+    #     Joker(JokersName.RAISED_FIST),
+    #     Joker(JokersName.THE_TRIO),
+    #     Joker(JokersName.BARON),
+    #     Joker(JokersName.MIME),
+    #     Joker(JokersName.ONYX_AGATE),
+    # ]
 
     # hand = Hand.random_hand(8)
     # cards = hand.cards

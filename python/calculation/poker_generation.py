@@ -49,7 +49,15 @@ def generate_flushes(bucket: dict[Suit, list[Card]]) -> list[list[Card]]:
     flushes: list[list[Card]] = []
     for card_values in bucket.values():
         if len(card_values) > 4:
-            combos = [list(flush) for flush in combinations(card_values, 5)]
+            combos = []
+            seen_set = set()
+            for flush in combinations(card_values, 5):
+                if flush in seen_set:
+                    continue
+                    
+                seen_set.add(flush)
+                combos.append(flush)
+
             for com in combos:
                 order = calculate_order(com)
                 flushes.extend(order)
