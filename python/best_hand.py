@@ -171,12 +171,6 @@ def get_best_scoring_hand(
         for joker_index, joker_lineup in enumerate(all_possible_jokers):
             joker_plan = joker_plan_cache[joker_index]
 
-            if (
-                hand_scoring.scored_played[0].rank == Rank.QUEEN
-                and hand_scoring.scored_played[1].rank == Rank.QUEEN
-            ):
-                a = 5
-
             score = calculate_score(hand_scoring, joker_plan, condition_args)
             if score > best_score:
                 best_score = score
@@ -188,7 +182,7 @@ def get_best_scoring_hand(
                 )
 
     if do_print:
-        print(f"Iterated over {len(hand_cache) * len(all_possible_jokers):,.0f}")
+        print(f"Iterated over {len(hand_cache) * len(all_possible_jokers):,.0f} possible hands + joker combinations")
         print(f"The hand played was a {PokerHand(best_hand_type).name}\n")
         for card in best_hand:
             print(card)
@@ -242,12 +236,12 @@ if __name__ == "__main__":
     # jokers = [
     #     Joker(JokersName.BLACKBOARD),
     #     Joker(JokersName.BLUEPRINT),
-    #     # Joker(JokersName.MIME),
+    #     Joker(JokersName.MIME),
     #     Joker(JokersName.RAISED_FIST),
-    #     # Joker(JokersName.THE_TRIO),
+    #     Joker(JokersName.THE_TRIO),
     #     Joker(JokersName.ZANY_JOKER),
-    #     # ancient,
-    #     # Joker(JokersName.ONYX_AGATE),
+    #     ancient,
+    #     Joker(JokersName.ONYX_AGATE),
     #     Joker(JokersName.BARON),
     # ]
     #
@@ -256,7 +250,6 @@ if __name__ == "__main__":
         Joker(JokersName.BLUEPRINT),
         Joker(JokersName.RAISED_FIST),
         Joker(JokersName.THE_TRIO),
-        Joker(JokersName.ZANY_JOKER),
         Joker(JokersName.BARON),
         Joker(JokersName.MIME),
         Joker(JokersName.ONYX_AGATE),
@@ -265,14 +258,26 @@ if __name__ == "__main__":
     # hand = Hand.random_hand(8)
     # cards = hand.cards
 
+    def format_duration(seconds: float) -> str:
+        if seconds < 1e-6:
+            return f"{seconds * 1e9:.2f}ns"
+        elif seconds < 1e-3:
+            return f"{seconds * 1e6:.2f}µs"
+        elif seconds < 1:
+            return f"{seconds * 1e3:.2f}ms"
+        else:
+            return f"{seconds:.2f}s"
+            
     count = 1 if command is None else 1_000
     start_time = time.perf_counter()
-
+    
     if count == 1:
         get_best_scoring_hand(cards, jokers, True)
     else:
         for _ in tqdm(range(count)):
             get_best_scoring_hand(cards, jokers, False)
-
+    
     end_time = time.perf_counter()
-    print(f"The time taken to calcualte the best was {end_time - start_time}")
+    elapsed = end_time - start_time
+    
+    print(f"The time taken to calculate the best was {format_duration(elapsed)}")

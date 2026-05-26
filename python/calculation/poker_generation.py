@@ -2,7 +2,7 @@ from itertools import combinations, permutations, product
 
 from calculation.poker_eval import get_hand_type
 from calculation.util import bucket_rank, bucket_suit
-from core.enums import Enhancement, JokersName, Rank, Suit
+from core.enums import Enhancement, JokersName, PokerHand, Rank, Suit
 from core.hand_stats import HandStats
 from core.models import Card, CardBucket, HandScoring, Joker
 
@@ -189,6 +189,19 @@ def build_cards_not_played(
     return cards_not_played
 
 
+def can_add_to_hand(card: Card, hand_stats: HandStats, scoring_cards: list[Card]) -> bool:
+    can_add = False
+    played_hand = hand_stats.name
+
+    if played_hand == PokerHand.HIGH_CARD:
+        can_add = scoring_cards[0].rank > card.rank
+    elif played_hand in [PokerHand.PAIR, PokerHand.THREE_OF_A_KIND, PokerHand.FOUR_OF_A_KIND, PokerHand.TWO_PAIR]:
+        can_add = all(card.rank != iter_card.rank for iter_card in scoring_cards)
+
+    # otherwise the hand we played is 5 cards which is the max amount
+    return can_add
+
+
 def filter_cards(
     main_bucket: dict[int, CardBucket], filter_cards: list[Card], jokers: list[Joker]
 ) -> tuple[list[Card], list[Card]]:
@@ -233,14 +246,13 @@ def add_stone_cards(stone_cards: list[Card], hand_cache: list[HandScoring]) -> N
         scoring_cards.extend(stone_cards[:max_add_cards])
 
 
-def help_blackboard(
-    hand_cache: list[HandScoring],
-) -> None:
+def help_blackboard(hand_cache: list[HandScoring], jokers: list[Joker]) -> None:
 
     def update_played_cards(
         cards_not_played: list[Card],
         scoring_cards: list[Card],
         none_scoring_cards: list[Card],
+        hand_stats: HandStats
     ) -> None:
         heart_diamond_cards: list[Card] = [
             card
@@ -251,27 +263,34 @@ def help_blackboard(
         if len(heart_diamond_cards) == 0:
             return
 
-        # we don't need to add the unscored_played since this functions
-        # is the first thing that is capable of adding to it
+        # We need this since if we play a queen highcard and want to throw out a king
+        # that queen highcard then becomes a king, so its different
+        none_altering_hd_cards = [card for card in heart_diamond_cards if can_add_to_hand(card, hand_stats, scoring_cards)]
+
+        # we don't need to check the length of unscored_played since this function
+        # is the first time we touch it
         max_add_cards = 5 - len(scoring_cards)
-        none_scoring_cards.extend(heart_diamond_cards[:max_add_cards])
+        none_scoring_cards.extend(none_altering_hd_cards[:max_add_cards])
 
         # Now we will remove all the cards that we've added to the hand
-        for card in heart_diamond_cards[:max_add_cards]:
+        for card in none_altering_hd_cards[:max_add_cards]:
             cards_not_played.remove(card)
 
     for hand_scoring in hand_cache:
-        # we are using unscored_played since this is a good way of filtering out cards
-        # for blackboard.
+        # checking if there is any unscored held cards that we can add
         update_played_cards(
             hand_scoring.unscored_held,
             hand_scoring.scored_played,
             hand_scoring.unscored_played,
+            hand_scoring.hand_stats
         )
+
+        # checking if there are scored held cards that we can add
         update_played_cards(
             hand_scoring.scored_held,
             hand_scoring.scored_played,
             hand_scoring.unscored_played,
+            hand_scoring.hand_stats
         )
 
 
@@ -300,24 +319,34 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
         scored_held.append(unscored_held.pop())
 
     for hand_scoring in hand_cache:
-
         if len(hand_scoring.scored_held) + len(hand_scoring.unscored_held) == 0:
             return  # there is nothing to do
 
         # The lowest card is already in the scored_held so just sort them accending
         if len(hand_scoring.scored_held) > 0 and len(hand_scoring.unscored_held) == 0:
-            hand_scoring.scored_held = sorted(hand_scoring.scored_held, key=lambda card: card.rank)
+            hand_scoring.scored_held = sorted(
+                hand_scoring.scored_held, key=lambda card: card.rank
+            )
             continue
 
-        max_add_cards = 5 - (len(hand_scoring.scored_played) + len(hand_scoring.unscored_held))
-        hand_scoring.scored_held = sorted(hand_scoring.scored_held, key=lambda card: card.rank)
-        hand_scoring.unscored_held = sorted(hand_scoring.unscored_held, key=lambda card: card.rank)
+        max_add_cards = 5 - (
+            len(hand_scoring.scored_played) + len(hand_scoring.unscored_held)
+        )
+        hand_scoring.scored_held = sorted(
+            hand_scoring.scored_held, key=lambda card: card.rank
+        )
+        hand_scoring.unscored_held = sorted(
+            hand_scoring.unscored_held, key=lambda card: card.rank
+        )
 
         # If there is no scored_held cards, then take the lowest card
         # form the unscored_held cards. (we can do some manipulation to get that number higher)
         if len(hand_scoring.scored_held) == 0 and len(hand_scoring.unscored_held) > 0:
             update_lowest_card(
-                max_add_cards, hand_scoring.scored_held, hand_scoring.unscored_held, hand_scoring.unscored_played
+                max_add_cards,
+                hand_scoring.scored_held,
+                hand_scoring.unscored_held,
+                hand_scoring.unscored_played,
             )
         else:
             min_scored_held = hand_scoring.scored_held[0].rank
@@ -327,7 +356,10 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
                 continue  # adding throw away cards will do nothing to the final score
 
             update_lowest_card(
-                max_add_cards, hand_scoring.scored_held, hand_scoring.unscored_held, hand_scoring.unscored_played
+                max_add_cards,
+                hand_scoring.scored_held,
+                hand_scoring.unscored_held,
+                hand_scoring.unscored_played,
             )
 
 
@@ -383,9 +415,9 @@ def generate_playable_hands(
         )
 
     # Since blackboard only activates when Spades and Clubs are held in hand,
-    # its benifial to add dead cards when playing (i.e. playing extra hearts and jacks even if they don't increase score)
+    # its benifial to add dead cards when playing (i.e. playing extra hearts and diamonds even if they don't increase score)
     if any(joker.background_image == JokersName.BLACKBOARD for joker in jokers):
-        help_blackboard(hand_cache)
+        help_blackboard(hand_cache, jokers)
 
     # For raised fist, we will do this after blackboard since 3x mult is better 99% of the time
     # then a max of +22
