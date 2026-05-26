@@ -26,7 +26,7 @@ BACKGROUND_JOKERS = {
 RANDOM_JOKERS = list(JOKER_TYPE_CLASSES)
 
 
-@dataclass
+@dataclass(slots=True)
 class Card:
     rank: Rank
     suit: Suit
@@ -47,11 +47,9 @@ class Card:
     is_low_card: bool = False
     is_any_suit: bool = False
 
-
     @classmethod
     def build_dummy(cls) -> Card:
         return Card(Rank.ACE, Suit.HEARTS, Enhancement.NONE, Seal.NONE, Edition.NONE)
-
 
     def __post_init__(self):
         self.is_facecard = self.rank > Rank.TEN and self.rank < Rank.ACE
@@ -147,7 +145,21 @@ class Card:
         return self.card_id
 
 
-@dataclass
+@dataclass(slots=True)
+class CardBucket:
+    count: int
+    cards: list[Card]
+
+
+@dataclass(slots=True)
+class BestHand:
+    chips: int = 0
+    worst_case_mult: float = 0
+    avg_case_mult: float = 0
+    best_case_mult: float = 0
+
+
+@dataclass(slots=True)
 class HandScoring:
     hand_stats: HandStats
     scored_played: list[Card]
@@ -156,7 +168,7 @@ class HandScoring:
     unscored_held: list[Card]
 
 
-@dataclass
+@dataclass(slots=True)
 class JokerScoringConditions:
     card: Card = Card.build_dummy()
     card_index: int = -1
@@ -166,196 +178,72 @@ class JokerScoringConditions:
     scoring_played: list[Card] = field(default_factory=list)
 
 
-
-@dataclass
-class JokerScoring:
-    trigger: JokerTriggers
-    chips: int | dict | None = None
-    add_mult: int | dict | None = None
-    x_mult: float | dict | None = None
-    condition: dict | None = None
+# @dataclass(slots=True)
+# class JokerRetrigger:
+#     trigger: JokerTriggers
+#     times: int
+#     condition: str | None = None
 
 
-@dataclass
-class JokerRetrigger:
-    trigger: JokerTriggers
-    times: int
-    condition: str | None = None
+# @dataclass(slots=True)
+# class JokerGameModifier:
+#     discards: int = 0
+#     hand_size: int = 0
+#     hands: int = 0
+#     all_cards_are_facecards: bool = False
+#     suit_groups: list[list[str]] = field(default_factory=list)
+#     straight_size: int | None = None
+#     flush_size: int | None = None
+#     straight_gap_allowed: int = 0
+#     all_played_cards_score: bool = False
+#     double_probabilities: bool = False
+#     allow_duplicate_shop_items: bool = False
+#     disable_boss_blind: bool = False
 
 
-@dataclass
-class JokerGameModifier:
-    discards: int = 0
-    hand_size: int = 0
-    hands: int = 0
-    all_cards_are_facecards: bool = False
-    suit_groups: list[list[str]] = field(default_factory=list)
-    straight_size: int | None = None
-    flush_size: int | None = None
-    straight_gap_allowed: int = 0
-    all_played_cards_score: bool = False
-    double_probabilities: bool = False
-    allow_duplicate_shop_items: bool = False
-    disable_boss_blind: bool = False
+# @dataclass(slots=True)
+# class JokerEcon:
+#     money: int | dict
+#     condition: dict | str | None = None
+#     when: str | None = None
 
 
-@dataclass
-class JokerEcon:
-    money: int | dict
-    condition: dict | str | None = None
-    when: str | None = None
+# @dataclass(slots=True)
+# class JokerUpgrade:
+#     target: str
+#     when: str
+#     condition: dict | str | None = None
 
 
-@dataclass
-class JokerUpgrade:
-    target: str
-    when: str
-    condition: dict | str | None = None
+# @dataclass(slots=True)
+# class JokerConfig:
+#     rarity: str
+#     buy_price: int
+#     copyable: bool
+#     life: int | None = None
 
 
-@dataclass
-class JokerConfig:
-    rarity: str
-    buy_price: int
-    copyable: bool
-    life: int | None = None
+@dataclass(slots=True)
+class JokerReq:
+    rank: Rank = Rank.NONE
+    suit: Suit = Suit.NONE
 
 
-@dataclass
-class CardBucket:
-    count: int
-    cards: list[Card]
-
-
-@dataclass
+@dataclass(slots=True)
 class Joker:
     background_image: JokersName
-    joker_id = -1
-    face_image: JokersName | None = None
-    negative: bool = False
-    edition: Edition = Edition.NONE
-    config: JokerConfig | None = None
-    scoring: JokerScoring | None = None
-    retrigger: JokerRetrigger | None = None
-    econ: JokerEcon | None = None
-    upgrade: JokerUpgrade | None = None
-    game_modifier: JokerGameModifier | None = None
-    copy: bool | None = None
-    req: dict[str, int] | None = None
-
-    def __post_init__(self):
-        self._add_face()
-
-        joker_key = (
-            self.background_image.name.lower()
-            if "BACKGROUND" not in self.background_image.name
-            else self.background_image.name.split("_BACKGROUND")[0].lower()
-        )
-        joker_data = CONFIG[joker_key]
-        self.copy = joker_data["copy"] if "copy" in joker_data else None
-
-        self._build_joker_config(joker_data)
-        self._build_joker_scoring(joker_data)
-        self._build_joker_retrigger(joker_data)
-        self._build_joker_econ(joker_data)
-        self._build_joker_upgrade(joker_data)
-        self._build_joker_game_modifier(joker_data)
-
-        if joker_key in {JokersName.ANCIENT_JOKER, JokersName.THE_IDOL}:
-            # will need to use vision functions to figure that out 0_0
-            pass
-
-    def _build_joker_config(self, joker_data: dict) -> None:
-        self.config = JokerConfig(
-            rarity=joker_data["rarity"],
-            buy_price=joker_data["buy_price"],
-            copyable=joker_data["copyable"],
-            life=joker_data.get("life"),
-        )
-
-    def _build_joker_scoring(self, joker_data: dict) -> None:
-        if "scoring" not in joker_data:
-            return
-
-        scoring_data = joker_data["scoring"]
-        self.scoring = JokerScoring(
-            chips=scoring_data.get("chips", None),
-            add_mult=scoring_data.get("add_mult", None),
-            x_mult=scoring_data.get("x_mult", None),
-            condition=scoring_data.get("condition", None),
-            trigger=JokerTriggers(scoring_data.get("trigger")),
-        )
-
-    def _build_joker_retrigger(self, joker_data: dict) -> None:
-        if "retrigger" not in joker_data:
-            return
-
-        retrigger_data = joker_data["retrigger"]
-        self.retrigger = JokerRetrigger(
-            trigger=retrigger_data.get("trigger"),
-            times=retrigger_data.get("times", 1),
-            condition=retrigger_data.get("condition", None),
-        )
-
-    def _build_joker_econ(self, joker_data: dict) -> None:
-        if "econ" not in joker_data:
-            return
-
-        econ_data = joker_data["econ"]
-        self.econ = JokerEcon(
-            money=econ_data["money"],
-            condition=econ_data.get("condition"),
-            when=econ_data.get("when"),
-        )
-
-    def _build_joker_upgrade(self, joker_data: dict) -> None:
-        if "upgrade" not in joker_data:
-            return
-
-        upgrade_data = joker_data["upgrade"]
-        self.upgrade = JokerUpgrade(
-            target=upgrade_data["target"],
-            when=upgrade_data["when"],
-            condition=upgrade_data.get("condition"),
-        )
-
-    def _build_joker_game_modifier(self, joker_data: dict) -> None:
-        if "game_modifier" not in joker_data:
-            return
-
-        game_modifier_data = joker_data["game_modifier"]
-        self.game_modifier = JokerGameModifier(
-            hands=game_modifier_data.get("hands", 0),
-            discards=game_modifier_data.get("discards", 0),
-            hand_size=game_modifier_data.get("hand_size", 0),
-            all_cards_are_facecards=game_modifier_data.get(
-                "all_cards_are_facecards", False
-            ),
-            suit_groups=game_modifier_data.get("suit_groups", []),
-            straight_size=game_modifier_data.get("straight_size"),
-            flush_size=game_modifier_data.get("flush_size"),
-            straight_gap_allowed=game_modifier_data.get("straight_gap_allowed", 0),
-            all_played_cards_score=game_modifier_data.get(
-                "all_played_cards_score", False
-            ),
-            double_probabilities=game_modifier_data.get("double_probabilities", False),
-            allow_duplicate_shop_items=game_modifier_data.get(
-                "allow_duplicate_shop_items", False
-            ),
-            disable_boss_blind=game_modifier_data.get("disable_boss_blind", False),
-        )
+    face_image: JokersName | None
+    negative: bool
+    edition: Edition
+    req: JokerReq
+    copyable: bool
 
     def _add_face(self):
         if self.background_image in BACKGROUND_JOKERS:
             self.face_image = JokersName(int(self.background_image) + 10)
 
-    @classmethod
-    def random(cls):
-        return cls(
-            background_image=random.choice(RANDOM_JOKERS),
-            negative=random.choice([True, False]),
-            edition=random.choice(list(Edition)),
-        )
+    def __post_init__(self):
+        self._add_face()
 
     def __repr__(self):
         base = self.background_image.name.lower()
@@ -366,17 +254,112 @@ class Joker:
 
         return base
 
+    @classmethod
+    def random(cls):
+        return Joker(
+            background_image=random.choice(list(JokersName)),
+            face_image=None,
+            negative=random.choice([True, False]),
+            edition=Edition(
+                random.choice(
+                    [edition.value for edition in Edition if edition.value >= 0]
+                )
+            ),
+            req=JokerReq(),
+            copyable=False,
+        )
 
-@dataclass
+    @classmethod
+    def build(cls, joker_name: JokersName):
+        joker_key = (
+            joker_name.name.lower()
+            if "BACKGROUND" not in joker_name.name
+            else joker_name.name.split("_BACKGROUND")[0].lower()
+        )
+        joker_data = CONFIG[joker_key]
+
+        if "scoring" in joker_data:
+            scoring_data = joker_data["scoring"]
+
+            return JokerScoring(
+                background_image=joker_name,
+                face_image=None,
+                negative=False,
+                edition=Edition.NONE,
+                req=JokerReq(),
+                copyable=joker_data.get("copyable", False),
+                trigger=JokerTriggers(scoring_data.get("trigger")),
+                prob=scoring_data.get("prob", 1),
+                chips=scoring_data.get("chips"),
+                add_mult=scoring_data.get("add_mult"),
+                x_mult=scoring_data.get("x_mult"),
+                condition=scoring_data.get("condition"),
+            )
+
+        elif "retrigger" in joker_data:
+            retrigger_data = joker_data["retrigger"]
+
+            return JokerRetrigger(
+                background_image=joker_name,
+                face_image=None,
+                negative=False,
+                edition=Edition.NONE,
+                req=JokerReq(),
+                copyable=joker_data.get("copyable", False),
+                trigger=JokerTriggers(retrigger_data.get("trigger")),
+                times=retrigger_data.get("times"),
+                condition=retrigger_data.get("condition", ""),
+            )
+
+        elif "copy" in joker_data:
+            copy_data = joker_data["copy"]
+
+            return JokerCopy(
+                background_image=joker_name,
+                face_image=None,
+                negative=False,
+                edition=Edition.NONE,
+                req=JokerReq(),
+                copyable=joker_data.get("copyable", False),
+                position=copy_data.get("position"),
+            )
+
+        else:
+            return Joker.random()
+
+
+@dataclass(slots=True, repr=False)
+class JokerScoring(Joker):
+    trigger: JokerTriggers
+    prob: float
+    chips: int | dict[str, str | int] | None
+    add_mult: int | dict[str, str | int] | None
+    x_mult: float | dict[str, str | int] | None
+    condition: dict | None
+
+
+@dataclass(slots=True, repr=False)
+class JokerRetrigger(Joker):
+    trigger: JokerTriggers
+    times: int
+    condition: str
+
+
+@dataclass(slots=True, repr=False)
+class JokerCopy(Joker):
+    position: str
+
+
+@dataclass(slots=True)
 class JokerPlan:
-    on_played: list[Joker]
-    on_held: list[Joker]
-    after_hand: list[Joker]
-    played_retrigger: list[Joker]
-    held_retrigger: list[Joker]
+    on_played: list[JokerScoring]
+    on_held: list[JokerScoring]
+    after_hand: list[JokerScoring]
+    played_retrigger: list[JokerRetrigger]
+    held_retrigger: list[JokerRetrigger]
 
 
-@dataclass
+@dataclass(slots=True)
 class ShopState:
     rerolls_used: int = 0
     chaos_free_reroll_used: bool = False

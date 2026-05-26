@@ -5,7 +5,7 @@ from calculation.poker_eval import (
     is_straight,
 )
 from core.enums import Enhancement, Rank, Suit
-from core.models import Card, Joker, JokerScoringConditions
+from core.models import Card, Joker, JokerScoring, JokerScoringConditions
 
 
 def calculate_scoring_condition(
@@ -13,7 +13,7 @@ def calculate_scoring_condition(
     condition_value: int,
     condition_args: JokerScoringConditions,
     condition: dict,
-    joker: Joker,
+    joker: JokerScoring,
 ) -> bool:
     card = condition_args.card
     match condition_key:
@@ -51,7 +51,7 @@ def calculate_scoring_condition(
 
             value = condition["suit"]
             if isinstance(value, str):
-                return joker.req["suit"] == card.suit
+                return joker.req.suit == card.suit
 
             elif isinstance(value, int):
                 return card.is_any_suit or card.suit == value
@@ -73,22 +73,20 @@ def calculate_scoring_condition(
         case "cards_played":
             return len(condition_args.scoring_played) <= condition_value
 
-    raise ValueError(f"This condition key {condition_key} does not exist")
+    raise ValueError(f"This condition key '{condition_key}' does not exist")
 
 
 def calculate_joker_scoring(
-    joker: Joker, condition_args: JokerScoringConditions
+    joker: JokerScoring, condition_args: JokerScoringConditions
 ) -> tuple[int, int, float]:
     chips, add_mult, x_mult = 0, 0, 1.0
-    scoring_data = joker.scoring
-    assert scoring_data is not None
 
-    condition = scoring_data.condition
+    condition = joker.condition
     passes_condition = (
         all(
             calculate_scoring_condition(key, value, condition_args, condition, joker)
             for key, value in condition.items()
-            if key != "forced"
+            if key not in ["forced", "prob"]
         )
         if condition is not None
         else True
@@ -97,8 +95,8 @@ def calculate_joker_scoring(
     if not passes_condition:
         return chips, add_mult, x_mult
 
-    if scoring_data.add_mult is not None:
-        if isinstance(scoring_data.add_mult, str):
+    if joker.add_mult is not None:
+        if isinstance(joker.add_mult, str):
             lowest_card = condition_args.scoring_held[
                 0
             ]  # this will always be the lowest card
@@ -113,17 +111,17 @@ def calculate_joker_scoring(
                 )
                 add_mult += rank * 2
 
-        elif isinstance(scoring_data.add_mult, int):
-            add_mult += scoring_data.add_mult
+        elif isinstance(joker.add_mult, int):
+            add_mult += joker.add_mult
 
-    if scoring_data.chips is not None:
-        if isinstance(scoring_data.chips, int):
-            chips += scoring_data.chips
+    if joker.chips is not None:
+        if isinstance(joker.chips, int):
+            chips += joker.chips
 
-    if scoring_data.x_mult is not None:
-        if isinstance(scoring_data.x_mult, dict):
+    if joker.x_mult is not None:
+        if isinstance(joker.x_mult, dict):
             x_mult *= 1
         else:
-            x_mult *= scoring_data.x_mult
+            x_mult *= joker.x_mult
 
     return chips, add_mult, x_mult

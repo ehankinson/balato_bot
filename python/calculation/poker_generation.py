@@ -391,7 +391,7 @@ def build_playable_hands(cards: list[Card]) -> list[list[Card]]:
     return hands
 
 
-def generate_playable_hands(
+def generate_scoring_hand_combinations(
     cards: list[Card], jokers: list[Joker]
 ) -> list[HandScoring]:
     hands = build_playable_hands(cards)

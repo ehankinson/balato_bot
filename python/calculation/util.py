@@ -42,13 +42,6 @@ def bucket_suit(cards: Iterable[Card]) -> dict[Suit, list[Card]]:
     return bucket_by(cards, lambda card: card.suit, skip_stones=True)
 
 
-def nested_getattr(obj, attr_path, default=None):
-    try:
-        return reduce(getattr, attr_path.split("."), obj)
-    except AttributeError:
-        return default
-
-
 def bucket_by(
     cards: Iterable[Card],
     key_func: Callable[[Card], K],

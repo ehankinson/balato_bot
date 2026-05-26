@@ -2,6 +2,7 @@ from enum import IntEnum
 
 
 class Rank(IntEnum):
+    NONE = -1
     TWO = 0
     THREE = 1
     FOUR = 2
@@ -18,6 +19,7 @@ class Rank(IntEnum):
 
 
 class Suit(IntEnum):
+    NONE = -1
     HEARTS = 0
     DIAMONDS = 1
     CLUBS = 2
@@ -25,30 +27,30 @@ class Suit(IntEnum):
 
 
 class Enhancement(IntEnum):
-    NONE = 0
-    STONE = 1
-    GOLD = 2
-    BONUS = 3
-    MULT = 4
-    WILD = 5
-    LUCKY = 6
-    GLASS = 7
-    STEEL = 8
+    NONE = -1
+    STONE = 0
+    GOLD = 1
+    BONUS = 2
+    MULT = 3
+    WILD = 4
+    LUCKY = 5
+    GLASS = 6
+    STEEL = 7
 
 
 class Seal(IntEnum):
-    NONE = 0
-    GOLD = 1
-    PURPLE = 2
-    RED = 3
-    BLUE = 4
+    NONE = -1
+    GOLD = -0
+    PURPLE = 1
+    RED = 2
+    BLUE = 3
 
 
 class Edition(IntEnum):
-    NONE = 0
-    FOIL = 1
-    HOLOGRAPHIC = 2
-    POLYCHROME = 3
+    NONE = -1
+    FOIL = 0
+    HOLOGRAPHIC = 1
+    POLYCHROME = 2
 
 
 class CardFeatureTrainingType(IntEnum):
