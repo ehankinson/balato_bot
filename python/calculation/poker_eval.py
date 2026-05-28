@@ -7,7 +7,7 @@ from core.models import Card
 
 def is_flush(cards: list[Card]) -> bool:
     initial_suit = cards[0].suit
-    return all(card.suit == initial_suit for card in cards)
+    return all(card.is_any_suit or card.suit == initial_suit for card in cards)
 
 
 def is_straight(cards: list[Card]) -> bool:

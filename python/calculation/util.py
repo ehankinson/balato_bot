@@ -39,8 +39,16 @@ def bucket_rank(cards: Iterable[Card]) -> dict[Rank, list[Card]]:
 
 
 def bucket_suit(cards: Iterable[Card]) -> dict[Suit, list[Card]]:
-    return bucket_by(cards, lambda card: card.suit, skip_stones=True)
+    bucket: dict[Suit, list[Card]] = {suit: [] for suit in Suit}
 
+    for card in cards:
+        if card.is_any_suit:
+            for suit in bucket:
+                bucket[suit].append(card)
+        else:
+            bucket[card.suit].append(card)
+
+    return bucket
 
 def bucket_by(
     cards: Iterable[Card],
