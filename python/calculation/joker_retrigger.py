@@ -1,4 +1,4 @@
-from core.models import Joker, JokerScoringConditions
+from core.models import Joker, JokerRetrigger, JokerScoringConditions
 
 
 def passed_retrigger_condition(condition: str, condition_args: JokerScoringConditions) -> bool:
@@ -20,15 +20,12 @@ def passed_retrigger_condition(condition: str, condition_args: JokerScoringCondi
     return val
 
 
-def calculate_joker_retrigger(joker: Joker, condition_args: JokerScoringConditions) -> int:
-    retrigger_data = joker.retrigger
-    assert retrigger_data is not None
-
-    condition = retrigger_data.condition
+def calculate_joker_retrigger(joker: JokerRetrigger, condition_args: JokerScoringConditions) -> int:
+    condition = joker.condition
     passes_condition = (
         passed_retrigger_condition(condition, condition_args)
         if condition is not None
         else True
     )
 
-    return retrigger_data.times if passes_condition else 0
+    return joker.times if passes_condition else 0

@@ -29,6 +29,8 @@ from core.models import (
 )
 
 JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
+ADD = 0
+MULT = 1
 
 
 def build_joker_plan(jokers: list[Joker]) -> JokerPlan:
@@ -53,11 +55,36 @@ def build_joker_plan(jokers: list[Joker]) -> JokerPlan:
     return plan
 
 
+def add_to_order(
+    add_mult: int,
+    x_mult: float,
+    prob: float,
+    mult_scoring_order: list[tuple[int, int | float, float]],
+) -> None:
+    if add_mult > ADD:
+        mult_scoring_order.append((ADD, add_mult, prob))
+
+    if x_mult > MULT:
+        mult_scoring_order.append((MULT, x_mult, prob))
+
+
+def extend_order(
+    start_index: int,
+    trigger: int,
+    mult_scoring_order: list[tuple[int, int | float, float]],
+) -> int:
+    mult_scoring_order.extend(
+        mult_scoring_order[start_index : len(mult_scoring_order)] * (trigger - 1)
+    )
+
+    return len(mult_scoring_order)
+
+
 def calculate_score(
     hand_scoring: HandScoring,
     joker_plan: JokerPlan,
     condition_args: JokerScoringConditions,
-) -> float:
+) -> BestHand:
     joker_cache = JOKER_CACHE
 
     hand_stats = hand_scoring.hand_stats
@@ -75,82 +102,83 @@ def calculate_score(
         best_case_mult=hand_stats.mult,
     )
 
+    mult_scoring_order: list[tuple[int, int | float, float]] = []
+    mult_start_index = 0
+
     for i, card in enumerate(scoring_played):
         condition_args.card = card
         condition_args.card_index = i
+
+        best_hand.chips += card.chips
+        add_to_order(
+            card.add_mult, card.play_x_mult, card.mult_prob, mult_scoring_order
+        )
 
         card_cache = joker_cache.get(card.card_id)
         if card_cache is None:
             card_cache = joker_cache[card.card_id] = {}
 
+        for joker in joker_plan.on_played:
+            joker_key = joker.background_image
+            cached = card_cache.get(joker_key)
+
+            if cached is None:
+                cached = calculate_joker_scoring(joker, condition_args)
+                card_cache[joker_key] = cached
+
+            j_chips, j_add_mult, j_x_mult = cached
+
+            best_hand.chips += j_chips
+            add_to_order(j_add_mult, j_x_mult, joker.prob, mult_scoring_order)
+
         trigger = card.trigger
         for joker in joker_plan.played_retrigger:
             trigger += calculate_joker_retrigger(joker, condition_args)
 
-        for _ in range(trigger, 0, -1):
-            best_hand.chips += card.chips
-
-        
-            best_hand.best_case_mult += card.add_mult
-            best_hand.best_case_mult *= card.play_x_mult
-            
-            best_hand.avg_case_mult += card.mult_prob * card.add_mult + (1 - card.mult_prob) * 0 if card.mult_prob < 1 else card.add_mult
-            best_hand.avg_case_mult *= card.play_x_mult
-
-            best_hand.worst_case_mult += 0 if card.mult_prob < 1 else card.add_mult
-            best_hand.worst_case_mult *= card.play_x_mult
-
-            for joker in joker_plan.on_played:
-                joker_key = joker.background_image
-                cached = card_cache.get(joker_key)
-
-                if cached is None:
-                    cached = calculate_joker_scoring(joker, condition_args)
-                    card_cache[joker_key] = cached
-
-                j_chips, j_add_mult, j_x_mult = cached
-
-                best_hand.chips += j_chips
-
-                if joker.prob < 1:
-                    best_hand.best_case_mult += j_add_mult
-                    best_hand.avg_case_mult += j_add_mult * joker.prob if j_add_mult > 0 else 0
-
-                    best_hand.best_case_mult *= j_x_mult
-                    best_hand.avg_case_mult *= j_x_mult * joker.prob if j_add_mult > 1 else 1
-
-                else:
-
-                    best_hand.best_case_mult += j_add_mult
-                    best_hand.best_case_mult *= j_x_mult
-
-                    best_hand.avg_case_mult = best_hand.best_case_mult
-                    best_hand.worst_case_mult = best_hand.best_case_mult
+        mult_start_index = extend_order(mult_start_index, trigger, mult_scoring_order)
 
     for card in scoring_held:
         condition_args.card = card
+        add_to_order(0, card.hand_x_mult, 1.0, mult_scoring_order)
+        
+        for joker in joker_plan.on_held:
+            _, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
+            add_to_order(j_add_mult, j_x_mult, joker.prob, mult_scoring_order)
 
-        trigger = card.trigger
-        # there is only mime which retriggers once and if we copy that is just mime + copys
-        trigger += len(joker_plan.held_retrigger)
-
-        for _ in range(trigger, 0, -1):
-            best_hand.best_case_mult *= card.hand_x_mult
-
-            for joker in joker_plan.on_held:
-                _, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
-
-                best_hand.best_case_mult += j_add_mult
-                best_hand.best_case_mult *= j_x_mult
+        trigger = card.trigger + len(joker_plan.held_retrigger)
+        mult_start_index = extend_order(mult_start_index, trigger, mult_scoring_order)
 
     for joker in joker_plan.after_hand:
         j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
 
         best_hand.chips += j_chips
-        best_hand.best_case_mult += j_add_mult
-        best_hand.best_case_mult *= j_x_mult
+        add_to_order(j_add_mult, j_x_mult, joker.prob, mult_scoring_order)
 
-    return best_hand.chips * best_hand.best_case_mult
+    best_value = -1
+    avg_value = -1
+    worst_value = -1
+    for mult_score in mult_scoring_order:
+        prob = mult_score[2]
+        val = mult_score[1]
+        operator = mult_score[0]
+
+        if prob < 1:
+            best_value = val
+            avg_value = prob * val + (1 - prob) * operator
+            worst_value = operator
+        else:
+            best_value, avg_value, worst_value = val, val, val
+
+        if operator == ADD:
+            best_hand.best_case_mult += best_value
+            best_hand.avg_case_mult += avg_value
+            best_hand.worst_case_mult += worst_value
+        else:
+            best_hand.best_case_mult *= best_value
+            best_hand.avg_case_mult *= avg_value
+            best_hand.worst_case_mult *= worst_value
+
+    return best_hand
 
 
 def get_best_scoring_hand(
@@ -212,13 +240,11 @@ if __name__ == "__main__":
 
     cards = [
         # Played hand: HEART/WILD face-heavy Flush Five / Five of a Kind style test
-    
         Card(Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.RED, Edition.POLYCHROME),
         Card(Rank.KING, Suit.HEARTS, Enhancement.MULT, Seal.RED, Edition.FOIL),
         Card(Rank.KING, Suit.DIAMONDS, Enhancement.WILD, Seal.RED, Edition.HOLOGRAPHIC),
         Card(Rank.KING, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.POLYCHROME),
         Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.GOLD, Edition.NONE),
-    
         # Held cards: Baron/Mime/Steel complexity
         Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.NONE),
         Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.NONE, Edition.POLYCHROME),
@@ -228,25 +254,18 @@ if __name__ == "__main__":
     jokers = [
         # Put Blueprint before Bloodstone to copy Bloodstone.
         Joker.build(JokersName.BLUEPRINT),
-    
         # Bloodstone itself.
         Joker.build(JokersName.BLOODSTONE),
-    
         # Guarantees Bloodstone and Lucky 1-in-2 / 1-in-5 style rolls if your sim models it.
         # Joker.build(JokersName.OOPS_ALL_6S),
-    
         # Retriggers all scored face cards: all five played Kings should retrigger.
         Joker.build(JokersName.SOCK_AND_BUSKIN),
-    
         # Extra retrigger on the first played card, which is also Red Seal.
         Joker.build(JokersName.HANGING_CHAD),
-    
         # Held Kings give XMult.
         Joker.build(JokersName.BARON),
-    
         # Retriggers held-card effects, especially Steel + Baron.
         Joker.build(JokersName.MIME),
-    
         # Optional additive suit pressure from real Clubs/spades/wilds if your evaluator handles suit jokers.
         Joker.build(JokersName.ONYX_AGATE),
     ]
