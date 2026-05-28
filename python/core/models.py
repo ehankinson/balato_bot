@@ -41,8 +41,9 @@ class Card:
     card_id: int = 0
     econ: int = 0
     card_score: int = 0
-    # For cards like steel or gold, they need to be held in hand to activate
-    in_hand: bool = False
+    mult_prob: float = 1.0
+    econ_prob: float = 1.0
+    
     is_facecard: bool = False
     is_low_card: bool = False
     is_any_suit: bool = False
@@ -62,14 +63,10 @@ class Card:
 
     def add_enhancement(self) -> None:
         match self.enhancement:
-            case Enhancement.NONE:
-                return
-
             case Enhancement.STONE:
                 self.chips = 50
 
             case Enhancement.GOLD:
-                self.in_hand = True
                 self.econ += 3
 
             case Enhancement.BONUS:
@@ -82,14 +79,14 @@ class Card:
                 self.is_any_suit = True
 
             case Enhancement.LUCKY:
-                return
+                self.mult_prob = 0.2  # 1/5
+                self.econ_prob = 0.05 # 1/20
 
             case Enhancement.GLASS:
                 self.play_x_mult = 2
 
             case Enhancement.STEEL:
                 self.hand_x_mult = 1.5
-                self.in_hand = True
 
     def add_edition(self) -> None:
         match self.edition:

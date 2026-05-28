@@ -89,8 +89,16 @@ def calculate_score(
 
         for _ in range(trigger, 0, -1):
             best_hand.chips += card.chips
+
+        
             best_hand.best_case_mult += card.add_mult
             best_hand.best_case_mult *= card.play_x_mult
+            
+            best_hand.avg_case_mult += card.mult_prob * card.add_mult + (1 - card.mult_prob) * 0 if card.mult_prob < 1 else card.add_mult
+            best_hand.avg_case_mult *= card.play_x_mult
+
+            best_hand.worst_case_mult += 0 if card.mult_prob < 1 else card.add_mult
+            best_hand.worst_case_mult *= card.play_x_mult
 
             for joker in joker_plan.on_played:
                 joker_key = joker.background_image
@@ -103,8 +111,21 @@ def calculate_score(
                 j_chips, j_add_mult, j_x_mult = cached
 
                 best_hand.chips += j_chips
-                best_hand.best_case_mult += j_add_mult
-                best_hand.best_case_mult *= j_x_mult
+
+                if joker.prob < 1:
+                    best_hand.best_case_mult += j_add_mult
+                    best_hand.avg_case_mult += j_add_mult * joker.prob if j_add_mult > 0 else 0
+
+                    best_hand.best_case_mult *= j_x_mult
+                    best_hand.avg_case_mult *= j_x_mult * joker.prob if j_add_mult > 1 else 1
+
+                else:
+
+                    best_hand.best_case_mult += j_add_mult
+                    best_hand.best_case_mult *= j_x_mult
+
+                    best_hand.avg_case_mult = best_hand.best_case_mult
+                    best_hand.worst_case_mult = best_hand.best_case_mult
 
     for card in scoring_held:
         condition_args.card = card
@@ -190,27 +211,43 @@ if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else None
 
     cards = [
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.FOIL),
-        Card(Rank.KING, Suit.SPADES, Enhancement.MULT, Seal.NONE, Edition.NONE),
-        Card(
-            Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.PURPLE, Edition.POLYCHROME
-        ),
-        Card(
-            Rank.QUEEN, Suit.SPADES, Enhancement.BONUS, Seal.GOLD, Edition.HOLOGRAPHIC
-        ),
-        Card(Rank.QUEEN, Suit.CLUBS, Enhancement.STONE, Seal.NONE, Edition.NONE),
-        Card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, Seal.BLUE, Edition.NONE),
-        Card(Rank.JACK, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.NONE),
-        Card(Rank.TEN, Suit.SPADES, Enhancement.STEEL, Seal.NONE, Edition.NONE),
+        # Played hand: HEART/WILD face-heavy Flush Five / Five of a Kind style test
+    
+        Card(Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.HEARTS, Enhancement.MULT, Seal.RED, Edition.FOIL),
+        Card(Rank.KING, Suit.DIAMONDS, Enhancement.WILD, Seal.RED, Edition.HOLOGRAPHIC),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.GOLD, Edition.NONE),
+    
+        # Held cards: Baron/Mime/Steel complexity
+        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.NONE),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.NONE, Edition.POLYCHROME),
+        Card(Rank.QUEEN, Suit.HEARTS, Enhancement.STEEL, Seal.BLUE, Edition.NONE),
     ]
 
     jokers = [
-        Joker.build(JokersName.BLACKBOARD),
+        # Put Blueprint before Bloodstone to copy Bloodstone.
         Joker.build(JokersName.BLUEPRINT),
-        Joker.build(JokersName.RAISED_FIST),
-        Joker.build(JokersName.THE_TRIO),
+    
+        # Bloodstone itself.
+        Joker.build(JokersName.BLOODSTONE),
+    
+        # Guarantees Bloodstone and Lucky 1-in-2 / 1-in-5 style rolls if your sim models it.
+        # Joker.build(JokersName.OOPS_ALL_6S),
+    
+        # Retriggers all scored face cards: all five played Kings should retrigger.
+        Joker.build(JokersName.SOCK_AND_BUSKIN),
+    
+        # Extra retrigger on the first played card, which is also Red Seal.
+        Joker.build(JokersName.HANGING_CHAD),
+    
+        # Held Kings give XMult.
         Joker.build(JokersName.BARON),
+    
+        # Retriggers held-card effects, especially Steel + Baron.
         Joker.build(JokersName.MIME),
+    
+        # Optional additive suit pressure from real Clubs/spades/wilds if your evaluator handles suit jokers.
         Joker.build(JokersName.ONYX_AGATE),
     ]
 
