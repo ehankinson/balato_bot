@@ -109,7 +109,11 @@ def calculate_score(
         condition_args.card = card
         condition_args.card_index = i
 
-        best_hand.chips += card.chips
+        trigger = card.trigger
+        for joker in joker_plan.played_retrigger:
+            trigger += calculate_joker_retrigger(joker, condition_args)
+
+        best_hand.chips += card.chips * trigger
         add_to_order(
             card.add_mult, card.play_x_mult, card.mult_prob, mult_scoring_order
         )
@@ -128,12 +132,8 @@ def calculate_score(
 
             j_chips, j_add_mult, j_x_mult = cached
 
-            best_hand.chips += j_chips
+            best_hand.chips += j_chips * trigger
             add_to_order(j_add_mult, j_x_mult, joker.prob, mult_scoring_order)
-
-        trigger = card.trigger
-        for joker in joker_plan.played_retrigger:
-            trigger += calculate_joker_retrigger(joker, condition_args)
 
         mult_start_index = extend_order(mult_start_index, trigger, mult_scoring_order)
 
@@ -208,11 +208,22 @@ def get_best_scoring_hand(
     for hand_scoring in hand_cache:
         for joker_index, joker_lineup in enumerate(all_possible_jokers):
             joker_plan = joker_plan_cache[joker_index]
+            hand = hand_scoring.scored_played
+            if (
+                len(hand) == 2
+                and all(card.rank == Rank.KING for card in hand)
+                and hand[0].edition == Edition.POLYCHROME
+                and hand[1].seal == Seal.RED
+                and hand[1].edition == Edition.POLYCHROME
+                and hand[2].enhancement == Enhancement.GLASS
+            ):
+                a = 5
+
             score = calculate_score(hand_scoring, joker_plan, condition_args)
-            highest_score = score.chips * score.best_case_mult
+            highest_score = score.chips * score.worst_case_mult
 
             if highest_score > best_score:
-                best_score = highest_score
+                best_score = score.chips * score.best_case_mult
                 avg_score = score.chips * score.avg_case_mult
                 worst_score = score.chips * score.worst_case_mult
                 best_hand = hand_scoring.scored_played + hand_scoring.unscored_played
@@ -230,12 +241,22 @@ def get_best_scoring_hand(
         for card in best_hand:
             print(card)
 
-        worst_string = f"{worst_score:e}" if worst_score > 99_999_999_999 else f"{worst_score:,.2f}"
-        avg_string = f"{avg_score:e}" if avg_score > 99_999_999_999 else f"{avg_score:,.2f}"
-        best_string = f"{best_score:e}" if best_score > 99_999_999_999 else f"{best_score:,.2f}"
+        worst_string = (
+            f"{worst_score:e}"
+            if worst_score > 99_999_999_999
+            else f"{worst_score:,.2f}"
+        )
+        avg_string = (
+            f"{avg_score:e}" if avg_score > 99_999_999_999 else f"{avg_score:,.2f}"
+        )
+        best_string = (
+            f"{best_score:e}" if best_score > 99_999_999_999 else f"{best_score:,.2f}"
+        )
 
         if worst_score != avg_score:
-            print(f"\nWhich has a range of score from {worst_string} - {best_string}\nLikely ending up with {avg_string}\n")
+            print(
+                f"\nWhich has a range of score from {worst_string} - {best_string}\nLikely ending up with {avg_string}\n"
+            )
         else:
             print(f"\nWhich scored {best_string}\n")
 

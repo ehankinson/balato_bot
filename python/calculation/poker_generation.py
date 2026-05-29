@@ -55,6 +55,23 @@ def generate_flushes(bucket: dict[Suit, list[Card]]) -> list[list[Card]]:
                 if flush in seen_set:
                     continue
                     
+                # we need to filter out 4 of a kinds in a flush since if you have 4 kings and 1 queen (all hearts for this example)
+                # then the 4 of a kind will overwrite the flush since it has higher order, so we need to filter this flush out 
+                skip = False
+                rank_count = {}
+                for card in flush:
+                    if card.rank not in rank_count:
+                        rank_count[card.rank] = 0
+
+                    rank_count[card.rank] += 1
+
+                    if rank_count[card.rank] == 4:
+                        skip = True
+                        break
+
+                if skip:
+                    continue
+                    
                 seen_set.add(flush)
                 combos.append(flush)
 
