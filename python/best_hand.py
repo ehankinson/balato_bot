@@ -183,7 +183,10 @@ def calculate_score(
 
 
 def get_best_scoring_hand(
-    cards: list[Card], jokers: list[Joker], do_print: bool = False
+    cards: list[Card],
+    jokers: list[Joker],
+    do_print: bool = False,
+    scoring_type: str = "",
 ) -> None:
     hand_cache = generate_scoring_hand_combinations(cards, jokers)
     all_possible_jokers = generate_scoring_jokers_combinations(jokers)
@@ -195,8 +198,17 @@ def get_best_scoring_hand(
         build_joker_plan(joker_lineup) for joker_lineup in all_possible_jokers
     ]
 
+    score_area = 0
+    if "avg" in scoring_type:
+        score_area = 0
+    elif "worst" in scoring_type:
+        score_area = 1
+    else:
+        score_area = 2
+
     condition_args = JokerScoringConditions()
 
+    score_to_beat = 0
     best_score = 0
     avg_score = 0
     worst_score = 0
@@ -208,21 +220,22 @@ def get_best_scoring_hand(
     for hand_scoring in hand_cache:
         for joker_index, joker_lineup in enumerate(all_possible_jokers):
             joker_plan = joker_plan_cache[joker_index]
-            hand = hand_scoring.scored_played
-            if (
-                len(hand) == 2
-                and all(card.rank == Rank.KING for card in hand)
-                and hand[0].edition == Edition.POLYCHROME
-                and hand[1].seal == Seal.RED
-                and hand[1].edition == Edition.POLYCHROME
-                and hand[2].enhancement == Enhancement.GLASS
-            ):
-                a = 5
 
             score = calculate_score(hand_scoring, joker_plan, condition_args)
-            highest_score = score.chips * score.worst_case_mult
+            highest_score = 0.0
 
-            if highest_score > best_score:
+            match score_area:
+                case 0:
+                    highest_score = score.chips * score.avg_case_mult
+
+                case 1:
+                    highest_score = score.chips * score.worst_case_mult
+
+                case _:
+                    highest_score = score.chips * score.best_case_mult
+
+            if highest_score > score_to_beat:
+                score_to_beat = highest_score
                 best_score = score.chips * score.best_case_mult
                 avg_score = score.chips * score.avg_case_mult
                 worst_score = score.chips * score.worst_case_mult
@@ -318,11 +331,14 @@ if __name__ == "__main__":
         else:
             return f"{seconds:.2f}s"
 
-    count = 1 if command is None else 1_000
+    count = 1
+    if command is not None and command == "time":
+        count = 1_000
+
     start_time = time.perf_counter()
 
     if count == 1:
-        get_best_scoring_hand(cards, jokers, True)
+        get_best_scoring_hand(cards, jokers, True, command or "")
     else:
         for _ in tqdm(range(count)):
             get_best_scoring_hand(cards, jokers, False)

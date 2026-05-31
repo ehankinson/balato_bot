@@ -1,4 +1,4 @@
-from itertools import combinations, permutations, product
+from itertools import combinations, product
 
 from calculation.poker_eval import get_hand_type
 from calculation.util import bucket_rank, bucket_suit
@@ -54,9 +54,9 @@ def generate_flushes(bucket: dict[Suit, list[Card]]) -> list[list[Card]]:
             for flush in combinations(card_values, 5):
                 if flush in seen_set:
                     continue
-                    
+
                 # we need to filter out 4 of a kinds in a flush since if you have 4 kings and 1 queen (all hearts for this example)
-                # then the 4 of a kind will overwrite the flush since it has higher order, so we need to filter this flush out 
+                # then the 4 of a kind will overwrite the flush since it has higher order, so we need to filter this flush out
                 skip = False
                 rank_count = {}
                 for card in flush:
@@ -71,7 +71,7 @@ def generate_flushes(bucket: dict[Suit, list[Card]]) -> list[list[Card]]:
 
                 if skip:
                     continue
-                    
+
                 seen_set.add(flush)
                 combos.append(flush)
 
@@ -214,13 +214,20 @@ def build_cards_not_played(
     return cards_not_played
 
 
-def can_add_to_hand(card: Card, hand_stats: HandStats, scoring_cards: list[Card]) -> bool:
+def can_add_to_hand(
+    card: Card, hand_stats: HandStats, scoring_cards: list[Card]
+) -> bool:
     can_add = False
     played_hand = hand_stats.name
 
     if played_hand == PokerHand.HIGH_CARD:
         can_add = scoring_cards[0].rank > card.rank
-    elif played_hand in [PokerHand.PAIR, PokerHand.THREE_OF_A_KIND, PokerHand.FOUR_OF_A_KIND, PokerHand.TWO_PAIR]:
+    elif played_hand in [
+        PokerHand.PAIR,
+        PokerHand.THREE_OF_A_KIND,
+        PokerHand.FOUR_OF_A_KIND,
+        PokerHand.TWO_PAIR,
+    ]:
         can_add = all(card.rank != iter_card.rank for iter_card in scoring_cards)
 
     # otherwise the hand we played is 5 cards which is the max amount
@@ -277,7 +284,7 @@ def help_blackboard(hand_cache: list[HandScoring], jokers: list[Joker]) -> None:
         cards_not_played: list[Card],
         scoring_cards: list[Card],
         none_scoring_cards: list[Card],
-        hand_stats: HandStats
+        hand_stats: HandStats,
     ) -> None:
         heart_diamond_cards: list[Card] = [
             card
@@ -290,7 +297,11 @@ def help_blackboard(hand_cache: list[HandScoring], jokers: list[Joker]) -> None:
 
         # We need this since if we play a queen highcard and want to throw out a king
         # that queen highcard then becomes a king, so its different
-        none_altering_hd_cards = [card for card in heart_diamond_cards if can_add_to_hand(card, hand_stats, scoring_cards)]
+        none_altering_hd_cards = [
+            card
+            for card in heart_diamond_cards
+            if can_add_to_hand(card, hand_stats, scoring_cards)
+        ]
 
         # we don't need to check the length of unscored_played since this function
         # is the first time we touch it
@@ -307,7 +318,7 @@ def help_blackboard(hand_cache: list[HandScoring], jokers: list[Joker]) -> None:
             hand_scoring.unscored_held,
             hand_scoring.scored_played,
             hand_scoring.unscored_played,
-            hand_scoring.hand_stats
+            hand_scoring.hand_stats,
         )
 
         # checking if there are scored held cards that we can add
@@ -315,7 +326,7 @@ def help_blackboard(hand_cache: list[HandScoring], jokers: list[Joker]) -> None:
             hand_scoring.scored_held,
             hand_scoring.scored_played,
             hand_scoring.unscored_played,
-            hand_scoring.hand_stats
+            hand_scoring.hand_stats,
         )
 
 
@@ -388,6 +399,34 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
             )
 
 
+def add_chad(hand_cache: list[HandScoring]) -> None:
+    cache_length = len(hand_cache)
+    for cache_index in range(cache_length):
+        hand_scoring = hand_cache[cache_index]
+        scored_played = hand_scoring.scored_played
+        length = len(scored_played)
+
+        if length == 1:
+            continue
+
+        new_list = scored_played.copy()
+        for _ in range(length - 1):
+            last_val = new_list[-1]
+            for i in range(length - 2, -1, -1):
+                new_list[i + 1] = new_list[i]
+            new_list[0] = last_val
+
+            hand_cache.append(
+                HandScoring(
+                    hand_stats=hand_scoring.hand_stats,
+                    scored_played=new_list.copy(),
+                    unscored_played=hand_scoring.unscored_played,
+                    scored_held=hand_scoring.scored_held,
+                    unscored_held=hand_scoring.unscored_held,
+                )
+            )
+
+
 def build_playable_hands(cards: list[Card]) -> list[list[Card]]:
     hands: list[list[Card]] = []
 
@@ -454,5 +493,10 @@ def generate_scoring_hand_combinations(
     stone_cards = [card for card in cards if card.enhancement == Enhancement.STONE]
     if len(stone_cards) > 0:
         add_stone_cards(stone_cards, hand_cache)
+
+    # When we have a HangingChad it is sometimes (there is math to figure out the best starting card but will do that later)
+    # So for now we will just take the end and make sure every card has a chance to start :p
+    if any(joker.background_image == JokersName.HANGING_CHAD for joker in jokers):
+        add_chad(hand_cache)
 
     return hand_cache

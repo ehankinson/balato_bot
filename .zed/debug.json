@@ -1,22 +1,13 @@
 [
   {
-    "label": "Debug rendering.joker",
-    "adapter": "Debugpy",
-    "request": "launch",
-    "module": "rendering.joker",
-    "cwd": "/home/hank/projects/balato_bot",
-    "env": {
-      "PYTHONPATH": "/home/hank/projects/balato_bot/python"
-    }
-  },
-  {
     "label": "Debug best_hand",
     "adapter": "Debugpy",
     "request": "launch",
-    "program": "~/projects/balato_bot/python/best_hand.py",
-    "cwd": "~/projects/balato_bot",
+    "program": "$ZED_WORKTREE_ROOT/python/best_hand.py",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "args": ["worst"],
     "env": {
-      "PYTHONPATH": "~/projects/balato_bot/python"
-    }
-  }
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",
+    },
+  },
 ]
