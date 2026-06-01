@@ -311,11 +311,18 @@ if __name__ == "__main__":
         Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
         Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
         Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
     ]
 
     jokers = [
         # Copy Baron if your sim supports Blueprint copying the next compatible Joker.
-        # Joker.build(JokersName.BLUEPRINT),
+        Joker.build(JokersName.BLUEPRINT),
         Joker.build(JokersName.BARON),
     
         # Brainstorm usually copies the leftmost Joker.

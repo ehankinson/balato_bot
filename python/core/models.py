@@ -235,6 +235,13 @@ class Joker:
     edition: Edition
     req: JokerReq
     copyable: bool
+    joker_id: int = field(init=False, default=0)
+
+    def _build_id(self):
+        val = self.background_image | 0b11111111
+        val = (val << 1) | self.negative
+        val = (val << 4) | (self.edition & 0b111)
+        self.joker_id = val
 
     def _add_face(self):
         if self.background_image in BACKGROUND_JOKERS:
@@ -242,6 +249,7 @@ class Joker:
 
     def __post_init__(self):
         self._add_face()
+        self._build_id()
 
     def __repr__(self):
         base = self.background_image.name.lower()
@@ -251,6 +259,9 @@ class Joker:
             base = f"{self.edition.name.lower()} {base}"
 
         return base
+
+    def __hash__(self) -> int:
+        return self.joker_id
 
     @classmethod
     def random(cls):

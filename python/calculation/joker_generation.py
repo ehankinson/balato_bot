@@ -2,11 +2,10 @@ from core.enums import JokersName
 from core.models import Joker, JokerCopy, JokerRetrigger, JokerScoring
 
 
-def generate_blueprint_permutations(
-    jokers: list[JokerScoring] | list[JokerRetrigger],
-) -> list[list[Joker]]:
+def generate_blueprint_permutations(jokers: list[Joker], skip_first: bool = False) -> list[list[Joker]]:
     final_list = []
-    for i in range(len(jokers)):
+    start_index = 1 if skip_first else 0
+    for i in range(start_index, len(jokers)):
         new_list = jokers[:i] + [jokers[i]] + jokers[i:]
         final_list.append(new_list)
 
@@ -18,12 +17,27 @@ def generate_brainstorm_permutations(jokers: list[Joker]) -> list[list[Joker]]:
     for i in range(len(jokers)):
         new_list = jokers + [jokers[0]]
         final_list.append(new_list)
-        
+
         last_joker = jokers[-1]
         for i in range(len(jokers) - 2, -1, -1):
             jokers[i + 1] = jokers[i]
 
         jokers[0] = last_joker
+
+    return final_list
+
+
+def generate_duo_copy_permutations(jokers: list[Joker]) -> list[list[Joker]]:
+    final_list = []
+
+    # take all the brainstorm combos
+    final_list.extend(generate_brainstorm_permutations(jokers))
+
+    blueprint_copies = []
+    for jokers in final_list:
+        blueprint_copies.extend(generate_blueprint_permutations(jokers, True))
+        
+    final_list.extend(blueprint_copies)
 
     return final_list
 
@@ -57,15 +71,17 @@ def build_mult_jokers(
 
 
 def generate_copy_combos(
-    edit_jokers: list[JokerScoring] | list[JokerRetrigger],
+    edit_jokers: list[Joker],
     copy_jokers: list[JokerCopy],
 ) -> list[list[Joker]]:
     final_list: list[list[Joker]] = []
-
+    
     if len(copy_jokers) == 1:
         copy_joker = copy_jokers[0]
         function = COPY_FUNCTION[copy_joker.background_image]
-        final_list.extend(function(edit_jokers))
+        return function(edit_jokers)
+    elif len(set([joker.background_image for joker in copy_jokers])) == 2:
+        return generate_duo_copy_permutations(edit_jokers)
 
     return final_list
 
@@ -94,7 +110,7 @@ def build_copy_combos(
     if len(retrigger_jokers) > 0:
         retrigger_combos = generate_copy_combos(retrigger_jokers, copy_jokers)
         final_jokers.extend(
-            mult_jokers + chip_jokers + retrigger_combo
+            retrigger_combo + mult_jokers + chip_jokers
             for retrigger_combo in retrigger_combos
         )
 
