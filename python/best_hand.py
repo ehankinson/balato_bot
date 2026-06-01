@@ -31,6 +31,7 @@ from core.models import (
 JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
 ADD = 0
 MULT = 1
+NO_CACHE_JOKERS = {JokersName.PHOTOGRAPH}
 
 
 def build_joker_plan(jokers: list[Joker]) -> JokerPlan:
@@ -94,6 +95,7 @@ def calculate_score(
     condition_args.scoring_held = scoring_held
     condition_args.scoring_played = scoring_played
     condition_args.unscoring_held = hand_scoring.unscored_held
+    condition_args.face_card_count = -1
 
     best_hand = BestHand(
         chips=hand_stats.chips,
@@ -125,13 +127,15 @@ def calculate_score(
 
         for joker in joker_plan.on_played:
             joker_key = joker.background_image
-            cached = card_cache.get(joker_key)
+            score = card_cache.get(joker_key)
 
-            if cached is None:
-                cached = calculate_joker_scoring(joker, condition_args)
-                card_cache[joker_key] = cached
+            if joker_key in NO_CACHE_JOKERS:
+                score = calculate_joker_scoring(joker, condition_args)
+            elif score is None:
+                score = calculate_joker_scoring(joker, condition_args)
+                card_cache[joker_key] = score
 
-            j_chips, j_add_mult, j_x_mult = cached
+            j_chips, j_add_mult, j_x_mult = score
 
             best_hand.chips += j_chips * trigger
             add_to_order(j_add_mult, j_x_mult, joker.prob, mult_scoring_order)
@@ -220,6 +224,10 @@ def get_best_scoring_hand(
 
     for hand_scoring in hand_cache:
         for joker_index, joker_lineup in enumerate(all_possible_jokers):
+            hand = hand_scoring.scored_played
+            if len(hand) == 5:
+                a = 5
+                
             joker_plan = joker_plan_cache[joker_index]
 
             score = calculate_score(hand_scoring, joker_plan, condition_args)
