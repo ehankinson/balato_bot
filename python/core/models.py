@@ -170,6 +170,7 @@ class JokerScoringConditions:
     card: Card = Card.build_dummy()
     card_index: int = -1
     hands_left: int = -1
+    face_card_count: int = -1
     scoring_held: list[Card] = field(default_factory=list)
     unscoring_held: list[Card] = field(default_factory=list)
     scoring_played: list[Card] = field(default_factory=list)

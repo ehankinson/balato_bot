@@ -39,7 +39,7 @@ def generate_same_rank_groups(hand_size: int, cards: list[Card]) -> list[list[Ca
 def generate_n_of_a_kind(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
     x_of_a_kind: list[list[Card]] = []
     for card_values in bucket.values():
-        for size in range(2, len(card_values) + 1):
+        for size in range(2, min(6, len(card_values) + 1)):
             x_of_a_kind.extend(generate_same_rank_groups(size, card_values))
 
     return x_of_a_kind

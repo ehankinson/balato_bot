@@ -1,4 +1,4 @@
-from core.enums import JokersName, JokerTriggers
+from core.enums import JokersName
 from core.models import Joker, JokerCopy, JokerRetrigger, JokerScoring
 
 
@@ -13,7 +13,25 @@ def generate_blueprint_permutations(
     return final_list
 
 
-COPY_FUNCTION = {JokersName.BLUEPRINT: generate_blueprint_permutations}
+def generate_brainstorm_permutations(jokers: list[Joker]) -> list[list[Joker]]:
+    final_list = []
+    for i in range(len(jokers)):
+        new_list = jokers + [jokers[0]]
+        final_list.append(new_list)
+        
+        last_joker = jokers[-1]
+        for i in range(len(jokers) - 2, -1, -1):
+            jokers[i + 1] = jokers[i]
+
+        jokers[0] = last_joker
+
+    return final_list
+
+
+COPY_FUNCTION = {
+    JokersName.BLUEPRINT: generate_blueprint_permutations,
+    JokersName.BRAINSTORM: generate_brainstorm_permutations,
+}
 
 
 def build_mult_jokers(

@@ -5,7 +5,7 @@ from calculation.poker_eval import (
     is_straight,
 )
 from core.enums import Enhancement, Rank, Suit
-from core.models import Card, Joker, JokerScoring, JokerScoringConditions
+from core.models import JokerScoring, JokerScoringConditions
 
 
 def calculate_scoring_condition(
@@ -72,6 +72,9 @@ def calculate_scoring_condition(
 
         case "cards_played":
             return len(condition_args.scoring_played) <= condition_value
+
+        case "first_played_facecard":
+            return condition_args.face_card_count == 0
 
     raise ValueError(f"This condition key '{condition_key}' does not exist")
 

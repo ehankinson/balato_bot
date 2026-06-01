@@ -927,11 +927,10 @@
     },
     "brainstorm": {
         "rarity": "rare",
-        "copyable": {
+        "copy": {
             "position": "left"
         },
-        "buy_price": 10,
-        "copy": false
+        "buy_price": 10
     },
     "satellite": {
         "rarity": "uncommon",

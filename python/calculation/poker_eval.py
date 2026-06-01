@@ -1,6 +1,6 @@
-from calculation.util import unique_cards, bucket_rank
+from calculation.util import bucket_rank, unique_cards
 from config.poker_hands import HAND_STATS
-from core.enums import PokerHand, Rank
+from core.enums import PokerHand
 from core.hand_stats import HandStats
 from core.models import Card
 
@@ -41,13 +41,13 @@ def contain_n_of_a_kind(n: int, cards: list[Card]):
 
 def get_hand_type(hand: list[Card]) -> HandStats:
     hand_len = len(hand)
+    if hand_len > 5 or hand_len < 1:
+        raise ValueError(f"Current Hand '{hand}' is not possible")
+
     unique_rank_count = unique_cards(hand)
 
     all_same_rank = unique_rank_count == 1
     has_two_ranks = unique_rank_count == 2
-
-    if hand_len == 5 and hand[0].rank == Rank.QUEEN and hand[1].rank == Rank.KING and hand[2].rank == Rank.KING and hand[3].rank == Rank.KING and hand[4].rank == Rank.KING:
-        a = 5
 
     match hand_len:
         case 5:

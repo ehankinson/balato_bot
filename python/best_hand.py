@@ -108,6 +108,7 @@ def calculate_score(
     for i, card in enumerate(scoring_played):
         condition_args.card = card
         condition_args.card_index = i
+        condition_args.face_card_count += 1 if card.is_facecard else 0
 
         trigger = card.trigger
         for joker in joker_plan.played_retrigger:
@@ -290,35 +291,40 @@ if __name__ == "__main__":
     command = sys.argv[1] if len(sys.argv) > 1 else None
 
     cards = [
-        # Played hand: HEART/WILD face-heavy Flush Five / Five of a Kind style test
-        Card(Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.HEARTS, Enhancement.MULT, Seal.RED, Edition.FOIL),
-        Card(Rank.KING, Suit.DIAMONDS, Enhancement.WILD, Seal.RED, Edition.HOLOGRAPHIC),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.WILD, Seal.NONE, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.GOLD, Edition.NONE),
-        # Held cards: Baron/Mime/Steel complexity
-        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.NONE),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.NONE, Edition.POLYCHROME),
-        Card(Rank.QUEEN, Suit.HEARTS, Enhancement.STEEL, Seal.BLUE, Edition.NONE),
+        # Played hand: keep this simple, just enough to score something.
+        # These are not where the huge score comes from.
+        Card(Rank.ACE, Suit.SPADES, Enhancement.NONE, Seal.NONE, Edition.NONE),
+    
+        # Held cards: these are the actual score engine.
+        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
+        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
     ]
 
     jokers = [
-        # Put Blueprint before Bloodstone to copy Bloodstone.
-        Joker.build(JokersName.BLUEPRINT),
-        # Bloodstone itself.
-        Joker.build(JokersName.BLOODSTONE),
-        # Guarantees Bloodstone and Lucky 1-in-2 / 1-in-5 style rolls if your sim models it.
-        # Joker.build(JokersName.OOPS_ALL_6S),
-        # Retriggers all scored face cards: all five played Kings should retrigger.
-        Joker.build(JokersName.SOCK_AND_BUSKIN),
-        # Extra retrigger on the first played card, which is also Red Seal.
-        Joker.build(JokersName.HANGING_CHAD),
-        # Held Kings give XMult.
+        # Copy Baron if your sim supports Blueprint copying the next compatible Joker.
+        # Joker.build(JokersName.BLUEPRINT),
         Joker.build(JokersName.BARON),
-        # Retriggers held-card effects, especially Steel + Baron.
+    
+        # Brainstorm usually copies the leftmost Joker.
+        # Depending on your sim, this may copy Blueprint, which may effectively copy Baron again.
+        Joker.build(JokersName.BRAINSTORM),
+    
+        # Mime retriggers held-card effects.
         Joker.build(JokersName.MIME),
-        # Optional additive suit pressure from real Clubs/spades/wilds if your evaluator handles suit jokers.
-        Joker.build(JokersName.ONYX_AGATE),
+    
+        # Extra scaling XMult.
+        Joker.build(JokersName.TRIBOULET_BACKGROUND),
+    
+        # More XMult if face cards are involved / if your sim applies it correctly.
+        Joker.build(JokersName.PHOTOGRAPH),
+    
+        # Optional extra XMult source.
+        Joker.build(JokersName.SOCK_AND_BUSKIN),
     ]
 
     def format_duration(seconds: float) -> str:
