@@ -10,4 +10,15 @@
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",
     },
   },
+  {
+    "label": "pytest: test_joker_retrigger",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "pytest",
+    "args": ["tests/test_joker_retrigger.py", "-s"],
+    "cwd": "$ZED_WORKTREE_ROOT/python",
+    "env": {
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",
+    },
+  },
 ]

@@ -16,3 +16,9 @@ dependencies = [
     "tqdm>=4.67.3",
     "ultralytics>=8.4.51",
 ]
+
+[dependency-groups]
+dev = [
+    "debugpy>=1.8.21",
+    "pytest>=9.0.3",
+]

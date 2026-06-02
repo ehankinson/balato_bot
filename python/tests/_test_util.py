@@ -78,23 +78,3 @@ def score_joker(
             unscoring_held=unscoring_held or [],
         ),
     )
-
-
-def retrigger_joker(
-    joker_name: JokersName,
-    card: Card,
-    *,
-    card_index: int = 0,
-    hands_left: int = -1,
-) -> int:
-    joker = Joker.build(joker_name)
-    assert isinstance(joker, JokerRetrigger)
-
-    return calculate_joker_retrigger(
-        joker,
-        JokerScoringConditions(
-            card=card,
-            card_index=card_index,
-            hands_left=hands_left,
-        ),
-    )

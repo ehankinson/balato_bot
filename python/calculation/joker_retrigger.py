@@ -1,9 +1,11 @@
-from core.models import Joker, JokerRetrigger, JokerScoringConditions
+from core.models import JokerRetrigger, JokerScoringConditions
 
 
-def passed_retrigger_condition(condition: str, condition_args: JokerScoringConditions) -> bool:
+def passed_retrigger_condition(
+    condition: str, condition_args: JokerScoringConditions
+) -> bool:
     val = False
-    
+
     match condition:
         case "first_played_card":
             val = condition_args.card_index == 0
@@ -16,11 +18,13 @@ def passed_retrigger_condition(condition: str, condition_args: JokerScoringCondi
 
         case "facecard":
             val = condition_args.card.is_facecard
-            
+
     return val
 
 
-def calculate_joker_retrigger(joker: JokerRetrigger, condition_args: JokerScoringConditions) -> int:
+def calculate_joker_retrigger(
+    joker: JokerRetrigger, condition_args: JokerScoringConditions
+) -> int:
     condition = joker.condition
     passes_condition = (
         passed_retrigger_condition(condition, condition_args)

@@ -1,20 +1,17 @@
 import pytest
+from _test_util import build_card
 
+from calculation.joker_retrigger import calculate_joker_retrigger
 from core.enums import JokersName, Rank
-from core.models import Card, JokerRetrigger
-from _test_util import buildable_jokers_of_type, build_card, retrigger_joker
+from core.models import Card, Joker, JokerRetrigger, JokerScoringConditions
 
 
-def test_0001_every_buildable_retrigger_joker_has_direct_tests():
-    tested_jokers = {
-        JokersName.SOCK_AND_BUSKIN,
-        JokersName.MIME,
-        JokersName.HACK,
-        JokersName.HANGING_CHAD,
-        JokersName.DUSK,
-        JokersName.SELTZER,
-    }
-    assert buildable_jokers_of_type(JokerRetrigger) == tested_jokers
+def _build_retrigger_joker(joker_name: JokersName) -> JokerRetrigger:
+    joker = Joker.build(joker_name)
+    assert isinstance(joker, JokerRetrigger), (
+        f"The joker {joker_name} is not type JokerRetrigger"
+    )
+    return joker
 
 
 @pytest.mark.parametrize(
@@ -22,30 +19,43 @@ def test_0001_every_buildable_retrigger_joker_has_direct_tests():
     [
         (JokersName.SOCK_AND_BUSKIN, build_card(Rank.KING), 1),
         (JokersName.SOCK_AND_BUSKIN, build_card(Rank.TEN), 0),
+        (JokersName.SOCK_AND_BUSKIN, build_card(Rank.ACE), 0),
         (JokersName.HACK, build_card(Rank.FIVE), 1),
         (JokersName.HACK, build_card(Rank.SIX), 0),
     ],
 )
-def test_0002_retrigger_card_conditions(
+def test_0001_retrigger_card_conditions(
     joker_name: JokersName,
     card: Card,
     expected: int,
 ):
-    assert retrigger_joker(joker_name, card) == expected
+    condition_args = JokerScoringConditions(card=card)
+    joker = _build_retrigger_joker(joker_name)
+    retrigger = calculate_joker_retrigger(joker, condition_args)
+    assert retrigger == expected, (
+        f"We expected to have a value of '{expected}' but got '{retrigger}'"
+    )
 
 
-@pytest.mark.parametrize("joker_name", [JokersName.MIME, JokersName.SELTZER])
-def test_0003_empty_retrigger_conditions_currently_do_not_trigger(
-    joker_name: JokersName,
-):
-    assert retrigger_joker(joker_name, build_card(Rank.ACE)) == 0
+def test_0002_hanging_chad_only_retriggers_first_played_card():
+    condition_args = JokerScoringConditions(card_index=0)
+    joker = _build_retrigger_joker(JokersName.HANGING_CHAD)
+
+    retrigger = calculate_joker_retrigger(joker, condition_args)
+    assert retrigger == 2, f"We expected to have a value of '2' but got '{retrigger}'"
+
+    condition_args.card_index = 1
+    retrigger = calculate_joker_retrigger(joker, condition_args)
+    assert retrigger == 0, f"We expected to have a value of '0' but got '{retrigger}'"
 
 
-def test_0004_hanging_chad_only_retriggers_first_played_card():
-    assert retrigger_joker(JokersName.HANGING_CHAD, build_card(Rank.ACE), card_index=0) == 2
-    assert retrigger_joker(JokersName.HANGING_CHAD, build_card(Rank.ACE), card_index=1) == 0
+def test_0003_dusk_triggers_on_the_last_hand():
+    condition_args = JokerScoringConditions(hands_left=2)
+    joker = _build_retrigger_joker(JokersName.DUSK)
 
+    retrigger = calculate_joker_retrigger(joker, condition_args)
+    assert retrigger == 0, f"We expected to have a value of '0' but got '{retrigger}'"
 
-def test_0005_dusk_only_retriggers_on_final_hand():
-    assert retrigger_joker(JokersName.DUSK, build_card(Rank.ACE), hands_left=1) == 1
-    assert retrigger_joker(JokersName.DUSK, build_card(Rank.ACE), hands_left=2) == 0
+    condition_args.hands_left = 1
+    retrigger = calculate_joker_retrigger(joker, condition_args)
+    assert retrigger == 1, f"We expected to have a value of '1' but got '{retrigger}'"
