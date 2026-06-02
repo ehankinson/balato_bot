@@ -19,6 +19,7 @@ from core.enums import (
 from core.models import (
     BestHand,
     Card,
+    FinalScoringResults,
     HandScoring,
     Joker,
     JokerPlan,
@@ -189,8 +190,8 @@ def calculate_score(
 def get_best_scoring_hand(
     cards: list[Card],
     jokers: list[Joker],
-    scoring_type: str = "",
-) -> BestHand:
+    scoring_type: str = "best",
+) -> FinalScoringResults:
     hand_cache = generate_scoring_hand_combinations(cards, jokers)
     all_possible_jokers = generate_scoring_jokers_combinations(jokers)
     # For early game when we have no jokers
@@ -212,11 +213,10 @@ def get_best_scoring_hand(
     condition_args = JokerScoringConditions()
 
     score_to_beat = float("-inf")
-    best_score: BestHand = BestHand()
+    final_results = FinalScoringResults()
     
     for hand_scoring in hand_cache:
-        for joker_index, joker_lineup in enumerate(all_possible_jokers):
-            joker_plan = joker_plan_cache[joker_index]
+        for joker_plan in joker_plan_cache:
             score = calculate_score(hand_scoring, joker_plan, condition_args)
             highest_score = 0.0
 
@@ -232,9 +232,11 @@ def get_best_scoring_hand(
 
             if highest_score > score_to_beat:
                 score_to_beat = highest_score
-                best_score = score
+                final_results.best_hand = score
+                final_results.hand_scoring = hand_scoring
+                final_results.joker_plan = joker_plan
 
-    return best_score
+    return final_results
 
 
 if __name__ == "__main__":

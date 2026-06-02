@@ -43,7 +43,7 @@ class Card:
     card_score: int = 0
     mult_prob: float = 1.0
     econ_prob: float = 1.0
-    
+
     is_facecard: bool = False
     is_low_card: bool = False
     is_any_suit: bool = False
@@ -80,7 +80,7 @@ class Card:
 
             case Enhancement.LUCKY:
                 self.mult_prob = 0.2  # 1/5
-                self.econ_prob = 0.05 # 1/20
+                self.econ_prob = 0.05  # 1/20
 
             case Enhancement.GLASS:
                 self.play_x_mult = 2
@@ -146,23 +146,6 @@ class Card:
 class CardBucket:
     count: int
     cards: list[Card]
-
-
-@dataclass(slots=True)
-class BestHand:
-    chips: int = 0
-    worst_case_mult: float = 0
-    avg_case_mult: float = 0
-    best_case_mult: float = 0
-
-
-@dataclass(slots=True)
-class HandScoring:
-    hand_stats: HandStats
-    scored_played: list[Card]
-    unscored_played: list[Card]
-    scored_held: list[Card]
-    unscored_held: list[Card]
 
 
 @dataclass(slots=True)
@@ -360,12 +343,36 @@ class JokerCopy(Joker):
 
 
 @dataclass(slots=True)
+class BestHand:
+    chips: int = 0
+    worst_case_mult: float = 0
+    avg_case_mult: float = 0
+    best_case_mult: float = 0
+
+
+@dataclass(slots=True)
+class HandScoring:
+    hand_stats: HandStats = HandStats()
+    scored_played: list[Card] = field(default_factory=list)
+    unscored_played: list[Card] = field(default_factory=list)
+    scored_held: list[Card] = field(default_factory=list)
+    unscored_held: list[Card] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class JokerPlan:
-    on_played: list[JokerScoring]
-    on_held: list[JokerScoring]
-    after_hand: list[JokerScoring]
-    played_retrigger: list[JokerRetrigger]
-    held_retrigger: list[JokerRetrigger]
+    on_played: list[JokerScoring] = field(default_factory=list)
+    on_held: list[JokerScoring] = field(default_factory=list)
+    after_hand: list[JokerScoring] = field(default_factory=list)
+    played_retrigger: list[JokerRetrigger] = field(default_factory=list)
+    held_retrigger: list[JokerRetrigger] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class FinalScoringResults:
+    best_hand: BestHand = field(default_factory=BestHand)
+    hand_scoring: HandScoring = field(default_factory=HandScoring)
+    joker_plan: JokerPlan = field(default_factory=JokerPlan)
 
 
 @dataclass(slots=True)
