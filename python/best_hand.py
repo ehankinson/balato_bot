@@ -190,9 +190,8 @@ def calculate_score(
 def get_best_scoring_hand(
     cards: list[Card],
     jokers: list[Joker],
-    do_print: bool = False,
     scoring_type: str = "",
-) -> None:
+) -> BestHand:
     hand_cache = generate_scoring_hand_combinations(cards, jokers)
     all_possible_jokers = generate_scoring_jokers_combinations(jokers)
     # For early game when we have no jokers
@@ -213,23 +212,12 @@ def get_best_scoring_hand(
 
     condition_args = JokerScoringConditions()
 
-    score_to_beat = 0
-    best_score = 0
-    avg_score = 0
-    worst_score = 0
-    best_hand_type = -1
-    best_hand = []
-    best_jokers = []
-    best_cards_not_played = []
-
+    score_to_beat = float("-inf")
+    best_score: BestHand = BestHand()
+    
     for hand_scoring in hand_cache:
         for joker_index, joker_lineup in enumerate(all_possible_jokers):
-            hand = hand_scoring.scored_played
-            if len(hand) == 5:
-                a = 5
-                
             joker_plan = joker_plan_cache[joker_index]
-
             score = calculate_score(hand_scoring, joker_plan, condition_args)
             highest_score = 0.0
 
@@ -245,54 +233,9 @@ def get_best_scoring_hand(
 
             if highest_score > score_to_beat:
                 score_to_beat = highest_score
-                best_score = score.chips * score.best_case_mult
-                avg_score = score.chips * score.avg_case_mult
-                worst_score = score.chips * score.worst_case_mult
-                best_hand = hand_scoring.scored_played + hand_scoring.unscored_played
-                best_jokers = joker_lineup
-                best_hand_type = hand_scoring.hand_stats.name
-                best_cards_not_played = (
-                    hand_scoring.scored_held + hand_scoring.unscored_held
-                )
+                best_score = score
 
-    if do_print:
-        print(
-            f"Iterated over {len(hand_cache) * len(all_possible_jokers):,.0f} possible hands + joker combinations"
-        )
-        print(f"The hand played was a {PokerHand(best_hand_type).name}\n")
-        for card in best_hand:
-            print(card)
-
-        worst_string = (
-            f"{worst_score:e}"
-            if worst_score > 99_999_999_999
-            else f"{worst_score:,.2f}"
-        )
-        avg_string = (
-            f"{avg_score:e}" if avg_score > 99_999_999_999 else f"{avg_score:,.2f}"
-        )
-        best_string = (
-            f"{best_score:e}" if best_score > 99_999_999_999 else f"{best_score:,.2f}"
-        )
-
-        if worst_score != avg_score:
-            print(
-                f"\nWhich has a range of score from {worst_string} - {best_string}\nLikely ending up with {avg_string}\n"
-            )
-        else:
-            print(f"\nWhich scored {best_string}\n")
-
-        print("The jokers order was:")
-        for joker in best_jokers:
-            print(joker)
-
-        print("\nThe cards that were not played were:")
-        for card in best_cards_not_played:
-            print(card)
-
-        print()
-
-    return
+    return best_score
 
 
 if __name__ == "__main__":
