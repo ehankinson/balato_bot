@@ -299,11 +299,9 @@
         "rarity": "common",
         "scoring": {
             "trigger": 1,
-            "add_mult": {
-                "min": 0,
-                "max": 23
-            }
+            "add_mult": 23
         },
+        "prob": 0.5,
         "buy_price": 4,
         "copyable": true
     },
@@ -806,7 +804,7 @@
             "trigger": 1,
             "add_mult": 15,
             "condition": {
-                "destroy_chance": 0.0667
+                "destroy_chance": 0.1667
             }
         },
         "buy_price": 5,

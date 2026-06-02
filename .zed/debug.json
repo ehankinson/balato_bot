@@ -11,11 +11,22 @@
     },
   },
   {
-    "label": "pytest: test_joker_retrigger",
+    "label": "pytest: TEST_JOKER_RETRIGGER",
     "adapter": "Debugpy",
     "request": "launch",
     "module": "pytest",
     "args": ["tests/test_joker_retrigger.py", "-s"],
+    "cwd": "$ZED_WORKTREE_ROOT/python",
+    "env": {
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",
+    },
+  },
+  {
+    "label": "pytest: TEST_JOKER_SCORING",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "pytest",
+    "args": ["tests/test_joker_scoring.py", "-s"],
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",

@@ -1,8 +1,58 @@
 import pytest
+from _test_util import build_card, buildable_jokers_of_type
 
+from calculation.joker_scoring import calculate_joker_scoring
 from core.enums import Enhancement, JokersName, Rank, Suit
-from core.models import Card, JokerScoring
-from _test_util import buildable_jokers_of_type, build_card, score_joker
+from core.models import (
+    Card,
+    Joker,
+    JokerReq,
+    JokerScoring,
+    JokerScoringConditions,
+)
+
+
+def _build_scoring_joker(
+    joker_name: JokersName,
+    *,
+    req_rank: Rank = Rank.NONE,
+    req_suit: Suit = Suit.NONE,
+) -> JokerScoring:
+    joker = Joker.build(joker_name)
+    assert isinstance(joker, JokerScoring), (
+        f"The joker {joker_name} is not type JokerScoring"
+    )
+    joker.req = JokerReq(rank=req_rank, suit=req_suit)
+    return joker
+
+
+def _score_joker(
+    joker_name: JokersName,
+    *,
+    card: Card | None = None,
+    scoring_played: list[Card] | None = None,
+    scoring_held: list[Card] | None = None,
+    unscoring_held: list[Card] | None = None,
+    face_card_count: int = -1,
+    req_rank: Rank = Rank.NONE,
+    req_suit: Suit = Suit.NONE,
+) -> tuple[int, int, float]:
+    scoring_played = scoring_played or [card or build_card(Rank.ACE)]
+    card = card or scoring_played[0]
+    condition_args = JokerScoringConditions(
+        card=card,
+        face_card_count=face_card_count,
+        scoring_played=scoring_played,
+        scoring_held=scoring_held or [],
+        unscoring_held=unscoring_held or [],
+    )
+    joker = _build_scoring_joker(
+        joker_name,
+        req_rank=req_rank,
+        req_suit=req_suit,
+    )
+
+    return calculate_joker_scoring(joker, condition_args)
 
 
 def test_0001_every_buildable_scoring_joker_has_direct_tests():
@@ -104,7 +154,7 @@ def test_0001_every_buildable_scoring_joker_has_direct_tests():
         (JokersName.BANNER, (0, 0, 1.0)),
         (JokersName.MYSTIC_SUMMIT, (0, 0, 1.0)),
         (JokersName.LOYALTY_CARD, (0, 0, 1)),
-        (JokersName.MISPRINT, (0, 0, 1.0)),
+        (JokersName.MISPRINT, (0, 23, 1.0)),
         (JokersName.STEEL_JOKER, (0, 0, 1)),
         (JokersName.ABSTRACT_JOKER, (0, 0, 1.0)),
         (JokersName.SUPERNOVA, (0, 0, 1.0)),
@@ -139,75 +189,267 @@ def test_0001_every_buildable_scoring_joker_has_direct_tests():
         (JokersName.CASTLE, (0, 0, 1.0)),
     ],
 )
-def test_0002_static_scoring_jokers(joker_name: JokersName, expected: tuple[int, int, float]):
-    assert score_joker(joker_name) == expected
-
-
-@pytest.mark.parametrize(
-    ("joker_name", "cards", "expected"),
-    [
-        (JokersName.JOLLY_JOKER, [build_card(Rank.ACE), build_card(Rank.ACE)], (0, 8, 1.0)),
-        (JokersName.ZANY_JOKER, [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE)], (0, 12, 1.0)),
-        (JokersName.MAD_JOKER, [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.KING)], (0, 10, 1.0)),
-        (JokersName.CRAZY_JOKER, [build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.QUEEN), build_card(Rank.JACK), build_card(Rank.TEN)], (0, 12, 1.0)),
-        (JokersName.DROLL_JOKER, [build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.NINE), build_card(Rank.SEVEN), build_card(Rank.THREE)], (0, 10, 1.0)),
-        (JokersName.THE_DUO, [build_card(Rank.ACE), build_card(Rank.ACE)], (0, 0, 2)),
-        (JokersName.THE_TRIO, [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE)], (0, 0, 3)),
-        (JokersName.THE_FAMILY, [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE)], (0, 0, 4)),
-        (JokersName.THE_ORDER, [build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.QUEEN), build_card(Rank.JACK), build_card(Rank.TEN)], (0, 0, 3)),
-        (JokersName.THE_TRIBE, [build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.NINE), build_card(Rank.SEVEN), build_card(Rank.THREE)], (0, 0, 2)),
-        (JokersName.SLY_JOKER, [build_card(Rank.ACE), build_card(Rank.ACE)], (50, 0, 1.0)),
-        (JokersName.WILY_JOKER, [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE)], (100, 0, 1.0)),
-        (JokersName.CLEVER_JOKER, [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.KING)], (80, 0, 1.0)),
-        (JokersName.DEVIOUS_JOKER, [build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.QUEEN), build_card(Rank.JACK), build_card(Rank.TEN)], (100, 0, 1.0)),
-        (JokersName.CRAFTY_JOKER, [build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.NINE), build_card(Rank.SEVEN), build_card(Rank.THREE)], (80, 0, 1.0)),
-    ],
-)
-def test_0003_hand_type_condition_hits(
+def test_0002_static_scoring_jokers(
     joker_name: JokersName,
-    cards: list[Card],
     expected: tuple[int, int, float],
 ):
-    assert score_joker(joker_name, scoring_played=cards) == expected
-
-
-def test_0004_hand_type_condition_misses():
-    high_card = [build_card(Rank.ACE), build_card(Rank.KING)]
-
-    assert score_joker(JokersName.JOLLY_JOKER, scoring_played=high_card) == (0, 0, 1.0)
-    assert score_joker(JokersName.THE_DUO, scoring_played=high_card) == (0, 0, 1.0)
-    assert score_joker(JokersName.SLY_JOKER, scoring_played=high_card) == (0, 0, 1.0)
-
-
-def test_0005_half_joker_hits_only_when_playing_three_or_fewer_cards():
-    assert score_joker(JokersName.HALF_JOKER, scoring_played=[build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.QUEEN)]) == (0, 20, 1.0)
-    assert score_joker(JokersName.HALF_JOKER, scoring_played=[build_card(Rank.ACE), build_card(Rank.KING), build_card(Rank.QUEEN), build_card(Rank.JACK)]) == (0, 0, 1.0)
+    assert _score_joker(joker_name) == expected
 
 
 @pytest.mark.parametrize(
-    ("joker_name", "card", "expected"),
+    ("joker_name", "hit_cards", "miss_cards", "expected"),
     [
-        (JokersName.SCARY_FACE, build_card(Rank.KING), (30, 0, 1.0)),
-        (JokersName.SCARY_FACE, build_card(Rank.TEN), (0, 0, 1.0)),
-        (JokersName.SMILEY_FACE, build_card(Rank.QUEEN), (0, 5, 1.0)),
-        (JokersName.SMILEY_FACE, build_card(Rank.ACE), (0, 0, 1.0)),
-        (JokersName.SHOOT_THE_MOON, build_card(Rank.QUEEN), (0, 13, 1.0)),
-        (JokersName.BARON, build_card(Rank.KING), (0, 0, 1.5)),
-        (JokersName.TRIBOULET_BACKGROUND, build_card(Rank.KING), (0, 0, 2)),
-        (JokersName.TRIBOULET_BACKGROUND, build_card(Rank.QUEEN), (0, 0, 2)),
-        (JokersName.TRIBOULET_BACKGROUND, build_card(Rank.JACK), (0, 0, 1.0)),
+        (
+            JokersName.JOLLY_JOKER,
+            [build_card(Rank.ACE), build_card(Rank.ACE)],
+            [build_card(Rank.ACE), build_card(Rank.KING)],
+            (0, 8, 1.0),
+        ),
+        (
+            JokersName.ZANY_JOKER,
+            [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE)],
+            [build_card(Rank.ACE), build_card(Rank.ACE)],
+            (0, 12, 1.0),
+        ),
+        (
+            JokersName.MAD_JOKER,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.KING),
+            ],
+            [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.KING)],
+            (0, 10, 1.0),
+        ),
+        (
+            JokersName.CRAZY_JOKER,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.QUEEN),
+                build_card(Rank.JACK),
+                build_card(Rank.TEN),
+            ],
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.QUEEN),
+                build_card(Rank.JACK),
+                build_card(Rank.NINE),
+            ],
+            (0, 12, 1.0),
+        ),
+        (
+            JokersName.DROLL_JOKER,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.NINE),
+                build_card(Rank.SEVEN),
+                build_card(Rank.THREE),
+            ],
+            [
+                build_card(Rank.ACE, Suit.HEARTS),
+                build_card(Rank.KING, Suit.CLUBS),
+                build_card(Rank.NINE, Suit.SPADES),
+                build_card(Rank.SEVEN, Suit.DIAMONDS),
+                build_card(Rank.THREE, Suit.HEARTS),
+            ],
+            (0, 10, 1.0),
+        ),
+        (
+            JokersName.THE_DUO,
+            [build_card(Rank.ACE), build_card(Rank.ACE)],
+            [build_card(Rank.ACE), build_card(Rank.KING)],
+            (0, 0, 2),
+        ),
+        (
+            JokersName.THE_TRIO,
+            [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE)],
+            [build_card(Rank.ACE), build_card(Rank.ACE)],
+            (0, 0, 3),
+        ),
+        (
+            JokersName.THE_FAMILY,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.ACE),
+                build_card(Rank.ACE),
+                build_card(Rank.ACE),
+            ],
+            [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE)],
+            (0, 0, 4),
+        ),
+        (
+            JokersName.THE_ORDER,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.QUEEN),
+                build_card(Rank.JACK),
+                build_card(Rank.TEN),
+            ],
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.QUEEN),
+                build_card(Rank.JACK),
+                build_card(Rank.NINE),
+            ],
+            (0, 0, 3),
+        ),
+        (
+            JokersName.THE_TRIBE,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.NINE),
+                build_card(Rank.SEVEN),
+                build_card(Rank.THREE),
+            ],
+            [
+                build_card(Rank.ACE, Suit.HEARTS),
+                build_card(Rank.KING, Suit.CLUBS),
+                build_card(Rank.NINE, Suit.SPADES),
+                build_card(Rank.SEVEN, Suit.DIAMONDS),
+                build_card(Rank.THREE, Suit.HEARTS),
+            ],
+            (0, 0, 2),
+        ),
+        (
+            JokersName.SLY_JOKER,
+            [build_card(Rank.ACE), build_card(Rank.ACE)],
+            [build_card(Rank.ACE), build_card(Rank.KING)],
+            (50, 0, 1.0),
+        ),
+        (
+            JokersName.WILY_JOKER,
+            [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.ACE)],
+            [build_card(Rank.ACE), build_card(Rank.ACE)],
+            (100, 0, 1.0),
+        ),
+        (
+            JokersName.CLEVER_JOKER,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.KING),
+            ],
+            [build_card(Rank.ACE), build_card(Rank.ACE), build_card(Rank.KING)],
+            (80, 0, 1.0),
+        ),
+        (
+            JokersName.DEVIOUS_JOKER,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.QUEEN),
+                build_card(Rank.JACK),
+                build_card(Rank.TEN),
+            ],
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.QUEEN),
+                build_card(Rank.JACK),
+                build_card(Rank.NINE),
+            ],
+            (100, 0, 1.0),
+        ),
+        (
+            JokersName.CRAFTY_JOKER,
+            [
+                build_card(Rank.ACE),
+                build_card(Rank.KING),
+                build_card(Rank.NINE),
+                build_card(Rank.SEVEN),
+                build_card(Rank.THREE),
+            ],
+            [
+                build_card(Rank.ACE, Suit.HEARTS),
+                build_card(Rank.KING, Suit.CLUBS),
+                build_card(Rank.NINE, Suit.SPADES),
+                build_card(Rank.SEVEN, Suit.DIAMONDS),
+                build_card(Rank.THREE, Suit.HEARTS),
+            ],
+            (80, 0, 1.0),
+        ),
     ],
 )
-def test_0006_rank_condition_jokers(
+def test_0003_hand_type_condition_jokers(
     joker_name: JokersName,
-    card: Card,
+    hit_cards: list[Card],
+    miss_cards: list[Card],
     expected: tuple[int, int, float],
 ):
-    assert score_joker(joker_name, card=card) == expected
+    assert _score_joker(joker_name, scoring_played=hit_cards) == expected
+    assert _score_joker(joker_name, scoring_played=miss_cards) == (0, 0, 1.0)
+
+
+def test_0004_cards_played_condition_jokers():
+    assert _score_joker(
+        JokersName.HALF_JOKER,
+        scoring_played=[
+            build_card(Rank.ACE),
+            build_card(Rank.KING),
+            build_card(Rank.QUEEN),
+        ],
+    ) == (0, 20, 1.0)
+    assert _score_joker(
+        JokersName.HALF_JOKER,
+        scoring_played=[
+            build_card(Rank.ACE),
+            build_card(Rank.KING),
+            build_card(Rank.QUEEN),
+            build_card(Rank.JACK),
+        ],
+    ) == (0, 0, 1.0)
 
 
 @pytest.mark.parametrize(
-    ("joker_name", "card", "expected"),
+    ("joker_name", "hit_card", "miss_card", "expected"),
+    [
+        (
+            JokersName.SCARY_FACE,
+            build_card(Rank.KING),
+            build_card(Rank.TEN),
+            (30, 0, 1.0),
+        ),
+        (
+            JokersName.SMILEY_FACE,
+            build_card(Rank.QUEEN),
+            build_card(Rank.ACE),
+            (0, 5, 1.0),
+        ),
+        (
+            JokersName.SHOOT_THE_MOON,
+            build_card(Rank.QUEEN),
+            build_card(Rank.KING),
+            (0, 13, 1.0),
+        ),
+        (JokersName.BARON, build_card(Rank.KING), build_card(Rank.QUEEN), (0, 0, 1.5)),
+        (
+            JokersName.TRIBOULET_BACKGROUND,
+            build_card(Rank.KING),
+            build_card(Rank.JACK),
+            (0, 0, 2),
+        ),
+    ],
+)
+def test_0005_rank_condition_jokers(
+    joker_name: JokersName,
+    hit_card: Card,
+    miss_card: Card,
+    expected: tuple[int, int, float],
+):
+    assert _score_joker(joker_name, card=hit_card) == expected
+    assert _score_joker(joker_name, card=miss_card) == (0, 0, 1.0)
+
+
+@pytest.mark.parametrize(
+    ("joker_name", "hit_card", "expected"),
     [
         (JokersName.EVEN_STEVEN, build_card(Rank.TEN), (0, 0, 1.0)),
         (JokersName.ODD_TODD, build_card(Rank.ACE), (0, 0, 1.0)),
@@ -216,48 +458,107 @@ def test_0006_rank_condition_jokers(
         (JokersName.WALKIE_TALKIE, build_card(Rank.TEN), (0, 0, 1.0)),
     ],
 )
-def test_0007_rank_alias_condition_jokers(
+def test_0006_rank_alias_condition_jokers_currently_do_not_hit(
     joker_name: JokersName,
-    card: Card,
+    hit_card: Card,
     expected: tuple[int, int, float],
 ):
-    assert score_joker(joker_name, card=card) == expected
+    assert _score_joker(joker_name, card=hit_card) == expected
 
 
-def test_0008_photograph_only_hits_first_played_face_card():
-    assert score_joker(JokersName.PHOTOGRAPH, card=build_card(Rank.KING), face_card_count=0) == (0, 0, 2)
-    assert score_joker(JokersName.PHOTOGRAPH, card=build_card(Rank.KING), face_card_count=1) == (0, 0, 1.0)
-    assert score_joker(JokersName.PHOTOGRAPH, card=build_card(Rank.TEN), face_card_count=0) == (0, 0, 1.0)
+def test_0007_photograph_only_hits_first_played_face_card():
+    assert _score_joker(
+        JokersName.PHOTOGRAPH,
+        card=build_card(Rank.KING),
+        face_card_count=0,
+    ) == (0, 0, 2)
+    assert _score_joker(
+        JokersName.PHOTOGRAPH,
+        card=build_card(Rank.KING),
+        face_card_count=1,
+    ) == (0, 0, 1.0)
+    assert _score_joker(
+        JokersName.PHOTOGRAPH,
+        card=build_card(Rank.TEN),
+        face_card_count=0,
+    ) == (0, 0, 1.0)
 
 
 @pytest.mark.parametrize(
-    ("joker_name", "card", "expected"),
+    ("joker_name", "hit_card", "miss_card", "expected"),
     [
-        (JokersName.GREEDY_JOKER, build_card(Rank.ACE, Suit.DIAMONDS), (0, 3, 1.0)),
-        (JokersName.LUSTY_JOKER, build_card(Rank.ACE, Suit.HEARTS), (0, 3, 1.0)),
-        (JokersName.WRATHFUL_JOKER, build_card(Rank.ACE, Suit.SPADES), (0, 3, 1.0)),
-        (JokersName.GLUTTONOUS_JOKER, build_card(Rank.ACE, Suit.CLUBS), (0, 3, 1.0)),
-        (JokersName.SEEING_DOUBLE, build_card(Rank.ACE, Suit.CLUBS), (0, 0, 2)),
-        (JokersName.BLOODSTONE, build_card(Rank.ACE, Suit.HEARTS), (0, 0, 1.5)),
-        (JokersName.ARROWHEAD, build_card(Rank.ACE, Suit.SPADES), (50, 0, 1.0)),
-        (JokersName.ONYX_AGATE, build_card(Rank.ACE, Suit.CLUBS), (0, 7, 1.0)),
+        (
+            JokersName.GREEDY_JOKER,
+            build_card(Rank.ACE, Suit.DIAMONDS),
+            build_card(Rank.ACE, Suit.HEARTS),
+            (0, 3, 1.0),
+        ),
+        (
+            JokersName.LUSTY_JOKER,
+            build_card(Rank.ACE, Suit.HEARTS),
+            build_card(Rank.ACE, Suit.SPADES),
+            (0, 3, 1.0),
+        ),
+        (
+            JokersName.WRATHFUL_JOKER,
+            build_card(Rank.ACE, Suit.SPADES),
+            build_card(Rank.ACE, Suit.CLUBS),
+            (0, 3, 1.0),
+        ),
+        (
+            JokersName.GLUTTONOUS_JOKER,
+            build_card(Rank.ACE, Suit.CLUBS),
+            build_card(Rank.ACE, Suit.DIAMONDS),
+            (0, 3, 1.0),
+        ),
+        (
+            JokersName.SEEING_DOUBLE,
+            build_card(Rank.ACE, Suit.CLUBS),
+            build_card(Rank.ACE, Suit.HEARTS),
+            (0, 0, 2),
+        ),
+        (
+            JokersName.BLOODSTONE,
+            build_card(Rank.ACE, Suit.HEARTS),
+            build_card(Rank.ACE, Suit.CLUBS),
+            (0, 0, 1.5),
+        ),
+        (
+            JokersName.ARROWHEAD,
+            build_card(Rank.ACE, Suit.SPADES),
+            build_card(Rank.ACE, Suit.CLUBS),
+            (50, 0, 1.0),
+        ),
+        (
+            JokersName.ONYX_AGATE,
+            build_card(Rank.ACE, Suit.CLUBS),
+            build_card(Rank.ACE, Suit.SPADES),
+            (0, 7, 1.0),
+        ),
     ],
 )
-def test_0009_suit_condition_jokers(
+def test_0008_suit_condition_jokers(
     joker_name: JokersName,
-    card: Card,
+    hit_card: Card,
+    miss_card: Card,
     expected: tuple[int, int, float],
 ):
-    assert score_joker(joker_name, card=card) == expected
+    assert _score_joker(joker_name, card=hit_card) == expected
+    assert _score_joker(joker_name, card=miss_card) == (0, 0, 1.0)
 
 
-def test_0010_suit_condition_misses_and_wild_cards_hit():
-    assert score_joker(JokersName.GREEDY_JOKER, card=build_card(Rank.ACE, Suit.HEARTS)) == (0, 0, 1.0)
-    assert score_joker(JokersName.GREEDY_JOKER, card=build_card(Rank.ACE, Suit.HEARTS, Enhancement.WILD)) == (0, 3, 1.0)
-    assert score_joker(JokersName.GREEDY_JOKER, card=build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.STONE)) == (0, 0, 1.0)
+def test_0009_suit_condition_wild_cards_hit_and_stone_cards_miss():
+    assert _score_joker(
+        JokersName.GREEDY_JOKER,
+        card=build_card(Rank.ACE, Suit.HEARTS, Enhancement.WILD),
+    ) == (0, 3, 1.0)
+    assert _score_joker(
+        JokersName.GREEDY_JOKER,
+        card=build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.STONE),
+    ) == (0, 0, 1.0)
 
 
-def test_0011_flower_pot_requires_four_played_suits():
+def test_0010_four_suit_condition_jokers():
     four_suits = [
         build_card(Rank.ACE, Suit.HEARTS),
         build_card(Rank.KING, Suit.DIAMONDS),
@@ -266,25 +567,52 @@ def test_0011_flower_pot_requires_four_played_suits():
     ]
     three_suits = four_suits[:3]
 
-    assert score_joker(JokersName.FLOWER_POT, scoring_played=four_suits) == (0, 0, 3)
-    assert score_joker(JokersName.FLOWER_POT, scoring_played=three_suits) == (0, 0, 1.0)
+    assert _score_joker(JokersName.FLOWER_POT, scoring_played=four_suits) == (
+        0,
+        0,
+        3,
+    )
+    assert _score_joker(JokersName.FLOWER_POT, scoring_played=three_suits) == (
+        0,
+        0,
+        1.0,
+    )
 
 
-def test_0012_blackboard_requires_only_clubs_and_spades_held():
-    assert score_joker(
+def test_0011_forced_suit_condition_jokers():
+    assert _score_joker(
         JokersName.BLACKBOARD,
-        unscoring_held=[build_card(Rank.ACE, Suit.CLUBS), build_card(Rank.KING, Suit.SPADES)],
+        unscoring_held=[
+            build_card(Rank.ACE, Suit.CLUBS),
+            build_card(Rank.KING, Suit.SPADES),
+        ],
     ) == (0, 0, 3)
-    assert score_joker(
+    assert _score_joker(
         JokersName.BLACKBOARD,
-        unscoring_held=[build_card(Rank.ACE, Suit.CLUBS), build_card(Rank.KING, Suit.HEARTS)],
+        unscoring_held=[
+            build_card(Rank.ACE, Suit.CLUBS),
+            build_card(Rank.KING, Suit.HEARTS),
+        ],
     ) == (0, 0, 1.0)
 
 
-def test_0013_the_idol_currently_does_not_hit_when_rank_and_suit_req_are_set():
+def test_0012_required_suit_condition_jokers():
+    assert _score_joker(
+        JokersName.ANCIENT_JOKER,
+        card=build_card(Rank.ACE, Suit.SPADES),
+        req_suit=Suit.SPADES,
+    ) == (0, 0, 1.5)
+    assert _score_joker(
+        JokersName.ANCIENT_JOKER,
+        card=build_card(Rank.ACE, Suit.HEARTS),
+        req_suit=Suit.SPADES,
+    ) == (0, 0, 1.0)
+
+
+def test_0013_required_rank_and_suit_condition_jokers_currently_do_not_hit():
     idol_card = build_card(Rank.ACE, Suit.HEARTS)
 
-    assert score_joker(
+    assert _score_joker(
         JokersName.THE_IDOL,
         card=idol_card,
         req_rank=Rank.ACE,
@@ -292,24 +620,16 @@ def test_0013_the_idol_currently_does_not_hit_when_rank_and_suit_req_are_set():
     ) == (0, 0, 1.0)
 
 
-def test_0014_ancient_joker_can_hit_when_suit_req_is_set():
-    assert score_joker(
-        JokersName.ANCIENT_JOKER,
-        card=build_card(Rank.ACE, Suit.SPADES),
-        req_suit=Suit.SPADES,
-    ) == (0, 0, 1.5)
-
-
-def test_0015_raised_fist_scores_lowest_held_card():
+def test_0014_raised_fist_scores_lowest_held_card():
     lowest_held = build_card(Rank.FIVE)
     higher_held = build_card(Rank.KING)
 
-    assert score_joker(
+    assert _score_joker(
         JokersName.RAISED_FIST,
         card=lowest_held,
         scoring_held=[lowest_held, higher_held],
     ) == (0, 10, 1.0)
-    assert score_joker(
+    assert _score_joker(
         JokersName.RAISED_FIST,
         card=higher_held,
         scoring_held=[lowest_held, higher_held],
@@ -326,8 +646,8 @@ def test_0015_raised_fist_scores_lowest_held_card():
         JokersName.BASEBALL_CARD,
     ],
 )
-def test_0016_runtime_state_condition_jokers_currently_raise_value_error(
+def test_0015_runtime_state_condition_jokers_currently_raise_value_error(
     joker_name: JokersName,
 ):
     with pytest.raises(ValueError):
-        score_joker(joker_name)
+        _score_joker(joker_name)
