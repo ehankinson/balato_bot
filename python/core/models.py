@@ -79,6 +79,8 @@ class Card:
                 self.is_any_suit = True
 
             case Enhancement.LUCKY:
+                self.add_mult = 20
+                self.econ = 20
                 self.mult_prob = 0.2  # 1/5
                 self.econ_prob = 0.05  # 1/20
 

@@ -190,7 +190,7 @@ def calculate_score(
 def get_best_scoring_hand(
     cards: list[Card],
     jokers: list[Joker],
-    scoring_type: str = "best",
+    scoring_type: str = "worst",
 ) -> FinalScoringResults:
     hand_cache = generate_scoring_hand_combinations(cards, jokers)
     all_possible_jokers = generate_scoring_jokers_combinations(jokers)
@@ -217,6 +217,8 @@ def get_best_scoring_hand(
     
     for hand_scoring in hand_cache:
         for joker_plan in joker_plan_cache:
+            if len(hand_scoring.scored_played) == 3:
+                a = 5
             score = calculate_score(hand_scoring, joker_plan, condition_args)
             highest_score = 0.0
 
@@ -237,78 +239,3 @@ def get_best_scoring_hand(
                 final_results.joker_plan = joker_plan
 
     return final_results
-
-
-if __name__ == "__main__":
-    command = sys.argv[1] if len(sys.argv) > 1 else None
-
-    cards = [
-        # Played hand: keep this simple, just enough to score something.
-        # These are not where the huge score comes from.
-        Card(Rank.ACE, Suit.SPADES, Enhancement.NONE, Seal.NONE, Edition.NONE),
-    
-        # Held cards: these are the actual score engine.
-        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.HEARTS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-        Card(Rank.KING, Suit.CLUBS, Enhancement.STEEL, Seal.RED, Edition.POLYCHROME),
-    ]
-
-    jokers = [
-        # Copy Baron if your sim supports Blueprint copying the next compatible Joker.
-        Joker.build(JokersName.BLUEPRINT),
-        Joker.build(JokersName.BARON),
-    
-        # Brainstorm usually copies the leftmost Joker.
-        # Depending on your sim, this may copy Blueprint, which may effectively copy Baron again.
-        Joker.build(JokersName.BRAINSTORM),
-    
-        # Mime retriggers held-card effects.
-        Joker.build(JokersName.MIME),
-    
-        # Extra scaling XMult.
-        Joker.build(JokersName.TRIBOULET_BACKGROUND),
-    
-        # More XMult if face cards are involved / if your sim applies it correctly.
-        Joker.build(JokersName.PHOTOGRAPH),
-    
-        # Optional extra XMult source.
-        Joker.build(JokersName.SOCK_AND_BUSKIN),
-    ]
-
-    def format_duration(seconds: float) -> str:
-        if seconds < 1e-6:
-            return f"{seconds * 1e9:.2f}ns"
-        elif seconds < 1e-3:
-            return f"{seconds * 1e6:.2f}µs"
-        elif seconds < 1:
-            return f"{seconds * 1e3:.2f}ms"
-        else:
-            return f"{seconds:.2f}s"
-
-    count = 1
-    if command is not None and command == "time":
-        count = 1_000
-
-    start_time = time.perf_counter()
-
-    if count == 1:
-        get_best_scoring_hand(cards, jokers, True, command or "")
-    else:
-        for _ in tqdm(range(count)):
-            get_best_scoring_hand(cards, jokers, False)
-
-    end_time = time.perf_counter()
-    elapsed = end_time - start_time
-
-    print(f"The time taken to calculate the best was {format_duration(elapsed)}")
