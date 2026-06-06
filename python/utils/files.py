@@ -16,8 +16,16 @@ def write_yaml(filepath: str, object: dict) -> None:
 
 
 def load_json(filepath: str) -> dict:
+    if not os.path.exists(filepath):
+        return {}
+
     with open(filepath, "r", encoding="utf-8") as j:
         return json.load(j)
+
+
+def write_json(filepath: str, object: dict) -> None:
+    with open(filepath, "w", encoding="utf-8") as j:
+        json.dump(object, j, indent=4)
 
 
 def build_folder(folder_path: str) -> None:
@@ -33,4 +41,3 @@ def remove_folder(folder_path: str) -> None:
 def rebuild_folder(folder_path: str) -> None:
     remove_folder(folder_path)
     build_folder(folder_path)
-

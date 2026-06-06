@@ -2,7 +2,9 @@ from core.enums import JokersName
 from core.models import Joker, JokerCopy, JokerRetrigger, JokerScoring
 
 
-def generate_blueprint_permutations(jokers: list[Joker], skip_first: bool = False) -> list[list[Joker]]:
+def generate_blueprint_permutations(
+    jokers: list[Joker], skip_first: bool = False
+) -> list[list[Joker]]:
     final_list = []
     start_index = 1 if skip_first else 0
     for i in range(start_index, len(jokers)):
@@ -36,7 +38,7 @@ def generate_duo_copy_permutations(jokers: list[Joker]) -> list[list[Joker]]:
     blueprint_copies = []
     for jokers in final_list:
         blueprint_copies.extend(generate_blueprint_permutations(jokers, True))
-        
+
     final_list.extend(blueprint_copies)
 
     return final_list
@@ -75,7 +77,7 @@ def generate_copy_combos(
     copy_jokers: list[JokerCopy],
 ) -> list[list[Joker]]:
     final_list: list[list[Joker]] = []
-    
+
     if len(copy_jokers) == 1:
         copy_joker = copy_jokers[0]
         function = COPY_FUNCTION[copy_joker.background_image]
@@ -133,12 +135,15 @@ def generate_scoring_jokers_combinations(jokers: list[Joker]) -> list[list[Joker
     retrigger_jokers = get_joker_type(jokers, JokerRetrigger)
 
     if len(copy_jokers) > 0:
-        # Blueprint only copies jokers to their right, so we can remove permutations when blueprint is the right most
-        # Brainstome only copies jokers that are the leftmost, so we only need all permutations of other cards to at the left most position
-        # When we have 2 blueprint, ummmmmm
-        # when we have 2 brainstroms, ummm
-        # when we have both blueprint and brainstorme, ummmmmmmmmmmmmmmmmmmmmmmmmmm
-
         return build_copy_combos(copy_jokers, scoring_jokers, retrigger_jokers)
 
-    return [mult_jokers]
+    chip_jokers, mult_jokers = build_mult_jokers(scoring_jokers)
+    other_jokers = [
+        joker
+        for joker in jokers
+        if joker not in retrigger_jokers
+        and joker not in chip_jokers
+        and joker not in mult_jokers
+    ]
+
+    return [chip_jokers + mult_jokers + retrigger_jokers + other_jokers]

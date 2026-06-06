@@ -190,8 +190,9 @@ def calculate_score(
 def get_best_scoring_hand(
     cards: list[Card],
     jokers: list[Joker],
-    scoring_type: str = "worst",
-) -> FinalScoringResults:
+    scoring_type: str = "avg",
+    test: bool = False
+) -> FinalScoringResults | tuple[FinalScoringResults, int]:
     hand_cache = generate_scoring_hand_combinations(cards, jokers)
     all_possible_jokers = generate_scoring_jokers_combinations(jokers)
     # For early game when we have no jokers
@@ -217,8 +218,6 @@ def get_best_scoring_hand(
     
     for hand_scoring in hand_cache:
         for joker_plan in joker_plan_cache:
-            if len(hand_scoring.scored_played) == 3:
-                a = 5
             score = calculate_score(hand_scoring, joker_plan, condition_args)
             highest_score = 0.0
 
@@ -238,4 +237,7 @@ def get_best_scoring_hand(
                 final_results.hand_scoring = hand_scoring
                 final_results.joker_plan = joker_plan
 
+    if test:
+        return final_results, len(hand_cache) * len(joker_plan_cache)
+    
     return final_results
