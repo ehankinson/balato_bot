@@ -162,29 +162,6 @@ class JokerScoringConditions:
 
 
 # @dataclass(slots=True)
-# class JokerRetrigger:
-#     trigger: JokerTriggers
-#     times: int
-#     condition: str | None = None
-
-
-# @dataclass(slots=True)
-# class JokerGameModifier:
-#     discards: int = 0
-#     hand_size: int = 0
-#     hands: int = 0
-#     all_cards_are_facecards: bool = False
-#     suit_groups: list[list[str]] = field(default_factory=list)
-#     straight_size: int | None = None
-#     flush_size: int | None = None
-#     straight_gap_allowed: int = 0
-#     all_played_cards_score: bool = False
-#     double_probabilities: bool = False
-#     allow_duplicate_shop_items: bool = False
-#     disable_boss_blind: bool = False
-
-
-# @dataclass(slots=True)
 # class JokerEcon:
 #     money: int | dict
 #     condition: dict | str | None = None
@@ -318,6 +295,36 @@ class Joker:
                 position=copy_data.get("position"),
             )
 
+        elif "game_modifier" in joker_data:
+            modifier_data = joker_data["game_modifier"]
+
+            return JokerGameModifier(
+                background_image=joker_name,
+                face_image=None,
+                negative=False,
+                edition=Edition.NONE,
+                req=JokerReq(),
+                copyable=joker_data.get("copyable", False),
+                discards=modifier_data.get("discards", 0),
+                hand_size=modifier_data.get("hand_size", 0),
+                hands=modifier_data.get("hands", 0),
+                all_cards_are_facecards=modifier_data.get(
+                    "all_cards_are_facecards", False
+                ),
+                suit_groups=modifier_data.get("suit_groups", []),
+                straight_size=modifier_data.get("straight_size", 5),
+                flush_size=modifier_data.get("flush_size", 5),
+                straight_gap_allowed=modifier_data.get("straight_gap_allowed", 1),
+                all_played_cards_score=modifier_data.get(
+                    "all_played_cards_score", False
+                ),
+                double_probabilities=modifier_data.get("double_probabilities", False),
+                allow_duplicate_shop_items=modifier_data.get(
+                    "allow_duplicate_shop_items", False
+                ),
+                disable_boss_blind=modifier_data.get("disable_boss_blind", False),
+            )
+
         else:
             return Joker.random()
 
@@ -342,6 +349,22 @@ class JokerRetrigger(Joker):
 @dataclass(slots=True, repr=False, eq=False)
 class JokerCopy(Joker):
     position: str
+
+
+@dataclass(slots=True, repr=False, eq=False)
+class JokerGameModifier(Joker):
+    discards: int
+    hand_size: int
+    hands: int
+    all_cards_are_facecards: bool
+    suit_groups: list[list[str]]
+    straight_size: int
+    flush_size: int
+    straight_gap_allowed: int
+    all_played_cards_score: bool
+    double_probabilities: bool
+    allow_duplicate_shop_items: bool
+    disable_boss_blind: bool
 
 
 @dataclass(slots=True)
@@ -375,6 +398,22 @@ class FinalScoringResults:
     best_hand: BestHand = field(default_factory=BestHand)
     hand_scoring: HandScoring = field(default_factory=HandScoring)
     joker_plan: JokerPlan = field(default_factory=JokerPlan)
+
+
+@dataclass(slots=True)
+class GameState:
+    hands: int = 4
+    discards: int = 3
+    hand_size: int = 8
+    flush_size: int = 5
+    straight_size: int = 5
+    probabily_mult: int = 1
+    straight_gap_allowed: int = 1
+    disable_boss_blind: bool = False
+    all_played_cards_score: bool = False
+    all_cards_are_facecards: bool = False
+    allow_duplicate_shop_items: bool = False
+    suit_groups: list[list[str]] = field(default_factory=list)
 
 
 @dataclass(slots=True)

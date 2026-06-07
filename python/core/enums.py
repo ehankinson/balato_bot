@@ -40,10 +40,10 @@ class Enhancement(IntEnum):
 
 class Seal(IntEnum):
     NONE = -1
-    GOLD = -0
+    GOLD = 0
     PURPLE = 1
-    RED = 2
-    BLUE = 3
+    BLUE = 2
+    RED = 3
 
 
 class Edition(IntEnum):

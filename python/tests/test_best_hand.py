@@ -14,11 +14,14 @@ from core.models import (
     BestHand,
     Card,
     FinalScoringResults,
+    GameState,
     HandScoring,
     Joker,
+    JokerGameModifier,
     JokerPlan,
     JokerReq,
 )
+from game.game_state import build_game_state
 from utils.files import load_json, write_json
 
 CWD = os.getcwd()
@@ -26,6 +29,14 @@ VERSION = 0.5
 PERFORMANCE_FILE = os.path.join(
     CWD, "tests", "best_hand_performance", f"results_{VERSION}_{platform.system()}.json"
 )
+
+
+def build_test_game_state(jokers: list[Joker]) -> GameState:
+    game_state = GameState()
+    build_game_state(
+        game_state, [joker for joker in jokers if isinstance(joker, JokerGameModifier)]
+    )
+    return game_state
 
 
 def build_joker(
@@ -96,10 +107,11 @@ def run_assert(
     test_number: int,
     cards: list[Card],
     jokers: list[Joker],
+    game_state: GameState,
     expected: FinalScoringResults,
 ):
     start_time = time.perf_counter()
-    best_score, iterations = get_best_scoring_hand(cards, jokers, test=True)
+    best_score, iterations = get_best_scoring_hand(cards, jokers, game_state, test=True)
     end_time = time.perf_counter()
     time_spent = end_time - start_time
 
@@ -165,7 +177,7 @@ def test_0001_high_card_scores_best_ace():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(1, cards, jokers, expected)
+    run_assert(1, cards, jokers, GameState(), expected)
 
 
 def test_0002_pair_scores_best_pair():
@@ -214,7 +226,7 @@ def test_0002_pair_scores_best_pair():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(2, cards, jokers, expected)
+    run_assert(2, cards, jokers, GameState(), expected)
 
 
 def test_0003_two_pair_scores_best_two_pair():
@@ -252,7 +264,7 @@ def test_0003_two_pair_scores_best_two_pair():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(3, cards, jokers, expected)
+    run_assert(3, cards, jokers, GameState(), expected)
 
 
 def test_0004_three_kind_scores_best_three_kind():
@@ -290,7 +302,7 @@ def test_0004_three_kind_scores_best_three_kind():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(4, cards, jokers, expected)
+    run_assert(4, cards, jokers, GameState(), expected)
 
 
 def test_0005_four_kind_scores_best_four_kind():
@@ -328,7 +340,7 @@ def test_0005_four_kind_scores_best_four_kind():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(5, cards, jokers, expected)
+    run_assert(5, cards, jokers, GameState(), expected)
 
 
 def test_0006_straight_scores_best_straight():
@@ -366,7 +378,7 @@ def test_0006_straight_scores_best_straight():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(6, cards, jokers, expected)
+    run_assert(6, cards, jokers, GameState(), expected)
 
 
 def test_0007_flush_scores_best_flush():
@@ -404,7 +416,7 @@ def test_0007_flush_scores_best_flush():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(7, cards, jokers, expected)
+    run_assert(7, cards, jokers, GameState(), expected)
 
 
 def test_0008_full_house_scores_best_full_house():
@@ -442,7 +454,7 @@ def test_0008_full_house_scores_best_full_house():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(8, cards, jokers, expected)
+    run_assert(8, cards, jokers, GameState(), expected)
 
 
 def test_0009_straight_flush_scores_best_straight_flush():
@@ -480,7 +492,7 @@ def test_0009_straight_flush_scores_best_straight_flush():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(9, cards, jokers, expected)
+    run_assert(9, cards, jokers, GameState(), expected)
 
 
 def test_0010_five_kind_scores_best_five_kind():
@@ -518,7 +530,7 @@ def test_0010_five_kind_scores_best_five_kind():
         joker_plan=JokerPlan(),
     )
 
-    run_assert(10, cards, jokers, expected)
+    run_assert(10, cards, jokers, GameState(), expected)
 
 
 def test_0011_photograph_hanging_chad_vs_polychrome_lucky_king():
@@ -542,9 +554,11 @@ def test_0011_photograph_hanging_chad_vs_polychrome_lucky_king():
         Joker.build(JokersName.OOPS_ALL_6S),
     ]
 
+    game_state = build_test_game_state(jokers)
+
     expected = FinalScoringResults(
         best_hand=BestHand(
-            chips=45, worst_case_mult=16, avg_case_mult=187.88, best_case_mult=2481
+            chips=45, worst_case_mult=81, avg_case_mult=1041, best_case_mult=2481
         ),
         hand_scoring=HandScoring(
             hand_stats=HAND_STATS[PokerHand.HIGH_CARD],
@@ -572,59 +586,114 @@ def test_0011_photograph_hanging_chad_vs_polychrome_lucky_king():
         joker_plan=build_joker_plan(jokers),
     )
 
-    run_assert(11, cards, jokers, expected)
+    run_assert(11, cards, jokers, game_state, expected)
 
 
-# def test_0012_glass_queen_vs_lucky_polychrome_king_as_first_card():
-#     cards = [
-#         build_card(Rank.QUEEN, Suit.SPADES, Enhancement.GLASS, Seal.RED),
-#         build_card(
-#             Rank.KING, Suit.DIAMONDS, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.ACE, Suit.HEARTS, edition=Edition.FOIL),
-#         build_card(Rank.TEN, Suit.SPADES, Enhancement.MULT),
-#         build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.LUCKY),
-#         build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.BONUS),
-#         build_card(Rank.TWO, Suit.HEARTS),
-#         build_card(Rank.JACK, Suit.HEARTS, Enhancement.GOLD),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.PHOTOGRAPH),
-#         Joker.build(JokersName.HANGING_CHAD),
-#         Joker.build(JokersName.SOCK_AND_BUSKIN),
-#     ]
+def test_0012_glass_queen_vs_lucky_polychrome_king_as_first_card():
+    cards = [
+        build_card(Rank.QUEEN, Suit.SPADES, Enhancement.GLASS, Seal.RED),
+        build_card(
+            Rank.KING, Suit.DIAMONDS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.ACE, Suit.HEARTS, edition=Edition.FOIL),
+        build_card(Rank.TEN, Suit.SPADES, Enhancement.MULT),
+        build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.LUCKY),
+        build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.BONUS),
+        build_card(Rank.TWO, Suit.HEARTS),
+        build_card(Rank.JACK, Suit.HEARTS, Enhancement.GOLD),
+    ]
+    jokers = [
+        Joker.build(JokersName.PHOTOGRAPH),
+        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokersName.SOCK_AND_BUSKIN),
+    ]
 
-#     best_score = get_best_scoring_hand(cards, jokers)
+    game_state = build_test_game_state(jokers)
 
-#     expected = FinalScoringResults()
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=191, worst_case_mult=9225, avg_case_mult=9240, best_case_mult=9300
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.STRAIGHT],
+            scored_played=[
+                build_card(Rank.QUEEN, Suit.SPADES, Enhancement.GLASS, Seal.RED),
+                build_card(Rank.ACE, Suit.HEARTS, edition=Edition.FOIL),
+                build_card(Rank.JACK, Suit.HEARTS, Enhancement.GOLD),
+                build_card(Rank.TEN, Suit.SPADES, Enhancement.MULT),
+                build_card(
+                    Rank.KING,
+                    Suit.DIAMONDS,
+                    Enhancement.LUCKY,
+                    edition=Edition.POLYCHROME,
+                ),
+            ],
+            unscored_held=[
+                build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.LUCKY),
+                build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.BONUS),
+                build_card(Rank.TWO, Suit.HEARTS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
 
-#     assert_final_scoring_results(best_score, expected)
+    run_assert(12, cards, jokers, game_state, expected)
 
 
-# def test_0013_baron_mime_wants_kings_held_not_played():
-#     cards = [
-#         build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED),
-#         build_card(
-#             Rank.KING, Suit.HEARTS, Enhancement.STEEL, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.KING, Suit.DIAMONDS, Enhancement.GOLD),
-#         build_card(Rank.ACE, Suit.CLUBS, edition=Edition.FOIL),
-#         build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.GLASS),
-#         build_card(Rank.ACE, Suit.HEARTS, Enhancement.MULT),
-#         build_card(Rank.NINE, Suit.SPADES),
-#         build_card(Rank.THREE, Suit.CLUBS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.BARON),
-#         Joker.build(JokersName.MIME),
-#         Joker.build(JokersName.RAISED_FIST),
-#     ]
+def test_0013_baron_mime_wants_kings_held_not_played():
+    cards = [
+        build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED),
+        build_card(
+            Rank.KING, Suit.HEARTS, Enhancement.STEEL, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.KING, Suit.DIAMONDS, Enhancement.GOLD),
+        build_card(Rank.ACE, Suit.CLUBS, edition=Edition.FOIL),
+        build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.GLASS),
+        build_card(Rank.ACE, Suit.HEARTS, Enhancement.MULT),
+        build_card(Rank.NINE, Suit.SPADES),
+        build_card(Rank.THREE, Suit.CLUBS),
+    ]
+    jokers = [
+        Joker.build(JokersName.BARON),
+        Joker.build(JokersName.MIME),
+        Joker.build(JokersName.RAISED_FIST),
+    ]
 
-#     best_score = get_best_scoring_hand(cards, jokers)
+    game_state = build_test_game_state(jokers)
 
-#     expected = FinalScoringResults()
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=113,
+            worst_case_mult=1891.448,
+            avg_case_mult=1891.448,
+            best_case_mult=1891.448,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.THREE_OF_A_KIND],
+            scored_played=[
+                build_card(Rank.ACE, Suit.CLUBS, edition=Edition.FOIL),
+                build_card(Rank.ACE, Suit.HEARTS, Enhancement.MULT),
+                build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.GLASS),
+            ],
+            unscored_played=[
+                build_card(Rank.NINE, Suit.SPADES),
+                build_card(Rank.THREE, Suit.CLUBS),
+            ],
+            scored_held=[
+                build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL, Seal.RED),
+                build_card(
+                    Rank.KING,
+                    Suit.HEARTS,
+                    Enhancement.STEEL,
+                    edition=Edition.POLYCHROME,
+                ),
+                build_card(Rank.KING, Suit.DIAMONDS, Enhancement.GOLD),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
 
-#     assert_final_scoring_results(best_score, expected)
+    run_assert(13, cards, jokers, game_state, expected)
 
 
 # def test_0014_full_house_available_but_held_baron_kings_may_dominate():

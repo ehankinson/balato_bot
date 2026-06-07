@@ -2,6 +2,7 @@ import sys
 import time
 
 from tqdm import tqdm
+from typing_extensions import Literal, overload
 
 from calculation.joker_generation import generate_scoring_jokers_combinations
 from calculation.joker_retrigger import calculate_joker_retrigger
@@ -20,6 +21,7 @@ from core.models import (
     BestHand,
     Card,
     FinalScoringResults,
+    GameState,
     HandScoring,
     Joker,
     JokerPlan,
@@ -61,12 +63,22 @@ def add_to_order(
     x_mult: float,
     prob: float,
     mult_scoring_order: list[tuple[int, int | float, float]],
+    is_lucky: bool = False,
 ) -> None:
+    # This is annoying, since if we have a lucky hologram card, the way its currently implemented
+    # the card would have +30 mult with a 1/5 change of hitting, BUT it should be 20 * 1/5 + 10
+    # so we have this special check
     if add_mult > ADD:
-        mult_scoring_order.append((ADD, add_mult, prob))
+        if is_lucky:
+            mult_scoring_order.append((ADD, 20, prob))
+            add_mult -= 20
+            prob = 1
+
+        if add_mult > 0:
+            mult_scoring_order.append((ADD, add_mult, prob))
 
     if x_mult > MULT:
-        mult_scoring_order.append((MULT, x_mult, prob))
+        mult_scoring_order.append((MULT, x_mult, 1.0))
 
 
 def extend_order(
@@ -84,6 +96,7 @@ def extend_order(
 def calculate_score(
     hand_scoring: HandScoring,
     joker_plan: JokerPlan,
+    game_state: GameState,
     condition_args: JokerScoringConditions,
 ) -> BestHand:
     joker_cache = JOKER_CACHE
@@ -118,7 +131,11 @@ def calculate_score(
 
         best_hand.chips += card.chips * trigger
         add_to_order(
-            card.add_mult, card.play_x_mult, card.mult_prob, mult_scoring_order
+            card.add_mult,
+            card.play_x_mult,
+            card.mult_prob,
+            mult_scoring_order,
+            card.enhancement == Enhancement.LUCKY,
         )
 
         card_cache = joker_cache.get(card.card_id)
@@ -165,8 +182,9 @@ def calculate_score(
 
     for operator, val, prob in mult_scoring_order:
         if prob < 1:
+            prob_value = prob * game_state.probabily_mult
             best_value = val
-            avg_value = prob * val + (1 - prob) * operator
+            avg_value = prob_value * val + (1 - prob_value) * operator
             worst_value = operator
         else:
             best_value = avg_value = worst_value = val
@@ -187,11 +205,35 @@ def calculate_score(
     return best_hand
 
 
+@overload
 def get_best_scoring_hand(
     cards: list[Card],
     jokers: list[Joker],
+    game_state: GameState,
     scoring_type: str = "avg",
-    test: bool = False
+    *,
+    test: Literal[False] = False,
+) -> FinalScoringResults: ...
+
+
+@overload
+def get_best_scoring_hand(
+    cards: list[Card],
+    jokers: list[Joker],
+    game_state: GameState,
+    scoring_type: str = "avg",
+    *,
+    test: Literal[True],
+) -> tuple[FinalScoringResults, int]: ...
+
+
+def get_best_scoring_hand(
+    cards: list[Card],
+    jokers: list[Joker],
+    game_state: GameState,
+    scoring_type: str = "avg",
+    *,
+    test: bool = False,
 ) -> FinalScoringResults | tuple[FinalScoringResults, int]:
     hand_cache = generate_scoring_hand_combinations(cards, jokers)
     all_possible_jokers = generate_scoring_jokers_combinations(jokers)
@@ -215,10 +257,12 @@ def get_best_scoring_hand(
 
     score_to_beat = float("-inf")
     final_results = FinalScoringResults()
-    
+
     for hand_scoring in hand_cache:
         for joker_plan in joker_plan_cache:
-            score = calculate_score(hand_scoring, joker_plan, condition_args)
+            score = calculate_score(
+                hand_scoring, joker_plan, game_state, condition_args
+            )
             highest_score = 0.0
 
             match score_area:
@@ -239,5 +283,5 @@ def get_best_scoring_hand(
 
     if test:
         return final_results, len(hand_cache) * len(joker_plan_cache)
-    
+
     return final_results

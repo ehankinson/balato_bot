@@ -215,20 +215,25 @@ def build_cards_not_played(
 
 
 def can_add_to_hand(
-    card: Card, hand_stats: HandStats, scoring_cards: list[Card]
+    card: Card,
+    hand_stats: HandStats,
+    scored_played: list[Card],
+    unscored_played: list[Card],
 ) -> bool:
     can_add = False
     played_hand = hand_stats.name
 
     if played_hand == PokerHand.HIGH_CARD:
-        can_add = scoring_cards[0].rank > card.rank
+        can_add = scored_played[0].rank > card.rank
     elif played_hand in [
         PokerHand.PAIR,
         PokerHand.THREE_OF_A_KIND,
         PokerHand.FOUR_OF_A_KIND,
         PokerHand.TWO_PAIR,
     ]:
-        can_add = all(card.rank != iter_card.rank for iter_card in scoring_cards)
+        can_add = all(
+            card.rank != iter_card.rank for iter_card in scored_played + unscored_played
+        )
 
     # otherwise the hand we played is 5 cards which is the max amount
     return can_add
@@ -335,24 +340,29 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
     # so we should be checking the unscored_held first and remove as many low cards as we cards
     # We should also not remove cards from scored_held since it is rare to improve score
 
-    def update_lowest_card(
-        max_add_cards: int,
-        scored_held: list[Card],
-        unscored_held: list[Card],
-        unscored_played: list[Card],
-    ) -> None:
+    def update_lowest_card(max_add_cards: int, hand_scoring: HandScoring) -> None:
+        unscored_held = hand_scoring.unscored_held
+
         if max_add_cards > len(unscored_held):
             max_add_cards = (
                 len(unscored_held) - 1
             )  # since we raised fist needs to have something
 
-        unscored_played.extend(unscored_held[:max_add_cards])
+        remove_values = []
+        for card in unscored_held:
+            if can_add_to_hand(card, hand_scoring.hand_stats, hand_scoring.scored_played, hand_scoring.unscored_played):
+                hand_scoring.unscored_played.append(card)
+                remove_values.append(card)
 
-        for i in range(max_add_cards - 1):
-            unscored_held.pop(i)
+       
+        for card in remove_values:
+            unscored_held.remove(card)
 
         # adding the lowest rank card to the scored_held_cards
-        scored_held.append(unscored_held.pop())
+        # if the unscored held length is 0, that means that the raised_fist
+        # card is already in the scored_held
+        if len(unscored_held) != 0:
+            hand_scoring.scored_held.append(unscored_held.pop())
 
     for hand_scoring in hand_cache:
         if len(hand_scoring.scored_held) + len(hand_scoring.unscored_held) == 0:
@@ -366,8 +376,13 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
             continue
 
         max_add_cards = 5 - (
-            len(hand_scoring.scored_played) + len(hand_scoring.unscored_held)
+            len(hand_scoring.scored_played) + len(hand_scoring.unscored_played)
         )
+
+        # we add seals here since a red seal is better as a trigger for the lowest
+        # ex: if we have two Steel Jacks, and one of them is a Red Seal, its better
+        # to play have the order of Red Steel Jack, Steel Jack, since the raised fist will
+        # trigger an extra time
         hand_scoring.scored_held = sorted(
             hand_scoring.scored_held, key=lambda card: card.rank
         )
@@ -378,12 +393,7 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
         # If there is no scored_held cards, then take the lowest card
         # form the unscored_held cards. (we can do some manipulation to get that number higher)
         if len(hand_scoring.scored_held) == 0 and len(hand_scoring.unscored_held) > 0:
-            update_lowest_card(
-                max_add_cards,
-                hand_scoring.scored_held,
-                hand_scoring.unscored_held,
-                hand_scoring.unscored_played,
-            )
+            update_lowest_card(max_add_cards, hand_scoring)
         else:
             min_scored_held = hand_scoring.scored_held[0].rank
             min_unscored_held = hand_scoring.unscored_held[0].rank
@@ -391,12 +401,7 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
             if min_scored_held < min_unscored_held:
                 continue  # adding throw away cards will do nothing to the final score
 
-            update_lowest_card(
-                max_add_cards,
-                hand_scoring.scored_held,
-                hand_scoring.unscored_held,
-                hand_scoring.unscored_played,
-            )
+            update_lowest_card(max_add_cards, hand_scoring)
 
 
 def add_chad(hand_cache: list[HandScoring]) -> None:
