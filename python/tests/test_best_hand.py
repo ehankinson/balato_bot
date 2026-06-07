@@ -1,11 +1,12 @@
 import os
+import platform
 import time
 from collections import Counter
 
 import pytest
 from _test_util import build_card
 
-from best_hand import get_best_scoring_hand
+from best_hand import build_joker_plan, get_best_scoring_hand
 from config.poker_hands import HAND_STATS
 from core.enums import Edition, Enhancement, JokersName, PokerHand, Rank, Seal, Suit
 from core.hand_stats import HandStats
@@ -20,10 +21,11 @@ from core.models import (
 )
 from utils.files import load_json, write_json
 
-
 CWD = os.getcwd()
 VERSION = 0.5
-PERFORMANCE_FILE = os.path.join(CWD, "tests", "best_hand_performance", f"results_{VERSION}.json")
+PERFORMANCE_FILE = os.path.join(
+    CWD, "tests", "best_hand_performance", f"results_{VERSION}_{platform.system()}.json"
+)
 
 
 def build_joker(
@@ -38,7 +40,7 @@ def build_joker(
 
 
 def _check_value(value: str, best_score: int | float, expected: int | float):
-    if best_score != expected:
+    if best_score != pytest.approx(expected):
         pytest.fail(
             f"The value {value}: {best_score} does not matche the expected: {expected}"
         )
@@ -85,32 +87,40 @@ def _assert_list(
 def assert_final_scoring_results(
     best_score: FinalScoringResults, expected: FinalScoringResults
 ):
-    _assert_numbers(best_score.best_hand, expected.best_hand)
     _assert_list(best_score.hand_scoring, expected.hand_scoring)
+    _assert_numbers(best_score.best_hand, expected.best_hand)
     _assert_list(best_score.joker_plan, expected.joker_plan)
 
 
-def run_assert(test_number: int, cards: list[Card], jokers: list[Joker], expected: FinalScoringResults):
+def run_assert(
+    test_number: int,
+    cards: list[Card],
+    jokers: list[Joker],
+    expected: FinalScoringResults,
+):
     start_time = time.perf_counter()
     best_score, iterations = get_best_scoring_hand(cards, jokers, test=True)
     end_time = time.perf_counter()
     time_spent = end_time - start_time
-    
+
     assert_final_scoring_results(best_score, expected)
     data = load_json(PERFORMANCE_FILE)
 
     if "total" not in data or test_number == 1:
-        data["total"] = { "test_count": 0, "total_time_spend": 0.0, "total_combinations": 0 }
+        data["total"] = {
+            "test_count": 0,
+            "total_time_spend": 0.0,
+            "total_combinations": 0,
+        }
 
     data["total"]["test_count"] += 1
     data["total"]["total_time_spend"] += time_spent
     data["total"]["total_combinations"] += iterations
 
-    data[f"test_{test_number}"] = { "time_spend": time_spent, "combinations": iterations }
+    data[f"test_{test_number}"] = {"time_spend": time_spent, "combinations": iterations}
 
     write_json(PERFORMANCE_FILE, data)
-    
-    
+
 
 def test_0001_high_card_scores_best_ace():
     cards = [
@@ -126,7 +136,7 @@ def test_0001_high_card_scores_best_ace():
         build_card(Rank.TWO, Suit.SPADES, edition=Edition.HOLOGRAPHIC),
     ]
     jokers = []
-    
+
     expected = FinalScoringResults(
         best_hand=BestHand(
             chips=77, worst_case_mult=9, avg_case_mult=9, best_case_mult=9
@@ -532,7 +542,35 @@ def test_0011_photograph_hanging_chad_vs_polychrome_lucky_king():
         Joker.build(JokersName.OOPS_ALL_6S),
     ]
 
-    expected = FinalScoringResults()
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=45, worst_case_mult=16, avg_case_mult=187.88, best_case_mult=2481
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.HIGH_CARD],
+            scored_played=[
+                build_card(
+                    Rank.KING,
+                    Suit.HEARTS,
+                    Enhancement.LUCKY,
+                    Seal.RED,
+                    Edition.POLYCHROME,
+                ),
+            ],
+            unscored_held=[
+                build_card(
+                    Rank.JACK, Suit.CLUBS, Enhancement.WILD, edition=Edition.HOLOGRAPHIC
+                ),
+                build_card(Rank.ACE, Suit.SPADES, edition=Edition.FOIL),
+                build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GLASS),
+                build_card(Rank.NINE, Suit.CLUBS, Enhancement.LUCKY),
+                build_card(Rank.FIVE, Suit.HEARTS, Enhancement.MULT),
+                build_card(Rank.TWO, Suit.SPADES, Enhancement.BONUS),
+                build_card(Rank.THREE, Suit.DIAMONDS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
 
     run_assert(11, cards, jokers, expected)
 

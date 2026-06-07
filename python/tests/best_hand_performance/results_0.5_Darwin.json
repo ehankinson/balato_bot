@@ -1,0 +1,51 @@
+{
+    "total": {
+        "test_count": 11,
+        "total_time_spend": 0.002480292023392394,
+        "total_combinations": 172
+    },
+    "test_1": {
+        "time_spend": 0.0004707499756477773,
+        "combinations": 7
+    },
+    "test_2": {
+        "time_spend": 0.0002971670182887465,
+        "combinations": 11
+    },
+    "test_3": {
+        "time_spend": 0.00019666602020151913,
+        "combinations": 13
+    },
+    "test_4": {
+        "time_spend": 0.00015120799071155488,
+        "combinations": 11
+    },
+    "test_5": {
+        "time_spend": 0.00019862499902956188,
+        "combinations": 18
+    },
+    "test_6": {
+        "time_spend": 6.991700502112508e-05,
+        "combinations": 8
+    },
+    "test_7": {
+        "time_spend": 5.079200491309166e-05,
+        "combinations": 8
+    },
+    "test_8": {
+        "time_spend": 0.00023558299290016294,
+        "combinations": 16
+    },
+    "test_9": {
+        "time_spend": 0.00011833399184979498,
+        "combinations": 17
+    },
+    "test_10": {
+        "time_spend": 0.0005832080205436796,
+        "combinations": 55
+    },
+    "test_11": {
+        "time_spend": 0.00010804200428538024,
+        "combinations": 8
+    }
+}

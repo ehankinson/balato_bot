@@ -322,7 +322,7 @@ class Joker:
             return Joker.random()
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, eq=False)
 class JokerScoring(Joker):
     trigger: JokerTriggers
     prob: float
@@ -332,14 +332,14 @@ class JokerScoring(Joker):
     condition: dict | None
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, eq=False)
 class JokerRetrigger(Joker):
     trigger: JokerTriggers
     times: int
     condition: str
 
 
-@dataclass(slots=True, repr=False)
+@dataclass(slots=True, repr=False, eq=False)
 class JokerCopy(Joker):
     position: str
 
