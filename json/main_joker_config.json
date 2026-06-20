@@ -101,12 +101,12 @@
         "rarity": "uncommon",
         "scoring": {
             "trigger": 1,
-            "chips": 0
-        },
-        "update": {
-            "trigger": 3,
-            "count": "stone_cards",
-            "target": "scoring.chips"
+            "chips": 0,
+            "update": {
+                "trigger": 3,
+                "count": "stone_cards",
+                "target": "scoring.chips"
+            }
         },
         "buy_price": 6,
         "copyable": true
@@ -1402,12 +1402,8 @@
         "rarity": "uncommon",
         "scoring": {
             "trigger": 1,
-            "x_mult": 1
-        },
-        "buy_price": 7,
-        "copyable": true,
-        "update": [
-            {
+            "x_mult": 1,
+            "update": {
                 "trigger": 3,
                 "change": 0.1,
                 "condition": {
@@ -1415,9 +1411,11 @@
                         "not": "none"
                     }
                 },
-                "target": "scoring.x_mult"
+                "effect": "x_mult"
             }
-        ]
+        },
+        "buy_price": 7,
+        "copyable": true
     },
     "shortcut": {
         "rarity": "uncommon",
@@ -1529,7 +1527,8 @@
         "update": {
             "trigger": 3,
             "rank": "facecard",
-            "enhancement": 1
+            "enhancement": 1,
+            "cards": "scoring"
         }
     },
     "luchador": {

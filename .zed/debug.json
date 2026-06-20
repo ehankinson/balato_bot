@@ -37,7 +37,7 @@
     "adapter": "Debugpy",
     "request": "launch",
     "module": "pytest",
-    "args": ["tests/test_best_hand.py", "-s"],
+    "args": ["tests/test_best_hand.py::test_0001_high_card_scores_best_ace", "-s"],
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",

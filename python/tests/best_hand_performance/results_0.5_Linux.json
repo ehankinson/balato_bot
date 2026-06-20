@@ -1,55 +1,71 @@
 {
     "total": {
-        "test_count": 12,
-        "total_time_spend": 2.118253957996785,
-        "total_combinations": 185
+        "test_count": 16,
+        "total_time_spend": 0.004151726996497018,
+        "total_combinations": 267
     },
     "test_1": {
-        "time_spend": 2.1146845929997653,
+        "time_spend": 0.00011635099872364663,
         "combinations": 7
     },
     "test_2": {
-        "time_spend": 0.0005024420006520813,
+        "time_spend": 0.00015164000069489703,
         "combinations": 11
     },
     "test_3": {
-        "time_spend": 0.0002544510007282952,
+        "time_spend": 0.00013879099788027816,
         "combinations": 13
     },
     "test_4": {
-        "time_spend": 0.00018874099987442605,
+        "time_spend": 0.0001173310010926798,
         "combinations": 11
     },
     "test_5": {
-        "time_spend": 0.0002491209997970145,
+        "time_spend": 0.00017432099775760435,
         "combinations": 18
     },
     "test_6": {
-        "time_spend": 0.0001020399995468324,
+        "time_spend": 9.341000259155408e-05,
         "combinations": 8
     },
     "test_7": {
-        "time_spend": 7.77810000727186e-05,
+        "time_spend": 9.549999958835542e-05,
         "combinations": 8
     },
     "test_8": {
-        "time_spend": 0.00029065099988656584,
+        "time_spend": 0.0001632309977139812,
         "combinations": 16
     },
     "test_9": {
-        "time_spend": 0.0002491309987817658,
+        "time_spend": 0.0001755599987518508,
         "combinations": 17
     },
     "test_10": {
-        "time_spend": 0.0007124629992176779,
+        "time_spend": 0.00046553200081689283,
         "combinations": 55
     },
     "test_11": {
-        "time_spend": 0.00035920099981012754,
+        "time_spend": 0.00014328000179375522,
         "combinations": 8
     },
     "test_12": {
-        "time_spend": 0.0005833429986523697,
+        "time_spend": 0.00022196099962457083,
         "combinations": 13
+    },
+    "test_14": {
+        "time_spend": 0.0005548219996853732,
+        "combinations": 31
+    },
+    "test_15": {
+        "time_spend": 0.00031376100014313124,
+        "combinations": 12
+    },
+    "test_13": {
+        "time_spend": 0.0006725029998051468,
+        "combinations": 31
+    },
+    "test_16": {
+        "time_spend": 0.0005537329998333007,
+        "combinations": 8
     }
 }

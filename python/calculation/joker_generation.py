@@ -146,4 +146,4 @@ def generate_scoring_jokers_combinations(jokers: list[Joker]) -> list[list[Joker
         and joker not in mult_jokers
     ]
 
-    return [chip_jokers + mult_jokers + retrigger_jokers + other_jokers]
+    return [other_jokers + chip_jokers + mult_jokers + retrigger_jokers]

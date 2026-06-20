@@ -80,16 +80,47 @@ class Card:
                 self.is_any_suit = True
 
             case Enhancement.LUCKY:
-                self.add_mult = 20
-                self.econ = 20
+                self.add_mult += 20
+                self.econ += 20
                 self.mult_prob = 0.2  # 1/5
                 self.econ_prob = 0.05  # 1/20
 
             case Enhancement.GLASS:
-                self.play_x_mult = 2
+                self.play_x_mult *= 2
 
             case Enhancement.STEEL:
-                self.hand_x_mult = 1.5
+                self.hand_x_mult *= 1.5
+
+    def remove_enhancement(self) -> None:
+        match self.enhancement:
+            case Enhancement.STONE:
+                self.chips = 0
+
+            case Enhancement.GOLD:
+                self.econ -= 3
+
+            case Enhancement.BONUS:
+                self.chips -= 30
+
+            case Enhancement.MULT:
+                self.add_mult -= 4
+
+            case Enhancement.WILD:
+                self.is_any_suit = False
+
+            case Enhancement.LUCKY:
+                self.add_mult -= 20
+                self.econ -= 20
+                self.mult_prob = 1
+                self.econ_prob = 1
+
+            case Enhancement.GLASS:
+                self.play_x_mult /= 2
+
+            case Enhancement.STEEL:
+                self.hand_x_mult -= 1.5
+
+        self.enhancement = Enhancement.NONE
 
     def add_edition(self) -> None:
         match self.edition:
@@ -143,6 +174,9 @@ class Card:
 
     def __hash__(self):
         return self.card_id
+
+    def __eq__(self, other):
+        return self.card_id == other.card_id
 
 
 @dataclass(slots=True)
@@ -246,6 +280,19 @@ class Joker:
         if "scoring" in joker_data:
             scoring_data = joker_data["scoring"]
 
+            update = None
+            if "update" in scoring_data:
+                update_data = scoring_data["update"]
+                update = JokerScoringUpdate(
+                    count=update_data.get("count", ""),
+                    effect=update_data.get("effect", ""),
+                    trigger=JokerTriggers(update_data.get("trigger")),
+                    condition=update_data.get("trigger", {}),
+                    each=update_data.get("each", -1),
+                    value=update_data.get("value", -1),
+                    change=update_data.get("change", -1),
+                )
+
             return JokerScoring(
                 background_image=joker_name,
                 face_image=None,
@@ -259,6 +306,7 @@ class Joker:
                 add_mult=scoring_data.get("add_mult"),
                 x_mult=scoring_data.get("x_mult"),
                 condition=scoring_data.get("condition"),
+                update=update,
             )
 
         elif "retrigger" in joker_data:
@@ -323,7 +371,7 @@ class Joker:
             modifier_data = joker_data["update"]
 
             rank_data = modifier_data["rank"]
-            rank = Rank(rank_data) if isinstance(rank_data, str) else rank_data
+            rank = Rank(rank_data) if isinstance(rank_data, int) else rank_data
 
             return JokerUpdate(
                 background_image=joker_name,
@@ -334,7 +382,7 @@ class Joker:
                 copyable=joker_data["copyable"],
                 trigger=JokerTriggers(modifier_data["trigger"]),
                 rank=rank,
-                enhacnement=Enhancement(joker_data["enhancement"])
+                enhacnement=Enhancement(modifier_data.get("enhancement", None)),
             )
 
         else:
@@ -342,13 +390,14 @@ class Joker:
 
 
 @dataclass(slots=True, repr=False, eq=False)
-class JokerScoringUpdate():
+class JokerScoringUpdate:
     count: str
-    target: str
+    effect: str
     trigger: JokerTriggers
     condition: dict
     each: int
     value: int
+    change: int
 
 
 @dataclass(slots=True, repr=False, eq=False)
@@ -359,6 +408,7 @@ class JokerScoring(Joker):
     add_mult: int | dict[str, str | int] | None
     x_mult: float | dict[str, str | int] | None
     condition: dict | None
+    update: JokerScoringUpdate | None
 
 
 @dataclass(slots=True, repr=False, eq=False)
@@ -392,7 +442,7 @@ class JokerGameModifier(Joker):
 @dataclass(slots=True, repr=False, eq=False)
 class JokerUpdate(Joker):
     trigger: JokerTriggers
-    rank: Rank | str
+    rank: Rank | str | None
     enhacnement: Enhancement
 
 
@@ -420,6 +470,7 @@ class JokerPlan:
     after_hand: list[JokerScoring] = field(default_factory=list)
     played_retrigger: list[JokerRetrigger] = field(default_factory=list)
     held_retrigger: list[JokerRetrigger] = field(default_factory=list)
+    update_jokers: list[JokerUpdate | JokerScoring] = field(default_factory=list)
 
 
 @dataclass(slots=True)

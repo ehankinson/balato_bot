@@ -1,12 +1,15 @@
 import sys
 import time
+from copy import copy, deepcopy
 
+from cv2 import decomposeProjectionMatrix
 from tqdm import tqdm
 from typing_extensions import Literal, overload
 
 from calculation.joker_generation import generate_scoring_jokers_combinations
 from calculation.joker_retrigger import calculate_joker_retrigger
 from calculation.joker_scoring import calculate_joker_scoring
+from calculation.joker_update import calculate_joker_update
 from calculation.poker_generation import generate_scoring_hand_combinations
 from core.enums import (
     Edition,
@@ -28,6 +31,7 @@ from core.models import (
     JokerRetrigger,
     JokerScoring,
     JokerScoringConditions,
+    JokerUpdate,
 )
 
 JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
@@ -37,7 +41,7 @@ NO_CACHE_JOKERS = {JokersName.PHOTOGRAPH}
 
 
 def build_joker_plan(jokers: list[Joker]) -> JokerPlan:
-    plan = JokerPlan([], [], [], [], [])
+    plan = JokerPlan([], [], [], [], [], [])
 
     for joker in jokers:
         if isinstance(joker, JokerScoring):
@@ -49,11 +53,17 @@ def build_joker_plan(jokers: list[Joker]) -> JokerPlan:
                 case JokerTriggers.AFTER_HAND:
                     plan.after_hand.append(joker)
 
+            if joker.update is not None:
+                plan.update_jokers.append(joker)
+
         elif isinstance(joker, JokerRetrigger):
             if joker.trigger == JokerTriggers.ON_PLAYED_CARDS:
                 plan.played_retrigger.append(joker)
             else:
                 plan.held_retrigger.append(joker)
+
+        elif isinstance(joker, JokerUpdate):
+            plan.update_jokers.append(joker)
 
     return plan
 
@@ -93,6 +103,66 @@ def extend_order(
     return len(mult_scoring_order)
 
 
+def apply_joker_update(
+    joker_plan: JokerPlan,
+    hand_scoring: HandScoring,
+    on_play_jokers: list[JokerScoring],
+    on_held_jokers: list[JokerScoring],
+    after_hand_jokers: list[JokerScoring],
+) -> tuple[
+    list[Card],
+    list[JokerScoring],
+    list[JokerScoring],
+    list[JokerScoring],
+]:
+    # this code currently causes an issue since we are update references
+    # and each other instand in hand_scoring uses that same reference, so we need to
+    # update it back to the original state of the card
+    copy_update_jokers = [
+        deepcopy(joker) if isinstance(joker, JokerScoring) else joker
+        for joker in joker_plan.update_jokers
+    ]
+
+    copy_hand_scoring = copy(hand_scoring)
+    copy_hand_scoring.scored_played = deepcopy(hand_scoring.scored_played)
+
+    calculate_joker_update(
+        copy_update_jokers, copy_hand_scoring, JokerTriggers.BEFORE_PLAYED_CARDS
+    )
+
+    # use the copy referenced card(s)
+    scoring_played = copy_hand_scoring.scored_played
+
+    def replace_deep_copy_joker(
+        jokers: list[JokerScoring], updated_joker: JokerScoring
+    ) -> list[JokerScoring]:
+        new_array = copy(jokers)
+        replace_index = next(
+            i
+            for i, og_joker in enumerate(jokers)
+            if og_joker.joker_id == updated_joker.joker_id
+        )
+        new_array[replace_index] = updated_joker
+
+        return new_array
+
+    for joker in copy_update_jokers:
+        if not isinstance(joker, JokerScoring):
+            continue
+
+        match joker.trigger:
+            case JokerTriggers.ON_PLAYED_CARDS:
+                on_play_jokers = replace_deep_copy_joker(on_play_jokers, joker)
+
+            case JokerTriggers.ON_HELD_CARDS:
+                on_held_jokers = replace_deep_copy_joker(on_held_jokers, joker)
+
+            case JokerTriggers.AFTER_HAND:
+                after_hand_jokers = replace_deep_copy_joker(after_hand_jokers, joker)
+
+    return scoring_played, on_play_jokers, on_held_jokers, after_hand_jokers
+
+
 def calculate_score(
     hand_scoring: HandScoring,
     joker_plan: JokerPlan,
@@ -105,10 +175,10 @@ def calculate_score(
     scoring_held = hand_scoring.scored_held
     scoring_played = hand_scoring.scored_played
 
-    condition_args.scoring_held = scoring_held
-    condition_args.scoring_played = scoring_played
-    condition_args.unscoring_held = hand_scoring.unscored_held
-    condition_args.face_card_count = -1
+    played_joker_retriggers = joker_plan.played_retrigger
+    on_play_jokers = joker_plan.on_played
+    on_held_jokers = joker_plan.on_held
+    after_hand_jokers = joker_plan.after_hand
 
     best_hand = BestHand(
         chips=hand_stats.chips,
@@ -116,6 +186,23 @@ def calculate_score(
         avg_case_mult=hand_stats.mult,
         best_case_mult=hand_stats.mult,
     )
+
+    update_joker_len = len(joker_plan.update_jokers)
+    if update_joker_len > 0:
+        scoring_played, on_play_jokers, on_held_jokers, after_hand_jokers = (
+            apply_joker_update(
+                joker_plan,
+                hand_scoring,
+                on_play_jokers,
+                on_held_jokers,
+                after_hand_jokers,
+            )
+        )
+
+    condition_args.scoring_held = scoring_held
+    condition_args.scoring_played = scoring_played
+    condition_args.unscoring_held = hand_scoring.unscored_held
+    condition_args.face_card_count = -1
 
     mult_scoring_order: list[tuple[int, int | float, float]] = []
     mult_start_index = 0
@@ -126,7 +213,7 @@ def calculate_score(
         condition_args.face_card_count += 1 if card.is_facecard else 0
 
         trigger = card.trigger
-        for joker in joker_plan.played_retrigger:
+        for joker in played_joker_retriggers:
             trigger += calculate_joker_retrigger(joker, condition_args)
 
         best_hand.chips += card.chips * trigger
@@ -142,7 +229,7 @@ def calculate_score(
         if card_cache is None:
             card_cache = joker_cache[card.card_id] = {}
 
-        for joker in joker_plan.on_played:
+        for joker in on_play_jokers:
             joker_key = joker.background_image
             score = card_cache.get(joker_key)
 
@@ -163,14 +250,14 @@ def calculate_score(
         condition_args.card = card
         add_to_order(0, card.hand_x_mult, 1.0, mult_scoring_order)
 
-        for joker in joker_plan.on_held:
+        for joker in on_held_jokers:
             _, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
             add_to_order(j_add_mult, j_x_mult, joker.prob, mult_scoring_order)
 
         trigger = card.trigger + len(joker_plan.held_retrigger)
         mult_start_index = extend_order(mult_start_index, trigger, mult_scoring_order)
 
-    for joker in joker_plan.after_hand:
+    for joker in after_hand_jokers:
         j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
 
         best_hand.chips += j_chips

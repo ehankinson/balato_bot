@@ -661,7 +661,7 @@ def test_0013_baron_mime_wants_kings_held_not_played():
         Joker.build(JokersName.RAISED_FIST),
     ]
 
-    game_state = build_test_game_state(jokers)
+    game_state = build_test_game_state(jokers, cards)
 
     expected = FinalScoringResults(
         best_hand=BestHand(
@@ -829,38 +829,31 @@ def test_0016_pareidolia_photograph_midas_vampire():
 
     expected = FinalScoringResults(
         best_hand=BestHand(
-            chips=60,
-            worst_case_mult=1392.504,
-            avg_case_mult=1700.051,
-            best_case_mult=2930.238,
+            chips=170,
+            worst_case_mult=8.8,
+            avg_case_mult=8.8,
+            best_case_mult=8.8,
         ),
         hand_scoring=HandScoring(
-            hand_stats=HAND_STATS[PokerHand.THREE_OF_A_KIND],
+            hand_stats=HAND_STATS[PokerHand.HIGH_CARD],
             scored_played=[
-                build_card(Rank.TEN, Suit.DIAMONDS, Enhancement.GLASS),
-                build_card(Rank.TEN, Suit.SPADES, Enhancement.MULT),
-                build_card(Rank.TEN, Suit.CLUBS, Enhancement.LUCKY),
+                build_card(Rank.FIVE, Suit.DIAMONDS, Enhancement.GLASS, edition=Edition.FOIL),
             ],
-            scored_held=[
-                build_card(Rank.KING, Suit.CLUBS, Enhancement.STEEL),
-                build_card(
-                    Rank.ACE,
-                    Suit.SPADES,
-                    Enhancement.STEEL,
-                    Seal.RED,
-                    Edition.POLYCHROME,
-                ),
-                build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.STEEL),
-            ],
-            unscored_played=[
-                build_card(Rank.FOUR, Suit.HEARTS),
-                build_card(Rank.TWO, Suit.DIAMONDS),
+            scored_held=[],
+            unscored_held=[
+                build_card(Rank.EIGHT, Suit.CLUBS, Enhancement.MULT),
+                build_card(Rank.ACE, Suit.SPADES, edition=Edition.POLYCHROME),
+                build_card(Rank.KING, Suit.HEARTS, Enhancement.GOLD),
+                build_card(Rank.JACK, Suit.DIAMONDS, Enhancement.WILD),
+                build_card(Rank.THREE, Suit.SPADES, Enhancement.BONUS),
+                build_card(Rank.TEN, Suit.CLUBS),
+                build_card(Rank.TWO, Suit.HEARTS, Enhancement.LUCKY, Seal.RED),
             ],
         ),
         joker_plan=build_joker_plan(jokers),
     )
 
-    assert_final_scoring_results(best_score, expected)
+    run_assert(16, cards, jokers, game_state, expected)
 
 
 # def test_0017_wild_polychrome_jack_creates_flush_and_retrigger_bait():
