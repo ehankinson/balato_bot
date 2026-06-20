@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass, field
 
 from PIL import Image
+from sympy.functions.combinatorial.numbers import E
 
 from config.settings import JOKER_CONFIG
 from core.class_indices import JOKER_TYPE_CLASSES
@@ -169,13 +170,6 @@ class JokerScoringConditions:
 
 
 # @dataclass(slots=True)
-# class JokerUpgrade:
-#     target: str
-#     when: str
-#     condition: dict | str | None = None
-
-
-# @dataclass(slots=True)
 # class JokerConfig:
 #     rarity: str
 #     buy_price: int
@@ -325,8 +319,36 @@ class Joker:
                 disable_boss_blind=modifier_data.get("disable_boss_blind", False),
             )
 
+        elif "update" in joker_data:
+            modifier_data = joker_data["update"]
+
+            rank_data = modifier_data["rank"]
+            rank = Rank(rank_data) if isinstance(rank_data, str) else rank_data
+
+            return JokerUpdate(
+                background_image=joker_name,
+                face_image=None,
+                negative=False,
+                edition=Edition.NONE,
+                req=JokerReq(),
+                copyable=joker_data["copyable"],
+                trigger=JokerTriggers(modifier_data["trigger"]),
+                rank=rank,
+                enhacnement=Enhancement(joker_data["enhancement"])
+            )
+
         else:
             return Joker.random()
+
+
+@dataclass(slots=True, repr=False, eq=False)
+class JokerScoringUpdate():
+    count: str
+    target: str
+    trigger: JokerTriggers
+    condition: dict
+    each: int
+    value: int
 
 
 @dataclass(slots=True, repr=False, eq=False)
@@ -365,6 +387,13 @@ class JokerGameModifier(Joker):
     double_probabilities: bool
     allow_duplicate_shop_items: bool
     disable_boss_blind: bool
+
+
+@dataclass(slots=True, repr=False, eq=False)
+class JokerUpdate(Joker):
+    trigger: JokerTriggers
+    rank: Rank | str
+    enhacnement: Enhancement
 
 
 @dataclass(slots=True)

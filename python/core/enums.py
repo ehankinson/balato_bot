@@ -85,6 +85,7 @@ class JokerTriggers(IntEnum):
     ON_PLAYED_CARDS = 0
     AFTER_HAND = 1
     ON_HELD_CARDS = 2
+    BEFORE_PLAYED_CARDS = 3
 
 
 class JokersName(IntEnum):

@@ -104,6 +104,7 @@
             "chips": 0
         },
         "update": {
+            "trigger": 3,
             "count": "stone_cards",
             "target": "scoring.chips"
         },
@@ -133,6 +134,7 @@
             "x_mult": 1
         },
         "update": {
+            "trigger": 3,
             "condition": {
                 "hand_left": 1
             },
@@ -234,6 +236,7 @@
             "chips": 0
         },
         "update": {
+            "trigger": 3,
             "count": "remaining_discards",
             "each": 30
         },
@@ -1403,19 +1406,16 @@
         },
         "buy_price": 7,
         "copyable": true,
-        "updates": [
+        "update": [
             {
+                "trigger": 3,
                 "change": 0.1,
                 "condition": {
                     "enhancement": {
                         "not": "none"
                     }
                 },
-                "after": {
-                    "remove_enhancement": true
-                },
-                "target": "scoring.x_mult",
-                "when": "on_card_scored"
+                "target": "scoring.x_mult"
             }
         ]
     },
@@ -1525,17 +1525,12 @@
     "midas_mask": {
         "rarity": "uncommon",
         "buy_price": 7,
-        "copyable": true,
-        "card_updates": [
-            {
-                "when": "on_card_scored",
-                "target": "card.enhancement",
-                "set": "gold",
-                "condition": {
-                    "rank": "facecard"
-                }
-            }
-        ]
+        "copyable": false,
+        "update": {
+            "trigger": 3,
+            "rank": "facecard",
+            "enhancement": 1
+        }
     },
     "luchador": {
         "rarity": "uncommon",
