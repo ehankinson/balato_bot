@@ -837,7 +837,9 @@ def test_0016_pareidolia_photograph_midas_vampire():
         hand_scoring=HandScoring(
             hand_stats=HAND_STATS[PokerHand.HIGH_CARD],
             scored_played=[
-                build_card(Rank.FIVE, Suit.DIAMONDS, Enhancement.GLASS, edition=Edition.FOIL),
+                build_card(
+                    Rank.FIVE, Suit.DIAMONDS, Enhancement.GLASS, edition=Edition.FOIL
+                ),
             ],
             scored_held=[],
             unscored_held=[
@@ -856,371 +858,767 @@ def test_0016_pareidolia_photograph_midas_vampire():
     run_assert(16, cards, jokers, game_state, expected)
 
 
-# def test_0017_wild_polychrome_jack_creates_flush_and_retrigger_bait():
-#     cards = [
-#         build_card(
-#             Rank.JACK, Suit.CLUBS, Enhancement.WILD, Seal.RED, Edition.POLYCHROME
-#         ),
-#         build_card(Rank.ACE, Suit.HEARTS, Enhancement.GLASS),
-#         build_card(Rank.TEN, Suit.HEARTS, Enhancement.LUCKY),
-#         build_card(Rank.SEVEN, Suit.HEARTS, Enhancement.MULT),
-#         build_card(Rank.FOUR, Suit.HEARTS, Enhancement.BONUS),
-#         build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
-#         build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
-#         build_card(Rank.TWO, Suit.CLUBS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.BLOODSTONE),
-#         Joker.build(JokersName.PHOTOGRAPH),
-#         Joker.build(JokersName.HANGING_CHAD),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0018_bloodstone_ev_vs_photograph_order():
-#     cards = [
-#         build_card(Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
-#         build_card(
-#             Rank.QUEEN, Suit.HEARTS, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.JACK, Suit.HEARTS, Enhancement.MULT),
-#         build_card(Rank.NINE, Suit.HEARTS, Enhancement.BONUS),
-#         build_card(Rank.THREE, Suit.HEARTS),
-#         build_card(Rank.ACE, Suit.SPADES, Enhancement.STEEL),
-#         build_card(Rank.EIGHT, Suit.DIAMONDS, Enhancement.LUCKY),
-#         build_card(Rank.TWO, Suit.CLUBS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.BLOODSTONE),
-#         Joker.build(JokersName.PHOTOGRAPH),
-#         Joker.build(JokersName.HANGING_CHAD),
-#         Joker.build(JokersName.SOCK_AND_BUSKIN),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0019_oops_lucky_cat_multiple_lucky_candidates():
-#     cards = [
-#         build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.LUCKY, Seal.RED),
-#         build_card(
-#             Rank.KING, Suit.CLUBS, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.LUCKY),
-#         build_card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, edition=Edition.FOIL),
-#         build_card(Rank.TEN, Suit.DIAMONDS, Enhancement.LUCKY),
-#         build_card(Rank.SIX, Suit.CLUBS, Enhancement.GLASS),
-#         build_card(Rank.SIX, Suit.HEARTS, Enhancement.MULT),
-#         build_card(Rank.TWO, Suit.SPADES),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.LUCKY_CAT),
-#         Joker.build(JokersName.OOPS_ALL_6S),
-#         Joker.build(JokersName.HANGING_CHAD),
-#         Joker.build(JokersName.PHOTOGRAPH),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0020_splash_makes_junk_enhanced_cards_score():
-#     cards = [
-#         build_card(Rank.ACE, Suit.SPADES),
-#         build_card(Rank.ACE, Suit.DIAMONDS),
-#         build_card(Rank.SEVEN, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
-#         build_card(
-#             Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.THREE, Suit.DIAMONDS, Enhancement.MULT),
-#         build_card(Rank.KING, Suit.HEARTS, Enhancement.STEEL),
-#         build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.GOLD),
-#         build_card(Rank.TWO, Suit.SPADES, Enhancement.BONUS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.SPLASH),
-#         Joker.build(JokersName.HANGING_CHAD),
-#         Joker.build(JokersName.OOPS_ALL_6S),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0021_splash_photograph_first_card_scores_outside_main_pair():
-#     cards = [
-#         build_card(Rank.KING, Suit.DIAMONDS, Enhancement.GLASS, Seal.RED),
-#         build_card(Rank.ACE, Suit.SPADES),
-#         build_card(Rank.ACE, Suit.HEARTS),
-#         build_card(Rank.EIGHT, Suit.CLUBS, Enhancement.LUCKY),
-#         build_card(Rank.FOUR, Suit.SPADES, Enhancement.MULT),
-#         build_card(Rank.TWO, Suit.DIAMONDS, Enhancement.BONUS),
-#         build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.STEEL),
-#         build_card(Rank.JACK, Suit.CLUBS, Enhancement.GOLD),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.SPLASH),
-#         Joker.build(JokersName.PHOTOGRAPH),
-#         Joker.build(JokersName.HANGING_CHAD),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0022_sock_and_buskin_red_seal_face_card_pile():
-#     cards = [
-#         build_card(Rank.KING, Suit.SPADES, Enhancement.GLASS, Seal.RED),
-#         build_card(
-#             Rank.KING, Suit.HEARTS, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.MULT, Seal.RED),
-#         build_card(
-#             Rank.JACK, Suit.CLUBS, Enhancement.WILD, edition=Edition.HOLOGRAPHIC
-#         ),
-#         build_card(Rank.TEN, Suit.SPADES),
-#         build_card(Rank.SIX, Suit.HEARTS, Enhancement.BONUS),
-#         build_card(Rank.THREE, Suit.CLUBS),
-#         build_card(Rank.TWO, Suit.DIAMONDS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.SOCK_AND_BUSKIN),
-#         Joker.build(JokersName.PHOTOGRAPH),
-#         Joker.build(JokersName.HANGING_CHAD),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0023_hack_retriggers_low_enhanced_cards():
-#     cards = [
-#         build_card(Rank.FIVE, Suit.HEARTS, Enhancement.GLASS, Seal.RED, Edition.FOIL),
-#         build_card(Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY),
-#         build_card(Rank.FIVE, Suit.DIAMONDS, Enhancement.MULT),
-#         build_card(
-#             Rank.FOUR, Suit.SPADES, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.THREE, Suit.HEARTS, Enhancement.BONUS),
-#         build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
-#         build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
-#         build_card(Rank.ACE, Suit.CLUBS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.HACK),
-#         Joker.build(JokersName.HANGING_CHAD),
-#         Joker.build(JokersName.OOPS_ALL_6S),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0024_hack_fibonacci_lucky_ev():
-#     cards = [
-#         build_card(Rank.TWO, Suit.SPADES, Enhancement.LUCKY, Seal.RED),
-#         build_card(Rank.THREE, Suit.HEARTS, Enhancement.GLASS),
-#         build_card(
-#             Rank.FIVE, Suit.DIAMONDS, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.FIVE, Suit.CLUBS, Enhancement.MULT),
-#         build_card(Rank.FIVE, Suit.HEARTS, Enhancement.BONUS),
-#         build_card(Rank.EIGHT, Suit.SPADES, Enhancement.LUCKY),
-#         build_card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL),
-#         build_card(Rank.QUEEN, Suit.CLUBS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.HACK),
-#         Joker.build(JokersName.FIBONACCI),
-#         Joker.build(JokersName.LUCKY_CAT),
-#         Joker.build(JokersName.OOPS_ALL_6S),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0025_idol_picks_one_exact_red_seal_card():
-#     cards = [
-#         build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
-#         build_card(
-#             Rank.QUEEN, Suit.DIAMONDS, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.MULT),
-#         build_card(Rank.NINE, Suit.SPADES, Enhancement.BONUS),
-#         build_card(Rank.SIX, Suit.HEARTS, Enhancement.LUCKY),
-#         build_card(Rank.KING, Suit.CLUBS, Enhancement.STEEL),
-#         build_card(Rank.ACE, Suit.DIAMONDS),
-#         build_card(Rank.TWO, Suit.SPADES),
-#     ]
-#     jokers = [
-#         build_joker(JokersName.THE_IDOL, req_rank=Rank.QUEEN, req_suit=Suit.HEARTS),
-#         Joker.build(JokersName.SOCK_AND_BUSKIN),
-#         Joker.build(JokersName.HANGING_CHAD),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0026_reserved_parking_held_face_cards():
-#     cards = [
-#         build_card(Rank.KING, Suit.SPADES, Enhancement.GOLD, Seal.RED),
-#         build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.GOLD),
-#         build_card(
-#             Rank.JACK, Suit.DIAMONDS, Enhancement.GOLD, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.ACE, Suit.SPADES, Enhancement.GLASS),
-#         build_card(Rank.ACE, Suit.HEARTS, Enhancement.MULT),
-#         build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.LUCKY),
-#         build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.BONUS),
-#         build_card(Rank.TWO, Suit.HEARTS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.RESERVED_PARKING),
-#         Joker.build(JokersName.MIME),
-#         Joker.build(JokersName.THE_TRIO),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0027_raised_fist_lowest_held_card_and_steel_kings():
-#     cards = [
-#         build_card(Rank.TWO, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
-#         build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
-#         build_card(
-#             Rank.KING, Suit.HEARTS, Enhancement.STEEL, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.TEN, Suit.DIAMONDS, Enhancement.GLASS),
-#         build_card(Rank.TEN, Suit.SPADES, Enhancement.MULT),
-#         build_card(Rank.TEN, Suit.HEARTS, Enhancement.LUCKY),
-#         build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.BONUS),
-#         build_card(Rank.ACE, Suit.DIAMONDS),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.RAISED_FIST),
-#         Joker.build(JokersName.BARON),
-#         Joker.build(JokersName.MIME),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0028_business_card_face_card_economy_with_hanging_chad():
-#     cards = [
-#         build_card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, Seal.RED),
-#         build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.GLASS, edition=Edition.FOIL),
-#         build_card(
-#             Rank.KING, Suit.DIAMONDS, Enhancement.MULT, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.TEN, Suit.HEARTS),
-#         build_card(Rank.EIGHT, Suit.DIAMONDS, Enhancement.BONUS),
-#         build_card(Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY),
-#         build_card(Rank.THREE, Suit.SPADES),
-#         build_card(Rank.ACE, Suit.HEARTS, Enhancement.STEEL),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.BUSINESS_CARD),
-#         Joker.build(JokersName.SOCK_AND_BUSKIN),
-#         Joker.build(JokersName.HANGING_CHAD),
-#         Joker.build(JokersName.PHOTOGRAPH),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0029_ancient_joker_suit_target_with_red_seal_glass_card():
-#     cards = [
-#         build_card(Rank.ACE, Suit.SPADES, Enhancement.GLASS, Seal.RED),
-#         build_card(
-#             Rank.KING, Suit.SPADES, Enhancement.LUCKY, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.QUEEN, Suit.SPADES, Enhancement.MULT),
-#         build_card(Rank.JACK, Suit.SPADES, Enhancement.WILD),
-#         build_card(Rank.TEN, Suit.SPADES, Enhancement.BONUS),
-#         build_card(Rank.NINE, Suit.HEARTS, Enhancement.LUCKY),
-#         build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.STEEL),
-#         build_card(Rank.TWO, Suit.CLUBS),
-#     ]
-#     jokers = [
-#         build_joker(JokersName.ANCIENT_JOKER, req_suit=Suit.SPADES),
-#         Joker.build(JokersName.PHOTOGRAPH),
-#         Joker.build(JokersName.HANGING_CHAD),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
-
-
-# def test_0030_full_scoring_chaos_splash_lucky_glass_held_steel():
-#     cards = [
-#         build_card(Rank.ACE, Suit.HEARTS, Enhancement.STEEL, Seal.RED),
-#         build_card(
-#             Rank.KING, Suit.CLUBS, Enhancement.STEEL, edition=Edition.POLYCHROME
-#         ),
-#         build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
-#         build_card(Rank.NINE, Suit.SPADES, Enhancement.GLASS, Seal.RED),
-#         build_card(Rank.NINE, Suit.HEARTS, Enhancement.LUCKY),
-#         build_card(Rank.SIX, Suit.CLUBS, Enhancement.MULT, edition=Edition.FOIL),
-#         build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.BONUS),
-#         build_card(Rank.TWO, Suit.SPADES, Enhancement.LUCKY),
-#     ]
-#     jokers = [
-#         Joker.build(JokersName.SPLASH),
-#         Joker.build(JokersName.HANGING_CHAD),
-#         Joker.build(JokersName.MIME),
-#         Joker.build(JokersName.BARON),
-#         Joker.build(JokersName.OOPS_ALL_6S),
-#     ]
-
-#     best_score = get_best_scoring_hand(cards, jokers)
-
-#     expected = FinalScoringResults()
-
-#     assert_final_scoring_results(best_score, expected)
+def test_0017_wild_polychrome_jack_creates_flush_and_retrigger_bait():
+    cards = [
+        build_card(
+            Rank.JACK, Suit.CLUBS, Enhancement.WILD, Seal.RED, Edition.POLYCHROME
+        ),
+        build_card(Rank.ACE, Suit.HEARTS, Enhancement.GLASS),
+        build_card(Rank.TEN, Suit.HEARTS, Enhancement.LUCKY),
+        build_card(Rank.SEVEN, Suit.HEARTS, Enhancement.MULT),
+        build_card(Rank.FOUR, Suit.HEARTS, Enhancement.BONUS),
+        build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
+        build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
+        build_card(Rank.TWO, Suit.CLUBS),
+    ]
+    jokers = [
+        Joker.build(JokersName.BLOODSTONE),
+        Joker.build(JokersName.PHOTOGRAPH),
+        Joker.build(JokersName.HANGING_CHAD),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=137,
+            worst_case_mult=984,
+            avg_case_mult=5835.759,
+            best_case_mult=25140.797,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.FLUSH],
+            scored_played=[
+                build_card(
+                    Rank.JACK,
+                    Suit.CLUBS,
+                    Enhancement.WILD,
+                    Seal.RED,
+                    Edition.POLYCHROME,
+                ),
+                build_card(Rank.ACE, Suit.HEARTS, Enhancement.GLASS),
+                build_card(Rank.TEN, Suit.HEARTS, Enhancement.LUCKY),
+                build_card(Rank.SEVEN, Suit.HEARTS, Enhancement.MULT),
+                build_card(Rank.FOUR, Suit.HEARTS, Enhancement.BONUS),
+            ],
+            scored_held=[
+                build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
+                build_card(Rank.TWO, Suit.CLUBS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(17, cards, jokers, game_state, expected)
+
+
+def test_0018_bloodstone_ev_vs_photograph_order():
+    cards = [
+        build_card(Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
+        build_card(
+            Rank.QUEEN, Suit.HEARTS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.JACK, Suit.HEARTS, Enhancement.MULT),
+        build_card(Rank.NINE, Suit.HEARTS, Enhancement.BONUS),
+        build_card(Rank.THREE, Suit.HEARTS),
+        build_card(Rank.ACE, Suit.SPADES, Enhancement.STEEL),
+        build_card(Rank.EIGHT, Suit.DIAMONDS, Enhancement.LUCKY),
+        build_card(Rank.TWO, Suit.CLUBS),
+    ]
+    jokers = [
+        Joker.build(JokersName.BLOODSTONE),
+        Joker.build(JokersName.PHOTOGRAPH),
+        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokersName.SOCK_AND_BUSKIN),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=167,
+            worst_case_mult=13851,
+            avg_case_mult=161024.211,
+            best_case_mult=1196075.531,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.FLUSH],
+            scored_played=[
+                build_card(Rank.KING, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
+                build_card(
+                    Rank.QUEEN,
+                    Suit.HEARTS,
+                    Enhancement.LUCKY,
+                    edition=Edition.POLYCHROME,
+                ),
+                build_card(Rank.JACK, Suit.HEARTS, Enhancement.MULT),
+                build_card(Rank.NINE, Suit.HEARTS, Enhancement.BONUS),
+                build_card(Rank.THREE, Suit.HEARTS),
+            ],
+            scored_held=[
+                build_card(Rank.ACE, Suit.SPADES, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.EIGHT, Suit.DIAMONDS, Enhancement.LUCKY),
+                build_card(Rank.TWO, Suit.CLUBS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(18, cards, jokers, game_state, expected)
+
+
+def test_0019_oops_lucky_cat_multiple_lucky_candidates():
+    cards = [
+        build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.LUCKY, Seal.RED),
+        build_card(
+            Rank.KING, Suit.CLUBS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.LUCKY),
+        build_card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, edition=Edition.FOIL),
+        build_card(Rank.TEN, Suit.DIAMONDS, Enhancement.LUCKY),
+        build_card(Rank.SIX, Suit.CLUBS, Enhancement.GLASS),
+        build_card(Rank.SIX, Suit.HEARTS, Enhancement.MULT),
+        build_card(Rank.TWO, Suit.SPADES),
+    ]
+    jokers = [
+        Joker.build(JokersName.LUCKY_CAT),
+        Joker.build(JokersName.OOPS_ALL_6S),
+        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokersName.PHOTOGRAPH),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=162,
+            worst_case_mult=108,
+            avg_case_mult=805,
+            best_case_mult=2470,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.STRAIGHT],
+            scored_played=[
+                build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.LUCKY, Seal.RED),
+                build_card(
+                    Rank.KING, Suit.CLUBS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+                ),
+                build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.LUCKY),
+                build_card(
+                    Rank.JACK, Suit.SPADES, Enhancement.LUCKY, edition=Edition.FOIL
+                ),
+                build_card(Rank.TEN, Suit.DIAMONDS, Enhancement.LUCKY),
+            ],
+            unscored_held=[
+                build_card(Rank.SIX, Suit.CLUBS, Enhancement.GLASS),
+                build_card(Rank.SIX, Suit.HEARTS, Enhancement.MULT),
+                build_card(Rank.TWO, Suit.SPADES),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(18, cards, jokers, game_state, expected)
+
+
+def test_0020_splash_makes_junk_enhanced_cards_score():
+    cards = [
+        build_card(Rank.ACE, Suit.SPADES),
+        build_card(Rank.ACE, Suit.DIAMONDS),
+        build_card(Rank.SEVEN, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
+        build_card(
+            Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.THREE, Suit.DIAMONDS, Enhancement.MULT),
+        build_card(Rank.KING, Suit.HEARTS, Enhancement.STEEL),
+        build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.GOLD),
+        build_card(Rank.TWO, Suit.SPADES, Enhancement.BONUS),
+    ]
+    jokers = [
+        Joker.build(JokersName.SPLASH),
+        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokersName.OOPS_ALL_6S),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=93,
+            worst_case_mult=40.5,
+            avg_case_mult=382.5,
+            best_case_mult=895.5,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.PAIR],
+            scored_played=[
+                build_card(
+                    Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+                ),
+                build_card(Rank.ACE, Suit.SPADES),
+                build_card(Rank.ACE, Suit.DIAMONDS),
+                build_card(Rank.TWO, Suit.SPADES, Enhancement.BONUS),
+                build_card(Rank.SEVEN, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
+            ],
+            scored_held=[
+                build_card(Rank.KING, Suit.HEARTS, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.GOLD),
+                build_card(Rank.THREE, Suit.DIAMONDS, Enhancement.MULT),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(20, cards, jokers, game_state, expected)
+
+
+def test_0021_splash_photograph_first_card_scores_outside_main_pair():
+    cards = [
+        build_card(Rank.KING, Suit.DIAMONDS, Enhancement.GLASS, Seal.RED),
+        build_card(Rank.ACE, Suit.SPADES),
+        build_card(Rank.ACE, Suit.HEARTS),
+        build_card(Rank.EIGHT, Suit.CLUBS, Enhancement.LUCKY),
+        build_card(Rank.FOUR, Suit.SPADES, Enhancement.MULT),
+        build_card(Rank.TWO, Suit.DIAMONDS, Enhancement.BONUS),
+        build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.STEEL),
+        build_card(Rank.JACK, Suit.CLUBS, Enhancement.GOLD),
+    ]
+    jokers = [
+        Joker.build(JokersName.SPLASH),
+        Joker.build(JokersName.PHOTOGRAPH),
+        Joker.build(JokersName.HANGING_CHAD),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=114,
+            worst_case_mult=768,
+            avg_case_mult=768,
+            best_case_mult=768,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.PAIR],
+            scored_played=[
+                build_card(Rank.KING, Suit.DIAMONDS, Enhancement.GLASS, Seal.RED),
+                build_card(Rank.ACE, Suit.SPADES),
+                build_card(Rank.ACE, Suit.HEARTS),
+                build_card(Rank.TWO, Suit.DIAMONDS, Enhancement.BONUS),
+                build_card(Rank.JACK, Suit.CLUBS, Enhancement.GOLD),
+            ],
+            scored_held=[
+                build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.EIGHT, Suit.CLUBS, Enhancement.LUCKY),
+                build_card(Rank.FOUR, Suit.SPADES, Enhancement.MULT),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(21, cards, jokers, game_state, expected)
+
+
+def test_0022_sock_and_buskin_red_seal_face_card_pile():
+    cards = [
+        build_card(Rank.KING, Suit.SPADES, Enhancement.GLASS, Seal.RED),
+        build_card(
+            Rank.KING, Suit.HEARTS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.MULT, Seal.RED),
+        build_card(
+            Rank.JACK, Suit.CLUBS, Enhancement.WILD, edition=Edition.HOLOGRAPHIC
+        ),
+        build_card(Rank.TEN, Suit.SPADES),
+        build_card(Rank.SIX, Suit.HEARTS, Enhancement.BONUS),
+        build_card(Rank.THREE, Suit.CLUBS),
+        build_card(Rank.TWO, Suit.DIAMONDS),
+    ]
+    jokers = [
+        Joker.build(JokersName.SOCK_AND_BUSKIN),
+        Joker.build(JokersName.PHOTOGRAPH),
+        Joker.build(JokersName.HANGING_CHAD),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=80,
+            worst_case_mult=1296,
+            avg_case_mult=5136,
+            best_case_mult=20496,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.PAIR],
+            scored_played=[
+                build_card(Rank.KING, Suit.SPADES, Enhancement.GLASS, Seal.RED),
+                build_card(
+                    Rank.KING,
+                    Suit.HEARTS,
+                    Enhancement.LUCKY,
+                    edition=Edition.POLYCHROME,
+                ),
+            ],
+            unscored_held=[
+                build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.MULT, Seal.RED),
+                build_card(
+                    Rank.JACK, Suit.CLUBS, Enhancement.WILD, edition=Edition.HOLOGRAPHIC
+                ),
+                build_card(Rank.TEN, Suit.SPADES),
+                build_card(Rank.SIX, Suit.HEARTS, Enhancement.BONUS),
+                build_card(Rank.THREE, Suit.CLUBS),
+                build_card(Rank.TWO, Suit.DIAMONDS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(22, cards, jokers, game_state, expected)
+
+
+def test_0023_hack_retriggers_low_enhanced_cards():
+    cards = [
+        build_card(Rank.FIVE, Suit.HEARTS, Enhancement.GLASS, Seal.RED, Edition.FOIL),
+        build_card(Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY),
+        build_card(Rank.FIVE, Suit.DIAMONDS, Enhancement.MULT),
+        build_card(
+            Rank.FOUR, Suit.SPADES, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.THREE, Suit.HEARTS, Enhancement.BONUS),
+        build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
+        build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
+        build_card(Rank.ACE, Suit.CLUBS),
+    ]
+    jokers = [
+        Joker.build(JokersName.HACK),
+        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokersName.OOPS_ALL_6S),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=225,
+            worst_case_mult=132,
+            avg_case_mult=516,
+            best_case_mult=1092,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.THREE_OF_A_KIND],
+            scored_played=[
+                build_card(
+                    Rank.FIVE, Suit.HEARTS, Enhancement.GLASS, Seal.RED, Edition.FOIL
+                ),
+                build_card(Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY),
+                build_card(Rank.FIVE, Suit.DIAMONDS, Enhancement.MULT),
+            ],
+            scored_held=[
+                build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.THREE, Suit.HEARTS, Enhancement.BONUS),
+                build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
+                build_card(Rank.ACE, Suit.CLUBS),
+                build_card(
+                    Rank.FOUR,
+                    Suit.SPADES,
+                    Enhancement.LUCKY,
+                    edition=Edition.POLYCHROME,
+                ),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(23, cards, jokers, game_state, expected)
+
+
+def test_0024_hack_fibonacci_lucky_ev():
+    cards = [
+        build_card(Rank.TWO, Suit.SPADES, Enhancement.LUCKY, Seal.RED),
+        build_card(Rank.THREE, Suit.HEARTS, Enhancement.GLASS),
+        build_card(
+            Rank.FIVE, Suit.DIAMONDS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.FIVE, Suit.CLUBS, Enhancement.MULT),
+        build_card(Rank.FIVE, Suit.HEARTS, Enhancement.BONUS),
+        build_card(Rank.EIGHT, Suit.SPADES, Enhancement.LUCKY),
+        build_card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL),
+        build_card(Rank.QUEEN, Suit.CLUBS),
+    ]
+    jokers = [
+        Joker.build(JokersName.HACK),
+        Joker.build(JokersName.FIBONACCI),
+        Joker.build(JokersName.LUCKY_CAT),
+        Joker.build(JokersName.OOPS_ALL_6S),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=120,
+            worst_case_mult=175.125,
+            avg_case_mult=220.125,
+            best_case_mult=287.625,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.THREE_OF_A_KIND],
+            scored_played=[
+                build_card(
+                    Rank.FIVE,
+                    Suit.DIAMONDS,
+                    Enhancement.LUCKY,
+                    edition=Edition.POLYCHROME,
+                ),
+                build_card(Rank.FIVE, Suit.CLUBS, Enhancement.MULT),
+                build_card(Rank.FIVE, Suit.HEARTS, Enhancement.BONUS),
+            ],
+            scored_held=[
+                build_card(Rank.KING, Suit.DIAMONDS, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.QUEEN, Suit.CLUBS),
+                build_card(Rank.EIGHT, Suit.SPADES, Enhancement.LUCKY),
+                build_card(Rank.TWO, Suit.SPADES, Enhancement.LUCKY, Seal.RED),
+                build_card(Rank.THREE, Suit.HEARTS, Enhancement.GLASS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(24, cards, jokers, game_state, expected)
+
+
+def test_0025_idol_picks_one_exact_red_seal_card():
+    cards = [
+        build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
+        build_card(
+            Rank.QUEEN, Suit.DIAMONDS, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.MULT),
+        build_card(Rank.NINE, Suit.SPADES, Enhancement.BONUS),
+        build_card(Rank.SIX, Suit.HEARTS, Enhancement.LUCKY),
+        build_card(Rank.KING, Suit.CLUBS, Enhancement.STEEL),
+        build_card(Rank.ACE, Suit.DIAMONDS),
+        build_card(Rank.TWO, Suit.SPADES),
+    ]
+    jokers = [
+        build_joker(JokersName.THE_IDOL, req_rank=Rank.QUEEN, req_suit=Suit.HEARTS),
+        Joker.build(JokersName.SOCK_AND_BUSKIN),
+        Joker.build(JokersName.HANGING_CHAD),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=120,
+            worst_case_mult=10395,
+            avg_case_mult=10417.5,
+            best_case_mult=10507.5,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.THREE_OF_A_KIND],
+            scored_played=[
+                build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.GLASS, Seal.RED),
+                build_card(
+                    Rank.QUEEN,
+                    Suit.DIAMONDS,
+                    Enhancement.LUCKY,
+                    edition=Edition.POLYCHROME,
+                ),
+                build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.MULT),
+            ],
+            scored_held=[
+                build_card(Rank.KING, Suit.CLUBS, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.ACE, Suit.DIAMONDS),
+                build_card(Rank.TWO, Suit.SPADES),
+                build_card(Rank.SIX, Suit.HEARTS, Enhancement.LUCKY),
+                build_card(Rank.NINE, Suit.SPADES, Enhancement.BONUS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(25, cards, jokers, game_state, expected)
+
+
+def test_0026_reserved_parking_held_face_cards():
+    cards = [
+        build_card(Rank.KING, Suit.SPADES, Enhancement.GOLD, Seal.RED),
+        build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.GOLD),
+        build_card(
+            Rank.JACK, Suit.DIAMONDS, Enhancement.GOLD, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.ACE, Suit.SPADES, Enhancement.GLASS),
+        build_card(Rank.ACE, Suit.HEARTS, Enhancement.MULT),
+        build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.LUCKY),
+        build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.BONUS),
+        build_card(Rank.TWO, Suit.HEARTS),
+    ]
+    jokers = [
+        Joker.build(JokersName.RESERVED_PARKING),
+        Joker.build(JokersName.MIME),
+        Joker.build(JokersName.THE_TRIO),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=63,
+            worst_case_mult=42,
+            avg_case_mult=66,
+            best_case_mult=162,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.THREE_OF_A_KIND],
+            scored_played=[
+                build_card(Rank.ACE, Suit.SPADES, Enhancement.GLASS),
+                build_card(Rank.ACE, Suit.HEARTS, Enhancement.MULT),
+                build_card(Rank.ACE, Suit.DIAMONDS, Enhancement.LUCKY),
+            ],
+            unscored_held=[
+                build_card(Rank.KING, Suit.SPADES, Enhancement.GOLD, Seal.RED),
+                build_card(Rank.QUEEN, Suit.HEARTS, Enhancement.GOLD),
+                build_card(
+                    Rank.JACK,
+                    Suit.DIAMONDS,
+                    Enhancement.GOLD,
+                    edition=Edition.POLYCHROME,
+                ),
+                build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.BONUS),
+                build_card(Rank.TWO, Suit.HEARTS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(26, cards, jokers, game_state, expected)
+
+
+def test_0027_raised_fist_lowest_held_card_and_steel_kings():
+    cards = [
+        build_card(Rank.TWO, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
+        build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
+        build_card(
+            Rank.KING, Suit.HEARTS, Enhancement.STEEL, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.TEN, Suit.DIAMONDS, Enhancement.GLASS),
+        build_card(Rank.TEN, Suit.SPADES, Enhancement.MULT),
+        build_card(Rank.TEN, Suit.HEARTS, Enhancement.LUCKY),
+        build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.BONUS),
+        build_card(Rank.ACE, Suit.DIAMONDS),
+    ]
+    jokers = [
+        Joker.build(JokersName.RAISED_FIST),
+        Joker.build(JokersName.BARON),
+        Joker.build(JokersName.MIME),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=60,
+            worst_case_mult=1697.915,
+            avg_case_mult=2389.896,
+            best_case_mult=5157.817,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.THREE_OF_A_KIND],
+            scored_played=[
+                build_card(Rank.TEN, Suit.DIAMONDS, Enhancement.GLASS),
+                build_card(Rank.TEN, Suit.SPADES, Enhancement.MULT),
+                build_card(Rank.TEN, Suit.HEARTS, Enhancement.LUCKY),
+            ],
+            scored_held=[
+                build_card(Rank.TWO, Suit.CLUBS, Enhancement.STEEL, Seal.RED),
+                build_card(Rank.KING, Suit.SPADES, Enhancement.STEEL),
+                build_card(
+                    Rank.KING, Suit.HEARTS, Enhancement.STEEL, edition=Edition.POLYCHROME
+                ),
+            ],
+            unscored_held=[
+                build_card(Rank.SEVEN, Suit.CLUBS, Enhancement.BONUS),
+                build_card(Rank.ACE, Suit.DIAMONDS),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(27, cards, jokers, game_state, expected)
+
+
+def test_0028_business_card_face_card_economy_with_hanging_chad():
+    cards = [
+        build_card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, Seal.RED),
+        build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.GLASS, edition=Edition.FOIL),
+        build_card(
+            Rank.KING, Suit.DIAMONDS, Enhancement.MULT, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.TEN, Suit.HEARTS),
+        build_card(Rank.EIGHT, Suit.DIAMONDS, Enhancement.BONUS),
+        build_card(Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY),
+        build_card(Rank.THREE, Suit.SPADES),
+        build_card(Rank.ACE, Suit.HEARTS, Enhancement.STEEL),
+    ]
+    jokers = [
+        Joker.build(JokersName.BUSINESS_CARD),
+        Joker.build(JokersName.SOCK_AND_BUSKIN),
+        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokersName.PHOTOGRAPH),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=241,
+            worst_case_mult=1212,
+            avg_case_mult=3444,
+            best_case_mult=12372,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.STRAIGHT],
+            scored_played=[
+                build_card(Rank.JACK, Suit.SPADES, Enhancement.LUCKY, Seal.RED),
+                build_card(Rank.QUEEN, Suit.CLUBS, Enhancement.GLASS, edition=Edition.FOIL),
+                build_card(
+                    Rank.KING, Suit.DIAMONDS, Enhancement.MULT, edition=Edition.POLYCHROME
+                ),
+                build_card(Rank.TEN, Suit.HEARTS),
+                build_card(Rank.ACE, Suit.HEARTS, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.EIGHT, Suit.DIAMONDS, Enhancement.BONUS),
+                build_card(Rank.FIVE, Suit.CLUBS, Enhancement.LUCKY),
+                build_card(Rank.THREE, Suit.SPADES),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(28, cards, jokers, game_state, expected)
+
+
+def test_0029_ancient_joker_suit_target_with_red_seal_glass_card():
+    cards = [
+        build_card(Rank.ACE, Suit.SPADES, Enhancement.GLASS, Seal.RED),
+        build_card(
+            Rank.KING, Suit.SPADES, Enhancement.LUCKY, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.QUEEN, Suit.SPADES, Enhancement.MULT),
+        build_card(Rank.JACK, Suit.SPADES, Enhancement.WILD),
+        build_card(Rank.TEN, Suit.SPADES, Enhancement.BONUS),
+        build_card(Rank.NINE, Suit.HEARTS, Enhancement.LUCKY),
+        build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.STEEL),
+        build_card(Rank.TWO, Suit.CLUBS),
+    ]
+    jokers = [
+        build_joker(JokersName.ANCIENT_JOKER, req_suit=Suit.SPADES),
+        Joker.build(JokersName.PHOTOGRAPH),
+        Joker.build(JokersName.HANGING_CHAD),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=212,
+            worst_case_mult=33296.063,
+            avg_case_mult=54414.281,
+            best_case_mult=138887.156,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.STRAIGHT_FLUSH],
+            scored_played=[
+                build_card(Rank.ACE, Suit.SPADES, Enhancement.GLASS, Seal.RED),
+                build_card(
+                    Rank.KING, Suit.SPADES, Enhancement.LUCKY, edition=Edition.POLYCHROME
+                ),
+                build_card(Rank.QUEEN, Suit.SPADES, Enhancement.MULT),
+                build_card(Rank.JACK, Suit.SPADES, Enhancement.WILD),
+                build_card(Rank.TEN, Suit.SPADES, Enhancement.BONUS),
+            ],
+            scored_held=[
+                build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.STEEL),
+            ],
+            unscored_held=[
+                build_card(Rank.TWO, Suit.CLUBS),
+                build_card(Rank.NINE, Suit.HEARTS, Enhancement.LUCKY),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(29, cards, jokers, game_state, expected)
+
+
+def test_0030_full_scoring_chaos_splash_lucky_glass_held_steel():
+    cards = [
+        build_card(Rank.ACE, Suit.HEARTS, Enhancement.STEEL, Seal.RED),
+        build_card(
+            Rank.KING, Suit.CLUBS, Enhancement.STEEL, edition=Edition.POLYCHROME
+        ),
+        build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
+        build_card(Rank.NINE, Suit.SPADES, Enhancement.GLASS, Seal.RED),
+        build_card(Rank.NINE, Suit.HEARTS, Enhancement.LUCKY),
+        build_card(Rank.SIX, Suit.CLUBS, Enhancement.MULT, edition=Edition.FOIL),
+        build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.BONUS),
+        build_card(Rank.TWO, Suit.SPADES, Enhancement.LUCKY),
+    ]
+    jokers = [
+        Joker.build(JokersName.SPLASH),
+        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokersName.MIME),
+        Joker.build(JokersName.BARON),
+        Joker.build(JokersName.OOPS_ALL_6S),
+    ]
+
+    game_state = build_test_game_state(jokers, cards)
+
+    expected = FinalScoringResults(
+        best_hand=BestHand(
+            chips=249,
+            worst_case_mult=425.25,
+            avg_case_mult=425.25,
+            best_case_mult=425.25,
+        ),
+        hand_scoring=HandScoring(
+            hand_stats=HAND_STATS[PokerHand.PAIR],
+            scored_played=[
+                build_card(Rank.QUEEN, Suit.DIAMONDS, Enhancement.GOLD),
+                build_card(Rank.NINE, Suit.SPADES, Enhancement.GLASS, Seal.RED),
+                build_card(Rank.NINE, Suit.HEARTS, Enhancement.LUCKY),
+                build_card(Rank.SIX, Suit.CLUBS, Enhancement.MULT, edition=Edition.FOIL),
+                build_card(Rank.FOUR, Suit.DIAMONDS, Enhancement.BONUS),
+            ],
+            scored_held=[
+                build_card(Rank.ACE, Suit.HEARTS, Enhancement.STEEL, Seal.RED),
+                build_card(
+                    Rank.KING, Suit.CLUBS, Enhancement.STEEL, edition=Edition.POLYCHROME
+                ),
+            ],
+            unscored_held=[
+                build_card(Rank.TWO, Suit.SPADES, Enhancement.LUCKY),
+            ],
+        ),
+        joker_plan=build_joker_plan(jokers),
+    )
+
+    run_assert(30, cards, jokers, game_state, expected)

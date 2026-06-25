@@ -197,13 +197,6 @@ class JokerScoringConditions:
 
 
 # @dataclass(slots=True)
-# class JokerEcon:
-#     money: int | dict
-#     condition: dict | str | None = None
-#     when: str | None = None
-
-
-# @dataclass(slots=True)
 # class JokerConfig:
 #     rarity: str
 #     buy_price: int
@@ -385,6 +378,21 @@ class Joker:
                 enhacnement=Enhancement(modifier_data.get("enhancement", None)),
             )
 
+        elif "econ" in joker_data:
+            modifier_data = joker_data["econ"]
+
+            return JokerEcon(
+                background_image=joker_name,
+                face_image=None,
+                negative=False,
+                edition=Edition.NONE,
+                req=JokerReq(),
+                copyable=joker_data["copyable"],
+                trigger=JokerTriggers(modifier_data.get("trigger")),
+                money=modifier_data.get("money"),
+                condition=modifier_data.get("condition", None)
+            )
+
         else:
             return Joker.random()
 
@@ -444,6 +452,13 @@ class JokerUpdate(Joker):
     trigger: JokerTriggers
     rank: Rank | str | None
     enhacnement: Enhancement
+
+
+@dataclass(slots=True, repr=False, eq=False)
+class JokerEcon(Joker):
+    money: int
+    trigger: JokerTriggers
+    condition: dict | None
 
 
 @dataclass(slots=True)

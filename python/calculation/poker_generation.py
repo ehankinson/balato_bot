@@ -1,3 +1,4 @@
+from copy import copy
 from itertools import combinations, product
 
 from calculation.poker_eval import get_hand_type
@@ -27,11 +28,10 @@ def generate_same_rank_groups(hand_size: int, cards: list[Card]) -> list[list[Ca
 
     for opt in options:
         order = calculate_order(opt)
-        for possible_hand in order:
-            hash_obj = tuple(card.card_id for card in possible_hand)
-            if hash_obj not in seen:
-                seen.add(hash_obj)
-                final_results.append(possible_hand)
+        hash_obj = tuple(card.card_id for card in order)
+        if hash_obj not in seen:
+            seen.add(hash_obj)
+            final_results.append(order)
 
     return final_results
 
@@ -77,7 +77,7 @@ def generate_flushes(bucket: dict[Suit, list[Card]]) -> list[list[Card]]:
 
             for com in combos:
                 order = calculate_order(com)
-                flushes.extend(order)
+                flushes.append(order)
 
     return flushes
 
@@ -94,11 +94,10 @@ def generate_2_pair(bucket: dict[Rank, list[Card]]) -> list[list[Card]]:
     for rank1, rank2 in combinations(pair_options.keys(), 2):
         for pair1, pair2 in product(pair_options[rank1], pair_options[rank2]):
             order = calculate_order(pair1 + pair2)
-            for ord in order:
-                hash_obj = tuple(card.card_id for card in pair1 + pair2)
-                if hash_obj not in seen:
-                    seen.add(hash_obj)
-                    final_results.append(ord)
+            hash_obj = tuple(card.card_id for card in order)
+            if hash_obj not in seen:
+                seen.add(hash_obj)
+                final_results.append(order)
 
     return final_results
 
@@ -166,26 +165,26 @@ def generate_straights(cards: list[Card]) -> list[list[Card]]:
         else:
             for straight in product(*buckets):
                 order = calculate_order(list(straight))
-                straights.extend(order)
+                straights.append(order)
 
     return straights
 
 
-def calculate_order(cards: list[Card]) -> list[list[Card]]:
+def calculate_order(cards: list[Card]) -> list[Card]:
     double_cards = []
-    add_cards = []
-    mul_cards = []
+    add_mult_cards = []
+    x_mul_cards = []
     none_cards = []
 
     for card in cards:
         if card.play_x_mult > 1 and card.add_mult > 0:
             double_cards.append(card)
-        # x_mult has higher priority
+
         elif card.play_x_mult > 1:
-            mul_cards.append(card)
+            x_mul_cards.append(card)
 
         elif card.add_mult > 0:
-            add_cards.append(card)
+            add_mult_cards.append(card)
 
         else:
             none_cards.append(card)
@@ -194,7 +193,10 @@ def calculate_order(cards: list[Card]) -> list[list[Card]]:
     # then a hologram glass (x + 10) * 2
     double_cards.sort(key=lambda c: c.add_mult / (c.play_x_mult - 1), reverse=True)
 
-    return [none_cards + add_cards + double_cards + mul_cards]
+    # sort the chips from low to high
+    none_cards.sort(key=lambda c: c.chips)
+
+    return none_cards + add_mult_cards + double_cards + x_mul_cards
 
 
 def build_cards_not_played(
@@ -350,11 +352,15 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
 
         remove_values = []
         for card in unscored_held:
-            if can_add_to_hand(card, hand_scoring.hand_stats, hand_scoring.scored_played, hand_scoring.unscored_played):
+            if can_add_to_hand(
+                card,
+                hand_scoring.hand_stats,
+                hand_scoring.scored_played,
+                hand_scoring.unscored_played,
+            ):
                 hand_scoring.unscored_played.append(card)
                 remove_values.append(card)
 
-       
         for card in remove_values:
             unscored_held.remove(card)
 
@@ -404,6 +410,48 @@ def help_raised_fist(hand_cache: list[HandScoring]) -> None:
             update_lowest_card(max_add_cards, hand_scoring)
 
 
+def add_splash(hand_cache: list[HandScoring], jokers: list[Joker]) -> None:
+
+    def filter_held_cards(hand: HandScoring, updated_cards: list[Card]):
+        for card in updated_cards:
+            if card in hand.unscored_held:
+                hand.unscored_held.remove(card)
+            elif card in hand.scored_held:
+                hand.scored_held.remove(card)
+
+    length = len(hand_cache)
+    for index in range(length):
+        hand_scoring = hand_cache[index]
+        unplayed_cards = calculate_order(
+            hand_scoring.unscored_held + hand_scoring.scored_held
+        )
+
+        free_space = 5 - len(hand_scoring.scored_played)
+        if any(joker.background_image == JokersName.HANGING_CHAD for joker in jokers):
+            for combo in combinations(unplayed_cards, free_space):
+                copy_scoring = HandScoring(
+                    hand_stats=copy(hand_scoring.hand_stats),
+                    scored_played=copy(hand_scoring.scored_played),
+                    unscored_played=copy(hand_scoring.unscored_played),
+                    scored_held=copy(hand_scoring.scored_held),
+                    unscored_held=copy(hand_scoring.unscored_held)
+                )
+                update_cards = [card for card in combo]
+                copy_scoring.scored_played.extend(update_cards)
+                filter_held_cards(copy_scoring, update_cards)
+                hand_cache.append(copy_scoring)
+
+        else:        
+            cutoff_index = len(unplayed_cards) - free_space
+            hand_scoring.scored_played = (
+                hand_scoring.scored_played + unplayed_cards[cutoff_index:]
+            )
+
+            filter_held_cards(hand_scoring, unplayed_cards[cutoff_index:])
+
+        
+
+
 def add_chad(hand_cache: list[HandScoring]) -> None:
     cache_length = len(hand_cache)
     for cache_index in range(cache_length):
@@ -414,17 +462,18 @@ def add_chad(hand_cache: list[HandScoring]) -> None:
         if length == 1:
             continue
 
-        new_list = scored_played.copy()
-        for _ in range(length - 1):
-            last_val = new_list[-1]
-            for i in range(length - 2, -1, -1):
-                new_list[i + 1] = new_list[i]
-            new_list[0] = last_val
+        for swap_index in range(1, length):
+            new_list = scored_played.copy()
+            tmp = new_list[swap_index]
+            for i in range(swap_index, 0, -1):
+                new_list[i] = new_list[i - 1]
+
+            new_list[0] = tmp
 
             hand_cache.append(
                 HandScoring(
                     hand_stats=hand_scoring.hand_stats,
-                    scored_played=new_list.copy(),
+                    scored_played=new_list,
                     unscored_played=hand_scoring.unscored_played,
                     scored_held=hand_scoring.scored_held,
                     unscored_held=hand_scoring.unscored_held,
@@ -482,6 +531,9 @@ def generate_scoring_hand_combinations(
                 unscored_held=unscored_held,
             )
         )
+
+    if any(joker.background_image == JokersName.SPLASH for joker in jokers):
+        add_splash(hand_cache, jokers)
 
     # Since blackboard only activates when Spades and Clubs are held in hand,
     # its benifial to add dead cards when playing (i.e. playing extra hearts and diamonds even if they don't increase score)

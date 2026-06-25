@@ -1,71 +1,119 @@
 {
     "total": {
-        "test_count": 16,
-        "total_time_spend": 0.004151726996497018,
-        "total_combinations": 267
+        "test_count": 29,
+        "total_time_spend": 0.03125354199073627,
+        "total_combinations": 3454
     },
     "test_1": {
-        "time_spend": 0.00011635099872364663,
+        "time_spend": 0.00014174100215313956,
         "combinations": 7
     },
     "test_2": {
-        "time_spend": 0.00015164000069489703,
+        "time_spend": 0.00019637099831015803,
         "combinations": 11
     },
     "test_3": {
-        "time_spend": 0.00013879099788027816,
+        "time_spend": 0.00017843000023276545,
         "combinations": 13
     },
     "test_4": {
-        "time_spend": 0.0001173310010926798,
+        "time_spend": 0.00015456000255653635,
         "combinations": 11
     },
     "test_5": {
-        "time_spend": 0.00017432099775760435,
+        "time_spend": 0.00023044099725666456,
         "combinations": 18
     },
     "test_6": {
-        "time_spend": 9.341000259155408e-05,
+        "time_spend": 0.00012183999933768064,
         "combinations": 8
     },
     "test_7": {
-        "time_spend": 9.549999958835542e-05,
+        "time_spend": 0.00011404100223444402,
         "combinations": 8
     },
     "test_8": {
-        "time_spend": 0.0001632309977139812,
+        "time_spend": 0.0002009310010180343,
         "combinations": 16
     },
     "test_9": {
-        "time_spend": 0.0001755599987518508,
+        "time_spend": 0.00022460099717136472,
         "combinations": 17
     },
     "test_10": {
-        "time_spend": 0.00046553200081689283,
+        "time_spend": 0.0005940830014878884,
         "combinations": 55
     },
     "test_11": {
-        "time_spend": 0.00014328000179375522,
+        "time_spend": 0.00015689000065322034,
         "combinations": 8
     },
     "test_12": {
-        "time_spend": 0.00022196099962457083,
+        "time_spend": 0.00024374200074817054,
         "combinations": 13
     },
     "test_14": {
-        "time_spend": 0.0005548219996853732,
+        "time_spend": 0.0007102130002749618,
         "combinations": 31
     },
     "test_15": {
-        "time_spend": 0.00031376100014313124,
+        "time_spend": 0.00034810199940693565,
         "combinations": 12
     },
     "test_13": {
-        "time_spend": 0.0006725029998051468,
+        "time_spend": 0.0007564640000055078,
         "combinations": 31
     },
     "test_16": {
-        "time_spend": 0.0005537329998333007,
+        "time_spend": 0.0005922220007050782,
         "combinations": 8
+    },
+    "test_17": {
+        "time_spend": 0.00042321100045228377,
+        "combinations": 18
+    },
+    "test_18": {
+        "time_spend": 0.0002876009966712445,
+        "combinations": 15
+    },
+    "test_20": {
+        "time_spend": 0.010523144999751821,
+        "combinations": 1510
+    },
+    "test_21": {
+        "time_spend": 0.013242485998489428,
+        "combinations": 1510
+    },
+    "test_22": {
+        "time_spend": 0.0001245299972651992,
+        "combinations": 10
+    },
+    "test_23": {
+        "time_spend": 0.00015846099995542318,
+        "combinations": 17
+    },
+    "test_24": {
+        "time_spend": 0.0001517409982625395,
+        "combinations": 12
+    },
+    "test_25": {
+        "time_spend": 0.00017489099991507828,
+        "combinations": 17
+    },
+    "test_26": {
+        "time_spend": 0.00013520100037567317,
+        "combinations": 12
+    },
+    "test_27": {
+        "time_spend": 0.00027575099738896824,
+        "combinations": 17
+    },
+    "test_28": {
+        "time_spend": 0.0001691799989202991,
+        "combinations": 13
+    },
+    "test_29": {
+        "time_spend": 0.00030660099946544506,
+        "combinations": 23
     }
 }

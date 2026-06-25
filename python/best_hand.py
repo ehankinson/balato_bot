@@ -88,7 +88,7 @@ def add_to_order(
             mult_scoring_order.append((ADD, add_mult, prob))
 
     if x_mult > MULT:
-        mult_scoring_order.append((MULT, x_mult, 1.0))
+        mult_scoring_order.append((MULT, x_mult, prob))
 
 
 def extend_order(
@@ -180,6 +180,8 @@ def calculate_score(
     on_held_jokers = joker_plan.on_held
     after_hand_jokers = joker_plan.after_hand
 
+    lucky_triggers: int = 0
+
     best_hand = BestHand(
         chips=hand_stats.chips,
         worst_case_mult=hand_stats.mult,
@@ -215,6 +217,9 @@ def calculate_score(
         trigger = card.trigger
         for joker in played_joker_retriggers:
             trigger += calculate_joker_retrigger(joker, condition_args)
+
+        if card.enhancement == Enhancement.LUCKY:
+            lucky_triggers += 1
 
         best_hand.chips += card.chips * trigger
         add_to_order(
@@ -258,7 +263,11 @@ def calculate_score(
         mult_start_index = extend_order(mult_start_index, trigger, mult_scoring_order)
 
     for joker in after_hand_jokers:
-        j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
+        j_chips, j_add_mult, j_x_mult = 0, 0, 1
+        if joker.background_image == JokersName.LUCKY_CAT:
+            j_x_mult = 0.25 * lucky_triggers * 2
+        else:
+            j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
 
         best_hand.chips += j_chips
         add_to_order(j_add_mult, j_x_mult, joker.prob, mult_scoring_order)
@@ -347,6 +356,7 @@ def get_best_scoring_hand(
 
     for hand_scoring in hand_cache:
         for joker_plan in joker_plan_cache:
+            a = 5
             score = calculate_score(
                 hand_scoring, joker_plan, game_state, condition_args
             )

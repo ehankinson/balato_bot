@@ -5,7 +5,7 @@ from calculation.poker_eval import (
     is_straight,
 )
 from core.enums import Enhancement, Rank, Suit
-from core.models import JokerScoring, JokerScoringConditions
+from core.models import JokerReq, JokerScoring, JokerScoringConditions
 
 
 def calculate_scoring_condition(
@@ -84,6 +84,14 @@ def calculate_joker_scoring(
 ) -> tuple[int, int, float]:
     chips, add_mult, x_mult = 0, 0, 1.0
 
+    if joker.req != JokerReq():
+        condition = joker.condition
+        if "rank" in condition:
+            condition["rank"] = joker.req.rank
+
+        if "suit" in condition:
+            condition["suit"] = joker.req.suit
+        
     condition = joker.condition
     passes_condition = (
         all(
