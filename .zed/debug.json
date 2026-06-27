@@ -1,5 +1,15 @@
 [
   {
+    "label": "Debug vision",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/python/game.py",
+    "cwd": "$ZED_WORKTREE_ROOT/python",
+    "env": {
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
+    }
+  },
+  {
     "label": "Debug best_hand",
     "adapter": "Debugpy",
     "request": "launch",

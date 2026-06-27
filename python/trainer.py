@@ -53,8 +53,8 @@ def train_model(model_type: str):
     )
 
     # ===== LOAD DATA =====
-    train_dataset = datasets.ImageFolder(f"{data_dir}/train", transform=transform)
-    val_dataset = datasets.ImageFolder(f"{data_dir}/val", transform=transform)
+    train_dataset = datasets.ImageFolder(f"{ROOT_DIR}/{data_dir}/train", transform=transform)
+    val_dataset = datasets.ImageFolder(f"{ROOT_DIR}/{data_dir}/val", transform=transform)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
@@ -124,10 +124,10 @@ def train_model(model_type: str):
 
         val_acc = val_correct / val_total
 
-        print(f"Val Loss: {val_loss:.3f} | Val Acc: {val_acc:.3f}")
+        print(f"Val Loss: {val_loss:.3f} | Val Acc: {val_acc:.3f}\n")
 
     # ===== SAVE MODEL =====
-    output_path = model_config["output_path"]
+    output_path = f"{ROOT_DIR}/{model_config["output_path"]}"
 
     torch.save(
         {
@@ -138,7 +138,7 @@ def train_model(model_type: str):
             "class_names": train_dataset.classes,
             "state_dict": model.state_dict(),
         },
-        output_path,
+        output_path
     )
 
 
@@ -147,14 +147,19 @@ def train_joker_features() -> None:
         train_model(arg)
 
 
+def train_card_features() -> None:
+    for arg in ["rank", "suit", "seal", "edition", "enhancement"]:
+        train_model(arg)
+
+
 if __name__ == "__main__":
     available_commands = {
-        # "all_card_features": {"function": generate_all_feature_data},
-        # "card_enhancement": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.ENHANCEMENT]},
-        # "card_edition": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.EDITION]},
-        # "card_rank": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.RANK]},
-        # "card_suit": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SUIT]},
-        # "card_seal": {"function": generate_card_feature_data, "args": [CardFeatureTrainingType.SEAL]},
+        "all_card_features": {"function": train_card_features},
+        "card_enhancement": {"function": train_model, "args": ["enhancement"]},
+        "card_edition": {"function": train_model, "args": ["edition"]},
+        "card_rank": {"function": train_model, "args": ["rank"]},
+        "card_suit": {"function": train_model, "args": ["suit"]},
+        "card_seal": {"function": train_model, "args": ["seal"]},
         "playing_hands": {
             "function": train_card_box,
             "args": ["yaml/card_trainer.yaml"],

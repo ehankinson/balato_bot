@@ -61,16 +61,16 @@ def add_seal(img: Image.Image, seal_value: int) -> Image.Image:
 
 def add_edition(img: Image.Image, edition: int) -> Image.Image:
     match edition:
-        case 0:
+        case Edition.NONE:
             return img
 
-        case 1:
+        case Edition.FOIL:
             return foil_effect(img)
 
-        case 2:
+        case Edition.HOLOGRAPHIC:
             return hologram_effect(img)
 
-        case 3:
+        case Edition.POLYCHROME:
             return polychrome_effect(img)
 
     raise ValueError(f"This edition {edition} is impossible")

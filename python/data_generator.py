@@ -15,6 +15,7 @@ from config.settings import (
     JOKER_EDITION_CROP,
     JOKER_TYPE_CROP,
     RANK_CROP,
+    ROOT_DIR,
     SEAL_CROP,
     SUIT_CROP,
 )
@@ -29,7 +30,7 @@ from core.enums import (
     Seal,
     Suit,
 )
-from core.models import RANDOM_JOKERS, Card, Joker, RenderedHand
+from core.models import RANDOM_JOKERS, Card, Hand, Joker, RenderedHand
 from rendering.hand import render_hand
 from rendering.joker import render_jokers
 from utils.files import build_folder, rebuild_folder
@@ -37,7 +38,6 @@ from utils.images import card_crop
 
 CUTOFF = 0.9  # split between training and val
 CPU_COUNT = os.cpu_count()
-BATCH_SIZE = 10
 CropBox = tuple[int | float, int | float, int | float, int | float]
 
 CARD_FEATURE_ENUMS = {
@@ -86,12 +86,12 @@ def generate_rendered_hand(
     card_amount = (
         random_full_card_amount() if not is_feature else random_feature_card_amount()
     )
-    # hand = Hand.random_hand(card_amount)
-    # hand_render = render_hand(hand, True)
+    hand = Hand.random_hand(card_amount)
+    hand_render = render_hand(hand, True)
 
     name = f"{hand_index}_{card_amount}"
     split = "train" if hand_index < cutoff else "val"
-    return name, split, None
+    return name, split, hand_render
 
 
 def generate_rendered_jokers(
@@ -312,15 +312,14 @@ def generate_feature_data(
 
     def process_items(item_indices: range, progress: tqdm) -> None:
         thread_id = threading.get_ident()
-        count = 0
 
         for sample_index in item_indices:
             if special_data is not None:
-                _, split, rendered_data = render_function(
+                name, split, rendered_data = render_function(
                     sample_index, cutoff, special_data[sample_index]
                 )
             else:
-                _, split, rendered_data = render_function(sample_index, cutoff)
+                name, split, rendered_data = render_function(sample_index, cutoff)
 
             image = rendered_data.image
             item_locations = [
@@ -356,13 +355,10 @@ def generate_feature_data(
                 feature_label = str(int(feature))
                 feature_image_path = f"{image_path}/{feature_label}"
 
-                feature_image = (
-                    f"{feature_image_path}/{thread_id}_{count}_{feature_label}.png"
-                )
+                feature_image = f"{feature_image_path}/{thread_id}_{name}_{item_index}_{feature_label}.png"
 
                 crop_feature = item_image.crop((crop_values))
                 crop_feature.save(feature_image)
-                count += 1
 
             with progress_lock:
                 progress.update(1)
@@ -373,7 +369,8 @@ def generate_feature_data(
 
 
 def generate_card_feature_data(
-    train_type: CardFeatureTrainingType, hand_amount: int = 5000
+    train_type: CardFeatureTrainingType,
+    hand_amount: int = 5000,
 ) -> None:
     def should_skip_card(card: Card) -> bool:
         return (
@@ -384,7 +381,7 @@ def generate_card_feature_data(
     generate_feature_data(
         train_type=train_type,
         amount=hand_amount,
-        start_path=f"training_data/{FOLDER_TRAINING_NAMES[train_type]}_data",
+        start_path=f"{ROOT_DIR}/training_data/{FOLDER_TRAINING_NAMES[train_type]}_data",
         features=list(CARD_FEATURE_ENUMS[train_type]),
         render_function=lambda item_index, cutoff: generate_rendered_hand(
             item_index, cutoff, True
@@ -395,7 +392,8 @@ def generate_card_feature_data(
 
 
 def generate_joker_feature_data(
-    train_type: JokerFeatureTrainingType, jokers_amount: int = 5000
+    train_type: JokerFeatureTrainingType,
+    jokers_amount: int = 5000,
 ) -> None:
     jokers = (
         generate_joker_type_list(jokers_amount)
@@ -406,7 +404,7 @@ def generate_joker_feature_data(
     generate_feature_data(
         train_type=train_type,
         amount=jokers_amount,
-        start_path=f"training_data/{train_type.name.lower()}_data",
+        start_path=f"{ROOT_DIR}/training_data/{train_type.name.lower()}_data",
         features=list(JOKER_FEATURE_ENUMS[train_type]),
         render_function=generate_rendered_jokers,
         feature_function=joker_feature_info,
@@ -471,6 +469,7 @@ if __name__ == "__main__":
         exit()
 
     command = sys.argv[1]
-    function = available_commands[command]["function"]
-    args = available_commands[command].get("args", [])
+    command_config = available_commands[command]
+    function = command_config["function"]
+    args = command_config.get("args", [])
     function(*args)

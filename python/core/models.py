@@ -179,6 +179,17 @@ class Card:
         return self.card_id == other.card_id
 
 
+@dataclass
+class Hand:
+    cards: list[Card]
+
+    @classmethod
+    def random_hand(cls, card_amount: int):
+        return cls(
+            cards=[Card.random() for _ in range(card_amount)]
+        )
+
+
 @dataclass(slots=True)
 class CardBucket:
     count: int
@@ -206,8 +217,8 @@ class JokerScoringConditions:
 
 @dataclass(slots=True)
 class JokerReq:
-    rank: Rank = Rank.NONE
-    suit: Suit = Suit.NONE
+    rank: Rank | None = None
+    suit: Suit | None = None
 
 
 @dataclass(slots=True)
@@ -568,3 +579,8 @@ class CardAnnotation:
 class RenderedHand:
     image: Image.Image
     annotations: list[CardAnnotation]
+
+@dataclass
+class CardData:
+    card: Card
+    location: list[float]

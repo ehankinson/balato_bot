@@ -1,227 +1,157 @@
-import sys
+import time
 
-import cv2
-import torch
+from PIL import Image
+
 from best_hand import get_best_scoring_hand
-from config.model_registry import CARD_BOX_MODEL, JOKER_BOX_MODEL
+from config.model_registry import CARD_BOX_MODEL
 from config.settings import (
     EDITION_CROP,
     ENHANCEMENT_CROP,
-    JOKER_TYPE_CROP,
     RANK_CROP,
     SEAL_CROP,
     SUIT_CROP,
 )
-from core.class_indices import NEGATIVE_JOKER_EDITION_ID
-from core.enums import Edition, Enhancement, JokersName, Rank, Seal, Suit
-from core.models import Card, Joker
-from PIL import Image
-from torchvision import models, transforms
+from core.enums import Edition, Enhancement, Rank, Seal, Suit
+from core.models import Card, CardData, FinalScoringResults, GameState
+from model import load_model, run_model
 from utils.images import card_crop
 
-TUPLE = False
-CONFIDENCE = 0.9
+
+def pretty_time(seconds: float) -> str:
+    if seconds < 0.001:
+        return f"{seconds * 1_000_000:.0f}us"
+
+    if seconds < 1:
+        return f"{seconds * 1_000:.0f}ms"
+
+    return f"{seconds:.2f}s"
 
 
-def load_model(model_path: str):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(model_path, map_location=device)
-    width, height = checkpoint["img_size"]
+def get_card_locations(img: Image.Image):
+    results = CARD_BOX_MODEL(img)
+    for result in results:
+        boxes = result.boxes
 
-    model = models.mobilenet_v3_small(weights=None)
-    model.classifier[3] = torch.nn.Linear(
-        model.classifier[3].in_features, checkpoint["num_classes"]
-    )
+        for box in boxes:
+            xyxy = box.xyxy[0]  # x1, y1, x2, y2
+            confidence = box.conf[0]
+            class_id = box.cls[0]
 
-    model.load_state_dict(checkpoint["state_dict"])
-    model = model.to(device)
-    model.eval()
-
-    transform = transforms.Compose(
-        [
-            transforms.Resize((height, width)),
-            transforms.ToTensor(),
-        ]
-    )
-
-    return model, transform, checkpoint["class_names"], device
+            print("box:", xyxy)
+            print("confidence:", confidence)
+            print("class:", class_id)
 
 
-# load model once
-rank_model, rank_transform, rank_class_names, rank_device = load_model(
-    "models/rank_model.pt"
-)
-suit_model, suit_transform, suit_class_names, suit_device = load_model(
-    "models/suit_model.pt"
-)
-(
-    enhancement_model,
-    enhancement_transform,
-    enhancement_class_names,
-    enhancement_device,
-) = load_model("models/enhancement_model.pt")
-seal_model, seal_transform, seal_class_names, seal_device = load_model(
-    "models/seal_model.pt"
-)
-edition_model, edition_transform, edition_class_names, edition_device = load_model(
-    "models/edition_model.pt"
-)
-joker_type_model, joker_type_transform, joker_type_class_names, joker_type_device = (
-    load_model("models/joker_type_model.pt")
-)
-(
-    joker_edition_model,
-    joker_edition_transform,
-    joker_edition_class_names,
-    joker_edition_device,
-) = load_model("models/joker_edition_model.pt")
+def get_card_information(card_images: list[Image.Image]) -> list[Card]:
+    cards: list[Card] = []
+    for card_image in card_images:
+        w, h = card_image.size
+        card_data = {"rank": 0, "suit": 0, "enhancement": -1, "edition": -1, "seal": -1}
+        for feature in card_data.keys():
+            crop_box: tuple[int, int, int, int] = (0, 0, 0, 0)
+            match feature:
+                case "rank":
+                    crop_box = card_crop(w, h, RANK_CROP)
 
+                case "suit":
+                    crop_box = card_crop(w, h, SUIT_CROP)
 
-def predict_image(img: Image.Image, model, transform, class_names, device):
-    x = transform(img).unsqueeze(0).to(device)
+                case "enhancement":
+                    crop_box = card_crop(w, h, ENHANCEMENT_CROP)
 
-    with torch.no_grad():
-        output = model(x)
-        pred_idx = output.argmax(1).item()
+                case "edition":
+                    crop_box = card_crop(w, h, EDITION_CROP)
 
-    return class_names[pred_idx]
+                case "seal":
+                    crop_box = card_crop(w, h, SEAL_CROP)
 
+            crop_image = card_image.crop(crop_box)
+            output = run_model(feature, crop_image)
+            card_data[feature] = int(output)
 
-def get_card_locations_in_hand(results: list) -> list[list[float]]:
-    values = []
-
-    for box in results[0].boxes:
-        confidence = float(box.conf[0])
-        if confidence < CONFIDENCE:
-            continue
-
-        x1, y1, x2, y2 = box.xyxy[0]
-        x1, y1, x2, y2 = map(float, (x1, y1, x2, y2))
-        values.append([x1, y1, x2, y2])
-
-    return sorted(values, key=lambda x: x[0])
-
-
-def predict_rank(img: Image.Image):
-    return predict_image(img, rank_model, rank_transform, rank_class_names, rank_device)
-
-
-def predict_suit(img: Image.Image):
-    return predict_image(img, suit_model, suit_transform, suit_class_names, suit_device)
-
-
-def predict_enhancement(img: Image.Image):
-    return predict_image(
-        img,
-        enhancement_model,
-        enhancement_transform,
-        enhancement_class_names,
-        enhancement_device,
-    )
-
-
-def predict_seal(img: Image.Image):
-    return predict_image(img, seal_model, seal_transform, seal_class_names, seal_device)
-
-
-def predict_edition(img: Image.Image):
-    return predict_image(
-        img, edition_model, edition_transform, edition_class_names, edition_device
-    )
-
-
-def predict_joker_type(img: Image.Image):
-    return predict_image(
-        img,
-        joker_type_model,
-        joker_type_transform,
-        joker_type_class_names,
-        joker_type_device,
-    )
-
-
-def predict_joker_edition(img: Image.Image):
-    return predict_image(
-        img,
-        joker_edition_model,
-        joker_edition_transform,
-        joker_edition_class_names,
-        joker_edition_device,
-    )
-
-
-def get_cards(image: Image.Image) -> list[Card | Joker]:
-    results = JOKER_BOX_MODEL(image, verbose=False)
-    annotated = results[0].plot()
-    cv2.imwrite("output.png", annotated)
-
-    joker_positions = get_card_locations_in_hand(results)
-
-    detected_cards = []
-
-    for i, (x1, y1, x2, y2) in enumerate(joker_positions):
-        card = image.crop((x1, y1, x2, y2))
-        # card.save(f"{i}_card.png")
-        w, h = card.size
-        #     if w < 100 or h < 150:
-        #         continue
-        #
-        joker_crop = card.crop(card_crop(w, h, JOKER_TYPE_CROP))
-        joker_crop.save(f"{i}.png")
-        #     rank_crop = card.crop(card_crop(w, h, RANK_CROP))
-        #     suit_crop = card.crop(card_crop(w, h, SUIT_CROP))
-        #     enhancement_crop = card.crop(card_crop(w, h, ENHANCEMENT_CROP))
-        #     seal_crop = card.crop(card_crop(w, h, SEAL_CROP))
-        #     edition_crop = card.crop(card_crop(w, h, EDITION_CROP))
-
-        # joker_crop.save(f"{i}_joker_type.png")
-        #     # rank_crop.save(f"{i}_rank.png")
-        #     # suit_crop.save(f"{i}_suit.png")
-        #     # enhancement_crop.save(f"{i}_enhancement.png")
-        #     # seal_crop.save(f"{i}_seal.png")
-        #
-        joker_type = predict_joker_type(joker_crop)
-        joker_edition = predict_joker_edition(joker_crop)
-        #     rank = predict_rank(rank_crop)
-        #     suit = predict_suit(suit_crop)
-        #     seal = predict_seal(seal_crop)
-        #     enhancement = predict_enhancement(enhancement_crop)
-        #     edition = predict_edition(edition_crop)
-
-        #     detected_cards.append(Card(
-        #         rank=Rank(int(rank)),
-        #         suit=Suit(int(suit)),
-        #         enhancement=Enhancement(int(enhancement)),
-        #         seal=Seal(int(seal)),
-        #         edition=Edition(int(edition))
-        #     ))
-        #
-        int_e = int(joker_edition)
-        is_negative = int_e == NEGATIVE_JOKER_EDITION_ID
-        edition = 0 if is_negative else int_e
-        detected_cards.append(
-            Joker(
-                background_image=JokersName(int(joker_type)),
-                negative=is_negative,
-                edition=Edition(edition),
-            )
+        card = Card(
+            rank=Rank(card_data["rank"]),
+            suit=Suit(card_data["suit"]),
+            enhancement=Enhancement(card_data["enhancement"]),
+            seal=Seal(card_data["seal"]),
+            edition=Edition(card_data["edition"])
         )
+        cards.append(card)
 
-    return detected_cards
+    return cards
 
+
+def get_played_hand(img: Image.Image) -> tuple[list[CardData], list[CardData], list[CardData]]:
+    results = CARD_BOX_MODEL(img, verbose=False)
+    game_state = GameState()
+
+    card_locations = []
+    start_time = time.perf_counter()
+    results = CARD_BOX_MODEL(img, verbose=False)
+    
+    for res in results:
+        for i, box in enumerate(res.boxes):
+            if float(box.conf) < 0.9:
+                continue
+
+            location = [float(val) for val in box.xyxy[0]]
+            card_locations.append(location)
+    location_end_time = time.perf_counter()
+    
+    card_images = []
+    for i, location in enumerate(card_locations):
+        card_image = img.crop(location)
+        card_image.save(f"../card_{i}.png")
+        card_images.append(card_image)
+
+    cards = get_card_information(card_images)
+
+    for card in cards:
+        print(card)
+    print()
+    
+    feature_end_time = time.perf_counter()
+
+
+    best_hand_start = time.perf_counter()
+    best_hand = get_best_scoring_hand(cards, [], game_state)
+    best_hand_end = time.perf_counter()
+
+    card_location_time = location_end_time - start_time
+    card_feature_time = feature_end_time - location_end_time
+    card_best_hand_time = best_hand_end - best_hand_start
+
+    total_time = card_location_time + card_feature_time + card_best_hand_time
+
+    location_pct = card_location_time / total_time
+    feature_pct = card_feature_time / total_time
+    best_hand_pct = card_best_hand_time / total_time
+
+    print(f"The location took {pretty_time(card_location_time)} which was {round(location_pct * 100, 3)}%")
+    print(f"The location took {pretty_time(card_feature_time)} which was {round(feature_pct * 100, 3)}%")
+    print(f"The location took {pretty_time(card_best_hand_time)} which was {round(best_hand_pct * 100, 3)}%")
+
+    scored_played = []
+    for card in best_hand.hand_scoring.scored_played:
+        index = cards.index(card)
+        card_location = card_locations[index]
+        scored_played.append(CardData(card=card, location=card_location))
+
+    unscored_played = []
+    for card in best_hand.hand_scoring.unscored_played:
+        index = cards.index(card)
+        card_location = card_locations[index]
+        unscored_played.append(CardData(card=card, location=card_location))
+
+    scored_held = []
+    for card in best_hand.hand_scoring.scored_held:
+        index = cards.index(card)
+        card_location = card_locations[index]
+        scored_held.append(CardData(card=card, location=card_location))
+    
+
+    return scored_played, unscored_played, scored_held
 
 if __name__ == "__main__":
-    args = sys.argv
-    image_count = args[1]
-    # image = Image.open(f"training_data/real_data/hand_{image_count}.png").convert("RGB")
-    image = Image.open(
-        "/home/hank/projects/balato_bot/training_data/7_joker.png"
-    ).convert("RGB")
-    cards = get_cards(image)
-    for c in cards:
-        print(c)
-
-    # best_score, best_hand = get_best_scoring_hand(cards)
-    # print(f"\nThe best score is {best_score}")
-    # print(f"The Cards played are {best_hand[0]}")
-    # print(f"The Cards held in hand are {best_hand[1]}")
+    img = Image.open("/home/hank/projects/balatro_bot/hand_0.png").convert("RGB")
+    get_played_hand(img)

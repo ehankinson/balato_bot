@@ -2,7 +2,6 @@ from enum import IntEnum
 
 
 class Rank(IntEnum):
-    NONE = -1
     TWO = 0
     THREE = 1
     FOUR = 2
@@ -19,7 +18,6 @@ class Rank(IntEnum):
 
 
 class Suit(IntEnum):
-    NONE = -1
     HEARTS = 0
     DIAMONDS = 1
     CLUBS = 2
