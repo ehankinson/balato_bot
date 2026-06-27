@@ -44,51 +44,49 @@ def get_card_locations(img: Image.Image):
 
 def get_card_information(card_images: list[Image.Image]) -> list[Card]:
     cards: list[Card] = []
+
+    feature_map = {
+        "rank": {"values": [], "crop": RANK_CROP},
+        "seal": {"values": [], "crop": SEAL_CROP},
+        "suit": {"values": [], "crop": SUIT_CROP},
+        "edition": {"values": [], "crop": EDITION_CROP},
+        "enhancement": {"values": [], "crop": ENHANCEMENT_CROP},
+    }
+
     for card_image in card_images:
         w, h = card_image.size
-        card_data = {"rank": 0, "suit": 0, "enhancement": -1, "edition": -1, "seal": -1}
-        for feature in card_data.keys():
-            crop_box: tuple[int, int, int, int] = (0, 0, 0, 0)
-            match feature:
-                case "rank":
-                    crop_box = card_crop(w, h, RANK_CROP)
+        for feature in feature_map:
+            feature_map[feature]["values"].append(
+                card_image.crop(card_crop(w, h, feature_map[feature]["crop"]))
+            )
 
-                case "suit":
-                    crop_box = card_crop(w, h, SUIT_CROP)
+    for feature in feature_map:
+        outputs = run_model(feature, feature_map[feature]["values"])
+        feature_map[feature]["values"] = outputs
 
-                case "enhancement":
-                    crop_box = card_crop(w, h, ENHANCEMENT_CROP)
-
-                case "edition":
-                    crop_box = card_crop(w, h, EDITION_CROP)
-
-                case "seal":
-                    crop_box = card_crop(w, h, SEAL_CROP)
-
-            crop_image = card_image.crop(crop_box)
-            output = run_model(feature, crop_image)
-            card_data[feature] = int(output)
-
-        card = Card(
-            rank=Rank(card_data["rank"]),
-            suit=Suit(card_data["suit"]),
-            enhancement=Enhancement(card_data["enhancement"]),
-            seal=Seal(card_data["seal"]),
-            edition=Edition(card_data["edition"])
+    for i in range(len(card_images)):
+        cards.append(
+            Card(
+                rank=Rank(feature_map["rank"]["values"][i]),
+                suit=Suit(feature_map["suit"]["values"][i]),
+                enhancement=Enhancement(feature_map["enhancement"]["values"][i]),
+                seal=Seal(feature_map["seal"]["values"][i]),
+                edition=Edition(feature_map["edition"]["values"][i]),
+            )
         )
-        cards.append(card)
 
     return cards
 
 
-def get_played_hand(img: Image.Image) -> tuple[list[CardData], list[CardData], list[CardData]]:
-    results = CARD_BOX_MODEL(img, verbose=False)
+def get_played_hand(
+    img: Image.Image,
+) -> tuple[list[CardData], list[CardData], list[CardData]]:
     game_state = GameState()
 
     card_locations = []
     start_time = time.perf_counter()
     results = CARD_BOX_MODEL(img, verbose=False)
-    
+
     for res in results:
         for i, box in enumerate(res.boxes):
             if float(box.conf) < 0.9:
@@ -97,7 +95,7 @@ def get_played_hand(img: Image.Image) -> tuple[list[CardData], list[CardData], l
             location = [float(val) for val in box.xyxy[0]]
             card_locations.append(location)
     location_end_time = time.perf_counter()
-    
+
     card_images = []
     for i, location in enumerate(card_locations):
         card_image = img.crop(location)
@@ -109,9 +107,8 @@ def get_played_hand(img: Image.Image) -> tuple[list[CardData], list[CardData], l
     for card in cards:
         print(card)
     print()
-    
-    feature_end_time = time.perf_counter()
 
+    feature_end_time = time.perf_counter()
 
     best_hand_start = time.perf_counter()
     best_hand = get_best_scoring_hand(cards, [], game_state)
@@ -127,9 +124,15 @@ def get_played_hand(img: Image.Image) -> tuple[list[CardData], list[CardData], l
     feature_pct = card_feature_time / total_time
     best_hand_pct = card_best_hand_time / total_time
 
-    print(f"The location took {pretty_time(card_location_time)} which was {round(location_pct * 100, 3)}%")
-    print(f"The location took {pretty_time(card_feature_time)} which was {round(feature_pct * 100, 3)}%")
-    print(f"The location took {pretty_time(card_best_hand_time)} which was {round(best_hand_pct * 100, 3)}%")
+    print(
+        f"The location took {pretty_time(card_location_time)} which was {round(location_pct * 100, 3)}%"
+    )
+    print(
+        f"The location took {pretty_time(card_feature_time)} which was {round(feature_pct * 100, 3)}%"
+    )
+    print(
+        f"The location took {pretty_time(card_best_hand_time)} which was {round(best_hand_pct * 100, 3)}%"
+    )
 
     scored_played = []
     for card in best_hand.hand_scoring.scored_played:
@@ -148,9 +151,9 @@ def get_played_hand(img: Image.Image) -> tuple[list[CardData], list[CardData], l
         index = cards.index(card)
         card_location = card_locations[index]
         scored_held.append(CardData(card=card, location=card_location))
-    
 
     return scored_played, unscored_played, scored_held
+
 
 if __name__ == "__main__":
     img = Image.open("/home/hank/projects/balatro_bot/hand_0.png").convert("RGB")

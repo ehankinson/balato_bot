@@ -58,6 +58,7 @@ def play_hand(played_hand: list[CardData]) -> None:
 def save_hand() -> None:
     for _ in range(4):
         hand_img = get_hand()
+        hand_img.save("../hand_0.png")
         scored_played, _, _ = get_played_hand(hand_img)
         play_hand(scored_played)
 

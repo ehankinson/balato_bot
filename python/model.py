@@ -21,12 +21,13 @@ def load_model(name: str):
     return model, checkpoint
 
 
-def run_model(name: str, img: Image.Image) -> str:
+def run_model(name: str, images: list[Image.Image]) -> list[int]:
     if name not in MODEL_QUEUE:
         model, checkpoint = load_model(name)
         MODEL_QUEUE[name] = { "model": model, "checkpoint": checkpoint }
 
-    model, checkpoint = MODEL_QUEUE[name].values()
+    model = MODEL_QUEUE[name]["model"]
+    checkpoint = MODEL_QUEUE[name]["checkpoint"]
     
     width, height = checkpoint["img_size"]
 
@@ -35,13 +36,14 @@ def run_model(name: str, img: Image.Image) -> str:
         transforms.ToTensor(),
     ])
 
-    x = transform(img).unsqueeze(0)
+    device = "cuda"
+    model.to(device)
+    x = torch.stack([transform(img) for img in images]).to(device)
 
-    with torch.no_grad():
+    with torch.inference_mode():
         outputs = model(x)
-        prediction = outputs.argmax(1).item()
+        predictions = outputs.argmax(1).cpu()
 
-    normalaized_prediction = checkpoint["class_names"][prediction]
 
-    return normalaized_prediction
+    return [int(checkpoint["class_names"][prediction]) for prediction in predictions]
     
