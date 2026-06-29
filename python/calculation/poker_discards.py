@@ -4,6 +4,7 @@ import time
 from core.enums import Rank, Suit
 from core.models import Card, Deck
 
+
 def pretty_time(seconds: float) -> str:
     if seconds < 0.001:
         return f"{seconds * 1_000_000:.0f}us"
@@ -22,28 +23,21 @@ def flush_odds(deck: Deck, dealt_cards: list[Card]):
 
         suit_bucket[card.suit] += 1
 
-    combination_cache = [math.comb(5, amount) for amount in range(1, 6)]
     total_cards = deck.total_cards
+    total_draw_combos = math.comb(total_cards, 5)
+
     for suit, dealt_suit_count in suit_bucket.items():
         deck_suit_total = len(deck.suits[suit])
         total_probability = 0.0
         amount_needed_for_flush = 5 - dealt_suit_count
-        for amount in range(amount_needed_for_flush, 6):
-            probability = 1.0
-            tmp_suit_total = deck_suit_total
-            for i in range(5):
-                if i < amount:
-                    probability *= tmp_suit_total / total_cards
-                    tmp_suit_total -= 1
-                else:
-                    probability *= (total_cards - tmp_suit_total) / total_cards
-                    
-                total_cards -= 1
-                
-            total_probability += probability * combination_cache[amount - 1]
-            total_cards += 5
-
-        print(f"Probability for {suit} is: {round(total_probability * 100, 3)}%")
+        non_flush_cards = total_cards - deck_suit_total
+        
+        for amount in range(amount_needed_for_flush, 6):    
+            total_probability += (
+                math.comb(deck_suit_total, amount)
+                * math.comb(non_flush_cards, 5 - amount)
+                / total_draw_combos
+            )
 
 
 if __name__ == "__main__":
