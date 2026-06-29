@@ -1,3 +1,4 @@
+from itertools import combinations
 import random
 from dataclasses import dataclass, field
 
@@ -31,9 +32,9 @@ RANDOM_JOKERS = list(JOKER_TYPE_CLASSES)
 class Card:
     rank: Rank
     suit: Suit
-    enhancement: Enhancement
-    seal: Seal
-    edition: Edition
+    enhancement: Enhancement = Enhancement.NONE
+    seal: Seal = Seal.NONE
+    edition: Edition = Edition.NONE
     chips: int = 0
     add_mult: int = 0
     trigger: int = 1
@@ -48,10 +49,6 @@ class Card:
     is_facecard: bool = False
     is_low_card: bool = False
     is_any_suit: bool = False
-
-    @classmethod
-    def build_dummy(cls) -> Card:
-        return Card(Rank.ACE, Suit.HEARTS, Enhancement.NONE, Seal.NONE, Edition.NONE)
 
     def __post_init__(self):
         self.is_facecard = self.rank > Rank.TEN and self.rank < Rank.ACE
@@ -155,6 +152,10 @@ class Card:
             edition=random.choice(list(Edition)),
         )
 
+    @classmethod
+    def build_dummy(cls):
+        return Card(Rank.ACE, Suit.HEARTS, Enhancement.NONE, Seal.NONE, Edition.NONE)
+
     def __repr__(self):
         base = f"{CARD_STRINGS[self.rank]} of {self.suit.name}"
 
@@ -185,9 +186,58 @@ class Hand:
 
     @classmethod
     def random_hand(cls, card_amount: int):
-        return cls(
-            cards=[Card.random() for _ in range(card_amount)]
-        )
+        return cls(cards=[Card.random() for _ in range(card_amount)])
+
+
+@dataclass(slots=True)
+class Deck:
+    total_cards: int = 0
+    cards: dict[Card, int] = field(default_factory=dict)
+    facecards: list[Card] = field(default_factory=list)
+    suits: dict[int, list[Card]] = field(default_factory=dict)
+    discards: dict[Card, int] = field(default_factory=dict)
+
+    def __post_init__(self):
+        self._build_deck()
+
+    def _build_deck(self) -> None:
+        for rank in Rank:
+            for suit in Suit:
+                card = Card(
+                    rank=rank,
+                    suit=suit,
+                    enhancement=Enhancement.NONE,
+                    seal=Seal.NONE,
+                    edition=Edition.NONE,
+                )
+                
+                self.cards[card] = 1
+                
+                if card.is_facecard:
+                    self.facecards.append(card)
+
+                if card.suit not in self.suits:
+                    self.suits[card.suit] = []
+
+                self.suits[card.suit].append(card)
+
+                self.total_cards += 1
+
+    def filter(self, hand: list[Card]) -> None:
+        for card in hand:
+            self.cards[card] -= 1
+            self.suits[card.suit].remove(card)
+            if card.is_facecard:
+                self.facecards.remove(card)
+            
+            if card not in self.discards:
+                self.discards[card] = 0
+
+            self.discards[card] += 1
+            self.total_cards -= 1
+        
+        
+    
 
 
 @dataclass(slots=True)
@@ -401,7 +451,7 @@ class Joker:
                 copyable=joker_data["copyable"],
                 trigger=JokerTriggers(modifier_data.get("trigger")),
                 money=modifier_data.get("money"),
-                condition=modifier_data.get("condition", None)
+                condition=modifier_data.get("condition", None),
             )
 
         else:
@@ -579,6 +629,7 @@ class CardAnnotation:
 class RenderedHand:
     image: Image.Image
     annotations: list[CardAnnotation]
+
 
 @dataclass
 class CardData:

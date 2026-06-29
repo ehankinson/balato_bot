@@ -3,7 +3,7 @@
     "label": "Debug vision",
     "adapter": "Debugpy",
     "request": "launch",
-    "program": "$ZED_WORKTREE_ROOT/python/vision.py",
+    "program": "$ZED_WORKTREE_ROOT/python/calculation/poker_discards.py",
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"

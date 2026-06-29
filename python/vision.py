@@ -99,7 +99,6 @@ def get_played_hand(
     card_images = []
     for i, location in enumerate(card_locations):
         card_image = img.crop(location)
-        card_image.save(f"../card_{i}.png")
         card_images.append(card_image)
 
     cards = get_card_information(card_images)
