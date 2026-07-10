@@ -1,5 +1,3 @@
-import time
-
 from PIL import Image
 
 from best_hand import get_best_scoring_hand
@@ -13,18 +11,8 @@ from config.settings import (
 )
 from core.enums import Edition, Enhancement, Rank, Seal, Suit
 from core.models import Card, CardData, FinalScoringResults, GameState
-from model import load_model, run_model
+from model import preload_models, run_model
 from utils.images import card_crop
-
-
-def pretty_time(seconds: float) -> str:
-    if seconds < 0.001:
-        return f"{seconds * 1_000_000:.0f}us"
-
-    if seconds < 1:
-        return f"{seconds * 1_000:.0f}ms"
-
-    return f"{seconds:.2f}s"
 
 
 def get_card_locations(img: Image.Image):
@@ -81,10 +69,10 @@ def get_card_information(card_images: list[Image.Image]) -> list[Card]:
 def get_played_hand(
     img: Image.Image,
 ) -> tuple[list[CardData], list[CardData], list[CardData]]:
+    preload_models()
     game_state = GameState()
 
     card_locations = []
-    start_time = time.perf_counter()
     results = CARD_BOX_MODEL(img, verbose=False)
 
     for res in results:
@@ -94,7 +82,6 @@ def get_played_hand(
 
             location = [float(val) for val in box.xyxy[0]]
             card_locations.append(location)
-    location_end_time = time.perf_counter()
 
     card_images = []
     for i, location in enumerate(card_locations):
@@ -103,35 +90,7 @@ def get_played_hand(
 
     cards = get_card_information(card_images)
 
-    for card in cards:
-        print(card)
-    print()
-
-    feature_end_time = time.perf_counter()
-
-    best_hand_start = time.perf_counter()
     best_hand = get_best_scoring_hand(cards, [], game_state)
-    best_hand_end = time.perf_counter()
-
-    card_location_time = location_end_time - start_time
-    card_feature_time = feature_end_time - location_end_time
-    card_best_hand_time = best_hand_end - best_hand_start
-
-    total_time = card_location_time + card_feature_time + card_best_hand_time
-
-    location_pct = card_location_time / total_time
-    feature_pct = card_feature_time / total_time
-    best_hand_pct = card_best_hand_time / total_time
-
-    print(
-        f"The location took {pretty_time(card_location_time)} which was {round(location_pct * 100, 3)}%"
-    )
-    print(
-        f"The location took {pretty_time(card_feature_time)} which was {round(feature_pct * 100, 3)}%"
-    )
-    print(
-        f"The location took {pretty_time(card_best_hand_time)} which was {round(best_hand_pct * 100, 3)}%"
-    )
 
     scored_played = []
     for card in best_hand.hand_scoring.scored_played:

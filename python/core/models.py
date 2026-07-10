@@ -1,6 +1,6 @@
-from itertools import combinations
 import random
 from dataclasses import dataclass, field
+from itertools import combinations
 
 from PIL import Image
 from sympy.functions.combinatorial.numbers import E
@@ -9,7 +9,12 @@ from config.settings import JOKER_CONFIG
 from core.class_indices import JOKER_TYPE_CLASSES
 from core.enums import Edition, Enhancement, JokersName, JokerTriggers, Rank, Seal, Suit
 from core.hand_stats import HandStats
-from core.scoring import get_initial_card_chips
+from core.scoring import (
+    EDITION_SCORING,
+    ENHANCEMENT_SCORING,
+    SEAL_SCORING,
+    get_initial_card_chips,
+)
 from utils.files import load_json
 
 CONFIG = load_json(JOKER_CONFIG)
@@ -42,6 +47,7 @@ class Card:
     hand_x_mult: float = 1
     card_id: int = 0
     econ: int = 0
+    score: int = 1
     card_score: int = 0
     mult_prob: float = 1.0
     econ_prob: float = 1.0
@@ -57,7 +63,8 @@ class Card:
         self.add_enhancement()
         self.add_edition()
         self.add_seal()
-        self.card_id = self.score()
+        self.card_id = self.id()
+        self.score = self.calculate_score()
 
     def add_enhancement(self) -> None:
         match self.enhancement:
@@ -87,6 +94,8 @@ class Card:
 
             case Enhancement.STEEL:
                 self.hand_x_mult *= 1.5
+
+        self.calculate_score()
 
     def remove_enhancement(self) -> None:
         match self.enhancement:
@@ -118,6 +127,7 @@ class Card:
                 self.hand_x_mult -= 1.5
 
         self.enhancement = Enhancement.NONE
+        self.calculate_score()
 
     def add_edition(self) -> None:
         match self.edition:
@@ -130,17 +140,29 @@ class Card:
             case Edition.POLYCHROME:
                 self.play_x_mult *= 1.5
 
+        self.calculate_score()
+
     def add_seal(self) -> None:
         if self.seal == Seal.RED:
             self.trigger += 1
 
-    def score(self) -> int:
+        self.calculate_score()
+
+    def id(self) -> int:
         val = self.rank & 0b1111
         val = (val << 2) | (self.suit & 0b11)
         val = (val << 4) | (self.enhancement & 0b1111)
         val = (val << 3) | (self.seal & 0b111)
         val = (val << 2) | (self.edition & 0b11)
         return val
+
+    def calculate_score(self) -> int:
+        score = 1
+        score *= ENHANCEMENT_SCORING[self.enhancement]
+        score *= SEAL_SCORING[self.seal]
+        score *= EDITION_SCORING[self.edition]
+        score += get_initial_card_chips(self.rank)
+        return score
 
     @classmethod
     def random(cls):
@@ -211,9 +233,9 @@ class Deck:
                     seal=Seal.NONE,
                     edition=Edition.NONE,
                 )
-                
+
                 self.cards[card] = 1
-                
+
                 if card.is_facecard:
                     self.facecards.append(card)
 
@@ -232,18 +254,15 @@ class Deck:
             self.cards[card] -= 1
             self.suits[card.suit].remove(card)
             self.ranks[card.rank].remove(card)
-            
+
             if card.is_facecard:
                 self.facecards.remove(card)
-            
+
             if card not in self.discards:
                 self.discards[card] = 0
 
             self.discards[card] += 1
             self.total_cards -= 1
-        
-        
-    
 
 
 @dataclass(slots=True)

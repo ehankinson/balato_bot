@@ -25,7 +25,7 @@ def load_json(filepath: str) -> dict:
 
 def write_json(filepath: str, object: dict) -> None:
     with open(filepath, "w", encoding="utf-8") as j:
-        json.dump(object, j, indent=4)
+        json.dump(object, j, indent=4, ensure_ascii=False)
 
 
 def build_folder(folder_path: str) -> None:

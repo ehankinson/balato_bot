@@ -1,119 +1,146 @@
 {
     "total": {
-        "test_count": 29,
-        "total_time_spend": 0.027429813006165205,
-        "total_combinations": 3454
+        "test_count": 28,
+        "total_time_spend_ns": 27112390,
+        "total_combinations": 3431,
+        "pretty_total_time_spend": "27.112 ms"
     },
     "test_1": {
-        "time_spend": 0.00014298099995357916,
+        "time_spend_ns": 113010,
+        "pretty_time_spend": "113.010 µs",
         "combinations": 7
     },
     "test_2": {
-        "time_spend": 0.00019462099953670986,
+        "time_spend_ns": 154881,
+        "pretty_time_spend": "154.881 µs",
         "combinations": 11
     },
     "test_3": {
-        "time_spend": 0.00017813999875215814,
+        "time_spend_ns": 143190,
+        "pretty_time_spend": "143.190 µs",
         "combinations": 13
     },
     "test_4": {
-        "time_spend": 0.00015290100054698996,
+        "time_spend_ns": 101800,
+        "pretty_time_spend": "101.800 µs",
         "combinations": 11
     },
     "test_5": {
-        "time_spend": 0.0002381310005148407,
+        "time_spend_ns": 147391,
+        "pretty_time_spend": "147.391 µs",
         "combinations": 18
     },
     "test_6": {
-        "time_spend": 0.00012078999861842021,
+        "time_spend_ns": 80430,
+        "pretty_time_spend": "80.430 µs",
         "combinations": 8
     },
     "test_7": {
-        "time_spend": 0.00012119999882997945,
+        "time_spend_ns": 82650,
+        "pretty_time_spend": "82.650 µs",
         "combinations": 8
     },
     "test_8": {
-        "time_spend": 0.00021461099822772667,
+        "time_spend_ns": 130471,
+        "pretty_time_spend": "130.471 µs",
         "combinations": 16
     },
     "test_9": {
-        "time_spend": 0.0002407610008958727,
+        "time_spend_ns": 147000,
+        "pretty_time_spend": "147.000 µs",
         "combinations": 17
     },
     "test_10": {
-        "time_spend": 0.0005960620001133066,
+        "time_spend_ns": 359422,
+        "pretty_time_spend": "359.422 µs",
         "combinations": 55
     },
     "test_11": {
-        "time_spend": 0.00015956100105540827,
+        "time_spend_ns": 110050,
+        "pretty_time_spend": "110.050 µs",
         "combinations": 8
     },
     "test_12": {
-        "time_spend": 0.000247539999691071,
+        "time_spend_ns": 166771,
+        "pretty_time_spend": "166.771 µs",
         "combinations": 13
     },
     "test_14": {
-        "time_spend": 0.0006123430030129384,
+        "time_spend_ns": 388821,
+        "pretty_time_spend": "388.821 µs",
         "combinations": 31
     },
     "test_15": {
-        "time_spend": 0.00034752099963952787,
+        "time_spend_ns": 218741,
+        "pretty_time_spend": "218.741 µs",
         "combinations": 12
     },
     "test_13": {
-        "time_spend": 0.0007595520000904799,
+        "time_spend_ns": 489991,
+        "pretty_time_spend": "489.991 µs",
         "combinations": 31
     },
     "test_16": {
-        "time_spend": 0.0006015720027789939,
+        "time_spend_ns": 418041,
+        "pretty_time_spend": "418.041 µs",
         "combinations": 8
     },
     "test_17": {
-        "time_spend": 0.00042792100066435523,
+        "time_spend_ns": 283151,
+        "pretty_time_spend": "283.151 µs",
         "combinations": 18
     },
     "test_18": {
-        "time_spend": 0.0003051810017495882,
+        "time_spend_ns": 195590,
+        "pretty_time_spend": "195.590 µs",
         "combinations": 15
     },
     "test_20": {
-        "time_spend": 0.006384561002050759,
+        "time_spend_ns": 6455112,
+        "pretty_time_spend": "6.455 ms",
         "combinations": 1510
     },
     "test_21": {
-        "time_spend": 0.013553926000895444,
+        "time_spend_ns": 15545362,
+        "pretty_time_spend": "15.545 ms",
         "combinations": 1510
     },
     "test_22": {
-        "time_spend": 0.0001347010002064053,
+        "time_spend_ns": 126790,
+        "pretty_time_spend": "126.790 µs",
         "combinations": 10
     },
     "test_23": {
-        "time_spend": 0.00016004100325517356,
+        "time_spend_ns": 151621,
+        "pretty_time_spend": "151.621 µs",
         "combinations": 17
     },
     "test_24": {
-        "time_spend": 0.0001610709987289738,
+        "time_spend_ns": 152650,
+        "pretty_time_spend": "152.650 µs",
         "combinations": 12
     },
     "test_25": {
-        "time_spend": 0.00017417100025340915,
+        "time_spend_ns": 175371,
+        "pretty_time_spend": "175.371 µs",
         "combinations": 17
     },
     "test_26": {
-        "time_spend": 0.0001316699999733828,
+        "time_spend_ns": 128641,
+        "pretty_time_spend": "128.641 µs",
         "combinations": 12
     },
     "test_27": {
-        "time_spend": 0.0002739509982347954,
+        "time_spend_ns": 268911,
+        "pretty_time_spend": "268.911 µs",
         "combinations": 17
     },
     "test_28": {
-        "time_spend": 0.0001777099969331175,
+        "time_spend_ns": 171090,
+        "pretty_time_spend": "171.090 µs",
         "combinations": 13
     },
     "test_29": {
-        "time_spend": 0.0003097810003964696,
         "combinations": 23
     }
 }

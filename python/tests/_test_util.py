@@ -45,8 +45,8 @@ def buildable_jokers_of_type(joker_type: type[Joker]) -> set[JokersName]:
 def scoring_joker(
     joker_name: JokersName,
     *,
-    req_rank: Rank = Rank.NONE,
-    req_suit: Suit = Suit.NONE,
+    req_rank: Rank,
+    req_suit: Suit,
 ) -> JokerScoring:
     joker = Joker.build(joker_name)
     assert isinstance(joker, JokerScoring)
@@ -62,8 +62,8 @@ def score_joker(
     scoring_held: list[Card] | None = None,
     unscoring_held: list[Card] | None = None,
     face_card_count: int = -1,
-    req_rank: Rank = Rank.NONE,
-    req_suit: Suit = Suit.NONE,
+    req_rank: Rank,
+    req_suit: Suit,
 ) -> tuple[int, int, float]:
     played = scoring_played or [card or build_card(Rank.ACE)]
     scoring_card = card or played[0]

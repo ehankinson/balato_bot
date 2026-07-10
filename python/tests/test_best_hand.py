@@ -31,6 +31,19 @@ PERFORMANCE_FILE = os.path.join(
 )
 
 
+def format_duration_ns(nanoseconds: int) -> str:
+    if nanoseconds < 1_000:
+        return f"{nanoseconds:,} ns"
+
+    if nanoseconds < 1_000_000:
+        return f"{nanoseconds / 1_000:.3f} µs"
+
+    if nanoseconds < 1_000_000_000:
+        return f"{nanoseconds / 1_000_000:.3f} ms"
+
+    return f"{nanoseconds / 1_000_000_000:.3f} s"
+
+
 def build_test_game_state(jokers: list[Joker], cards: list[Card]) -> GameState:
     game_state = GameState()
     build_game_state(
@@ -44,8 +57,8 @@ def build_test_game_state(jokers: list[Joker], cards: list[Card]) -> GameState:
 def build_joker(
     joker_name: JokersName,
     *,
-    req_rank: Rank = Rank.NONE,
-    req_suit: Suit = Suit.NONE,
+    req_rank: Rank,
+    req_suit: Suit,
 ) -> Joker:
     joker = Joker.build(joker_name)
     joker.req = JokerReq(rank=req_rank, suit=req_suit)
@@ -112,10 +125,10 @@ def run_assert(
     game_state: GameState,
     expected: FinalScoringResults,
 ):
-    start_time = time.perf_counter()
+    start_time = time.perf_counter_ns()
     best_score, iterations = get_best_scoring_hand(cards, jokers, game_state, test=True)
-    end_time = time.perf_counter()
-    time_spent = end_time - start_time
+    end_time = time.perf_counter_ns()
+    time_spent_ns = end_time - start_time
 
     assert_final_scoring_results(best_score, expected)
     data = load_json(PERFORMANCE_FILE)
@@ -123,15 +136,27 @@ def run_assert(
     if "total" not in data or test_number == 1:
         data["total"] = {
             "test_count": 0,
-            "total_time_spend": 0.0,
+            "total_time_spend_ns": 0,
             "total_combinations": 0,
         }
 
+    data["total"].pop("total_time_spend", None)
     data["total"]["test_count"] += 1
-    data["total"]["total_time_spend"] += time_spent
+    data["total"]["total_time_spend_ns"] += time_spent_ns
     data["total"]["total_combinations"] += iterations
+    data["total"]["pretty_total_time_spend"] = format_duration_ns(
+        data["total"]["total_time_spend_ns"]
+    )
 
-    data[f"test_{test_number}"] = {"time_spend": time_spent, "combinations": iterations}
+    data[f"test_{test_number}"] = {
+        "time_spend_ns": time_spent_ns,
+        "pretty_time_spend": format_duration_ns(time_spent_ns),
+        "combinations": iterations,
+    }
+    print(
+        f"test_{test_number}: {format_duration_ns(time_spent_ns)} "
+        f"for {iterations} combinations"
+    )
 
     write_json(PERFORMANCE_FILE, data)
 
