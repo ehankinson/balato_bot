@@ -13,7 +13,9 @@ def print_timing(label: str, elapsed_ns: int) -> None:
     )
 
 
-def odds_for_single_value(deck: Deck, hand: list[Card], bucket: list[int], amount: int):
+def odds_for_single_value(
+    deck: Deck, hand: list[Card], bucket: list[int], amount: int
+) -> tuple[int, float, list[Card]]:
     total_cards = deck.total_cards
     total_draws = math.comb(total_cards, 5)
     max_iter = len(bucket)
@@ -72,7 +74,9 @@ def odds_for_single_value(deck: Deck, hand: list[Card], bucket: list[int], amoun
     return best_option, best_probability, cards_to_discard
 
 
-def odds_for_double_value(deck: Deck, hand: list[Card], bucket: list[int], amount: int):
+def odds_for_double_value(
+    deck: Deck, hand: list[Card], bucket: list[int], amount: int
+) -> tuple[tuple[int, int], float, list[Card]]:
     total_cards = deck.total_cards
     total_draws = math.comb(total_cards, 5)
     max_iter = len(bucket)
@@ -83,7 +87,7 @@ def odds_for_double_value(deck: Deck, hand: list[Card], bucket: list[int], amoun
     right_amount = 2
 
     best_score = 0
-    best_option = (0, 0)
+    best_option: tuple[int, int] = (-1, -1)
     best_probability = 0.0
 
     for left_rank in range(max_iter):
@@ -178,7 +182,7 @@ def odds_for_double_value(deck: Deck, hand: list[Card], bucket: list[int], amoun
 
 def odds_for_straight(
     deck: Deck, hand: list[Card], rank_bucket: list[int], straight_length: int
-):
+) -> tuple[int, float, list[Card]]:
     rank_order = [
         Rank.ACE,
         Rank.KING,
@@ -198,7 +202,7 @@ def odds_for_straight(
     total_cards = deck.total_cards
     total_draws = math.comb(total_cards, 5)
     best_probability = 0.0
-    best_option = (0, 0, 0, 0, 0)
+    best_option = -1
     best_score = 0
     rank_weights = {i: 0.0 for i in range(len(rank_bucket))}
 
@@ -240,12 +244,16 @@ def odds_for_straight(
 
         if probability > best_probability:
             best_probability = probability
-            best_option = tuple(straight)
             best_score = score
+            best_option = 0
+            for rank in straight:
+                best_option = best_option << 4 | rank
 
         elif probability == best_probability and score > best_score:
             best_score = score
-            best_option = tuple(straight)
+            best_option = 0
+            for rank in straight:
+                best_option = best_option << 4 | rank
 
     straight_weight = []
     rank_count = [0] * len(Rank)
@@ -261,8 +269,8 @@ def odds_for_straight(
 
 
 def odds_for_straigh_flush(
-    deck: Deck, hand: list[Card], rank_bucket: list[int], straight_length: int
-):
+    deck: Deck, hand: list[Card], straight_length: int
+) -> tuple[int, float, list[Card]]:
     rank_order = [
         Rank.ACE,
         Rank.KING,
@@ -282,7 +290,7 @@ def odds_for_straigh_flush(
     total_cards = deck.total_cards
     total_draws = math.comb(total_cards, 5)
     best_probability = 0.0
-    best_option = (0, 0, 0, 0, 0)
+    best_option = 0
     best_score = 0
     suit_rank_weights = {suit << 4 | rank: 0.0 for suit in Suit for rank in Rank}
 
@@ -298,7 +306,11 @@ def odds_for_straigh_flush(
             for rank in straight:
                 max_score = 0
                 for card in hand:
-                    if card.rank == rank and card.suit == suit and card.score > max_score:
+                    if (
+                        card.rank == rank
+                        and card.suit == suit
+                        and card.score > max_score
+                    ):
                         max_score = card.score
 
                 score += max_score
@@ -331,12 +343,16 @@ def odds_for_straigh_flush(
 
             if probability > best_probability:
                 best_probability = probability
-                best_option = tuple((rank, suit) for rank in straight)
                 best_score = score
+                best_option = 0
+                for rank in straight:
+                    best_option = ((best_option << 2) | suit) << 4 | rank
 
             elif probability == best_probability and score > best_score:
                 best_score = score
-                best_option = tuple((rank, suit) for rank in straight)
+                best_option = 0
+                for rank in straight:
+                    best_option = ((best_option << 2) | suit) << 4 | rank
 
     straight_weight = []
     suit_rank_count = [0] * (Suit.SPADES << 4 | Rank.ACE)
@@ -348,6 +364,125 @@ def odds_for_straigh_flush(
 
     ordered_hand = sorted(straight_weight, key=lambda x: x[1])
     cards_to_discard = [card for card, _ in ordered_hand[:5]]
+
+    return best_option, best_probability, cards_to_discard
+
+
+def odds_for_flush_five(deck: Deck, hand: list[Card]):
+    total_cards = deck.total_cards
+    total_draws = math.comb(total_cards, 5)
+    suit_rank_weights = {suit << 4 | rank: 0.0 for suit in Suit for rank in Rank}
+
+    left_amount = 3
+    right_amount = 2
+
+    best_score = 0
+    best_option = 0
+    best_probability = 0.0
+
+    for suit in Suit:
+        for left_rank in Rank:
+            left_suit_rank_key = suit << 4 | left_rank
+            left_deck = deck.suit_rank[left_suit_rank_key]
+            left_deck_count = len(left_deck)
+
+            left_count, left_score = 0, 0
+            for card in hand:
+                if card.rank == left_rank and card.suit == suit:
+                    left_count += 1
+                    left_score += card.score
+
+            left_amount_needed = left_amount - left_count
+            if left_deck_count + left_count < left_amount:
+                continue  # we don't have enough cards to fetch from the deck
+
+            right_vals = [rank for rank in Rank if rank != left_rank]
+
+            for right_rank in right_vals:
+                right_suit_rank_key = suit << 4 | right_rank
+                right_deck = deck.suit_rank[right_suit_rank_key]
+                right_deck_count = len(right_deck)
+
+                right_count, right_score = 0, 0
+                for card in hand:
+                    if card.rank == right_rank and card.suit == suit:
+                        right_count += 1
+                        right_score += card.score
+
+                right_amount_needed = right_amount - right_count
+                if right_deck_count + right_count < right_amount:
+                    continue  # we don't have enough cards to fetch from the deck
+
+                if left_amount_needed + right_amount_needed == 0:
+                    continue  # this is already the hand we are looking for
+                    # lets try to find another
+
+                rest_of_deck = total_cards - (left_deck_count + right_deck_count)
+
+                right_max_iter = 5 if right_deck_count > 5 else right_deck_count
+                left_max_iter = 5 if left_deck_count > 5 else left_deck_count
+
+                good_draws = 0
+                if left_amount_needed == 0:
+                    rest_of_deck = total_cards - right_deck_count
+                    good_draws = sum(
+                        math.comb(right_deck_count, right_draw)
+                        * math.comb(rest_of_deck, 5 - right_draw)
+                        for right_draw in range(right_amount_needed, right_max_iter)
+                    )
+                elif right_amount_needed == 0:
+                    rest_of_deck = total_cards - left_deck_count
+                    good_draws = sum(
+                        math.comb(left_deck_count, left_draw)
+                        * math.comb(rest_of_deck, 5 - left_draw)
+                        for left_draw in range(left_amount_needed, left_max_iter)
+                    )
+                else:
+                    rest_of_deck = total_cards - (left_deck_count + right_deck_count)
+                    good_draws = sum(
+                        math.comb(left_deck_count, left_draw)
+                        * math.comb(right_deck_count, right_draw)
+                        * math.comb(rest_of_deck, 5 - (left_draw + right_draw))
+                        for right_draw in range(right_amount_needed, right_max_iter)
+                        for left_draw in range(left_amount_needed, left_max_iter)
+                        if right_draw + left_draw <= 5
+                    )
+                probability = good_draws / total_draws
+
+                key = left_suit_rank_key << 6 | right_suit_rank_key
+                left_expected_score = (
+                    sum(card.score for card in left_deck)
+                    / left_deck_count
+                    * left_amount_needed
+                )
+                right_expected_score = (
+                    sum(card.score for card in right_deck)
+                    / right_deck_count
+                    * right_amount_needed
+                )
+
+                total_score = (
+                    left_score
+                    + right_score
+                    + left_expected_score
+                    + right_expected_score
+                )
+
+                weighted_score = total_score * probability
+                suit_rank_weights[left_suit_rank_key] += weighted_score
+                suit_rank_weights[right_suit_rank_key] += weighted_score
+
+                if best_probability < probability:
+                    best_probability = probability
+                    best_option = key
+                    best_score = total_score
+
+                elif best_probability == probability and total_score > best_score:
+                    best_score = total_score
+                    best_option = key
+
+    ordered_hand = sorted(hand, key=lambda x: suit_rank_weights[x.suit << 4 | x.rank])
+    cards_to_discard = ordered_hand[:5]
 
     return best_option, best_probability, cards_to_discard
 
@@ -419,7 +554,7 @@ def calculate_odds(deck: Deck, dealt_cards: list[Card]):
 
     straight_flush_start = time.perf_counter_ns()
     straight_flush_val, straight_flush_prob, straight_flush_discards = (
-        odds_for_straigh_flush(deck, dealt_cards, rank_bucket, 5)
+        odds_for_straigh_flush(deck, dealt_cards, 5)
     )
     straight_flush_end = time.perf_counter_ns()
     print_timing("straight odds", straight_flush_end - straight_flush_start)
