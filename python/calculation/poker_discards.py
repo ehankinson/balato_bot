@@ -2,7 +2,7 @@ import math
 import time
 
 from core.enums import Rank, Suit
-from core.models import Card, Deck
+from core.models import CARD_STRINGS, Card, Deck
 
 
 def print_timing(label: str, elapsed_ns: int) -> None:
@@ -23,7 +23,7 @@ def odds_for_single_value(
 
     best_score = 0.0
     best_option = -1
-    best_probability = 0.0
+    best_probability = -1.0
 
     for val in range(max_iter):
         amount_needed = amount - bucket[val]
@@ -76,7 +76,7 @@ def odds_for_single_value(
 
 def odds_for_double_value(
     deck: Deck, hand: list[Card], bucket: list[int], amount: int
-) -> tuple[tuple[int, int], float, list[Card]]:
+) -> tuple[int, float, list[Card]]:
     total_cards = deck.total_cards
     total_draws = math.comb(total_cards, 5)
     max_iter = len(bucket)
@@ -86,9 +86,9 @@ def odds_for_double_value(
     left_amount = amount
     right_amount = 2
 
-    best_score = 0
-    best_option: tuple[int, int] = (-1, -1)
-    best_probability = 0.0
+    best_score = 0.0
+    best_option = -1
+    best_probability = -1.0
 
     for left_rank in range(max_iter):
         left_deck = deck.ranks[left_rank]
@@ -145,7 +145,7 @@ def odds_for_double_value(
                 )
             probability = good_draws / total_draws
 
-            key = (left_rank, right_rank)
+            key = left_rank << 4 | right_rank
             left_expected_score = (
                 sum(card.score for card in left_deck)
                 / left_deck_count
@@ -203,7 +203,7 @@ def odds_for_straight(
     total_draws = math.comb(total_cards, 5)
     best_probability = 0.0
     best_option = -1
-    best_score = 0
+    best_score = -1
     rank_weights = {i: 0.0 for i in range(len(rank_bucket))}
 
     for cut_off in range(straight_length, len(rank_order)):
@@ -289,9 +289,9 @@ def odds_for_straigh_flush(
     ]
     total_cards = deck.total_cards
     total_draws = math.comb(total_cards, 5)
-    best_probability = 0.0
-    best_option = 0
-    best_score = 0
+    best_probability = -1.0
+    best_option = -1
+    best_score = 0.0
     suit_rank_weights = {suit << 4 | rank: 0.0 for suit in Suit for rank in Rank}
 
     for suit in Suit:
@@ -368,7 +368,7 @@ def odds_for_straigh_flush(
     return best_option, best_probability, cards_to_discard
 
 
-def odds_for_flush_five(deck: Deck, hand: list[Card]):
+def odds_for_flush_house(deck: Deck, hand: list[Card]) -> tuple[int, float, list[Card]]:
     total_cards = deck.total_cards
     total_draws = math.comb(total_cards, 5)
     suit_rank_weights = {suit << 4 | rank: 0.0 for suit in Suit for rank in Rank}
@@ -376,8 +376,8 @@ def odds_for_flush_five(deck: Deck, hand: list[Card]):
     left_amount = 3
     right_amount = 2
 
-    best_score = 0
-    best_option = 0
+    best_score = -1
+    best_option = -1
     best_probability = 0.0
 
     for suit in Suit:
@@ -487,6 +487,69 @@ def odds_for_flush_five(deck: Deck, hand: list[Card]):
     return best_option, best_probability, cards_to_discard
 
 
+def odds_for_flush_five(deck: Deck, hand: list[Card]) -> tuple[int, float, list[Card]]:
+    total_cards = deck.total_cards
+    total_draws = math.comb(total_cards, 5)
+    suit_rank_weights = {suit << 4 | rank: 0.0 for suit in Suit for rank in Rank}
+
+    best_score = -1.0
+    best_option = -1
+    best_probability = 0.0
+
+    for suit in Suit:
+        for rank in Rank:
+            count, score = 0, 0
+            for card in hand:
+                if card.rank == rank and card.suit == suit:
+                    count += 1
+                    score += card.score
+
+            amount_needed = 5 - count
+            if amount_needed == 0:
+                continue
+
+            suit_rank_key = suit << 4 | rank
+            deck_val = deck.suit_rank[suit_rank_key]
+            deck_val_count = len(deck_val)
+
+            if deck_val_count + count < 5:
+                continue  # we don't have enough cards to get this
+
+            max_fetch_amount = 5 if deck_val_count > 5 else deck_val_count
+
+            every_other_card = total_cards - deck_val_count
+            good_draws = 0
+            for fetched_rank in range(amount_needed, max_fetch_amount + 1):
+                good_draws += math.comb(deck_val_count, fetched_rank) * math.comb(
+                    every_other_card, 5 - fetched_rank
+                )
+
+            total_probability = good_draws / total_draws
+
+            score_of_cards = sum(card.score for card in deck_val) / deck_val_count
+            expected_card_score = score_of_cards * amount_needed
+            total_card_score = score + expected_card_score
+            suit_rank_weights[suit_rank_key] = total_probability * total_card_score
+
+            if total_probability > best_probability:
+                best_probability = total_probability
+                best_option = rank
+                best_score = total_card_score
+
+            elif (
+                total_probability == best_probability and total_card_score > best_score
+            ):
+                best_score = total_card_score
+                best_option = rank
+
+    ordered_hand = sorted(
+        hand, key=lambda x: suit_rank_weights[x.suit << 4 | x.rank]
+    )
+
+    cards_to_discard = ordered_hand[:5]
+    return best_option, best_probability, cards_to_discard
+
+
 def calculate_odds(deck: Deck, dealt_cards: list[Card]):
     suit_bucket = [0] * 4
     rank_bucket = [0] * 13
@@ -557,10 +620,58 @@ def calculate_odds(deck: Deck, dealt_cards: list[Card]):
         odds_for_straigh_flush(deck, dealt_cards, 5)
     )
     straight_flush_end = time.perf_counter_ns()
-    print_timing("straight odds", straight_flush_end - straight_flush_start)
+    print_timing("straight flush odds", straight_flush_end - straight_flush_start)
+
+    flush_house_start = time.perf_counter_ns()
+    flush_house_val, flush_house_prob, flush_house_discards = odds_for_flush_house(
+        deck, dealt_cards
+    )
+    flush_house_end = time.perf_counter_ns()
+    print_timing("flush house odds", flush_house_end - flush_house_start)
+
+    flush_five_start = time.perf_counter_ns()
+    flush_five_val, flush_five_prob, flush_five_discards = odds_for_flush_five(
+        deck, dealt_cards
+    )
+    flush_five_end = time.perf_counter_ns()
+    print_timing("flush five odds", flush_five_end - flush_five_start)
 
     total_end = time.perf_counter_ns()
     print_timing("total odds time", total_end - total_start)
+
+    _rank_short = {r: CARD_STRINGS[r] for r in Rank}
+    _suit_short = {s: s.name[0] for s in Suit}
+
+    def _short(card: Card) -> str:
+        return f"{_rank_short[card.rank]}{_suit_short[card.suit]}"
+
+    def _fmt_val(val) -> str:
+        if isinstance(val, tuple):
+            return "(" + ", ".join(str(v) for v in val) + ")"
+        return str(val)
+
+    rows = [
+        ("Pair", pair_val, pair_prob, pair_discards, pair_end - pair_start),
+        ("Three of a Kind", three_val, three_prob, three_discards, three_end - three_start),
+        ("Four of a Kind", four_val, four_prob, four_discards, four_end - four_start),
+        ("Five of a Kind", five_val, five_prob, five_discards, five_end - five_start),
+        ("Flush", flush_val, flush_prob, flush_discards, flush_end - flush_start),
+        ("Two Pair", two_pair_val, two_pair_prob, two_pair_discards, two_pair_end - two_pair_start),
+        ("Full House", full_house_val, full_house_prob, full_house_discards, full_house_end - full_house_start),
+        ("Straight", straight_val, straight_prob, straight_discards, straight_end - straight_start),
+        ("Straight Flush", straight_flush_val, straight_flush_prob, straight_flush_discards, straight_flush_end - straight_flush_start),
+        ("Flush House", flush_house_val, flush_house_prob, flush_house_discards, flush_house_end - flush_house_start),
+        ("Flush Five", flush_five_val, flush_five_prob, flush_five_discards, flush_five_end - flush_five_start),
+    ]
+
+    print()
+    print(f"{'Hand':<18} {'Probability':>12} {'Val':>10} {'Time':>10}  Discards")
+    print("-" * 80)
+    for name, val, prob, discards, elapsed_ns in rows:
+        disc_str = ", ".join(_short(c) for c in discards) if discards else "-"
+        print(f"{name:<18} {prob:>11.2%} {_fmt_val(val):>10} {elapsed_ns / 1_000_000:>9.3f}ms  {disc_str}")
+    print("-" * 80)
+    print(f"Total time taken was: {(total_end - total_start) / 1_000_000:.3f}ms")
 
 
 if __name__ == "__main__":
