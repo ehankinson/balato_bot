@@ -712,5 +712,5 @@ if __name__ == "__main__":
         ),
     ]
 
-    deck.filter(hand)
+    deck._filter(hand)
     calculate_odds(deck, hand)

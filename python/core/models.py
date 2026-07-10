@@ -214,11 +214,12 @@ class Hand:
 @dataclass(slots=True)
 class Deck:
     total_cards: int = 0
+    deck: list[Card] = field(default_factory=list)
     cards: dict[Card, int] = field(default_factory=dict)
     facecards: list[Card] = field(default_factory=list)
     suits: dict[int, list[Card]] = field(default_factory=dict)
     ranks: dict[int, list[Card]] = field(default_factory=dict)
-    discards: dict[Card, int] = field(default_factory=dict)
+    discards: list[Card] = field(default_factory=list)
     suit_rank: dict[int, list[Card]] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -234,40 +235,57 @@ class Deck:
                     seal=Seal.NONE,
                     edition=Edition.NONE,
                 )
-                self.cards[card] = 1
+                self.add_card(card)
 
-                if card.is_facecard:
-                    self.facecards.append(card)
-
-                if card.suit not in self.suits:
-                    self.suits[card.suit] = []
-                self.suits[card.suit].append(card)
-
-                if card.rank not in self.ranks:
-                    self.ranks[card.rank] = []
-                self.ranks[card.rank].append(card)
-
-                suit_rank_key = suit << 4 | rank
-                if suit_rank_key not in self.suit_rank:
-                    self.suit_rank[suit_rank_key] = []
-                self.suit_rank[suit_rank_key].append(card)
-
-                self.total_cards += 1
-
-    def filter(self, hand: list[Card]) -> None:
+    def _filter(self, hand: list[Card]) -> None:
         for card in hand:
+            suit_rank_id = card.suit << 4 | card.rank
             self.cards[card] -= 1
             self.suits[card.suit].remove(card)
             self.ranks[card.rank].remove(card)
+            self.suit_rank[suit_rank_id].remove(card)
 
             if card.is_facecard:
                 self.facecards.remove(card)
 
-            if card not in self.discards:
-                self.discards[card] = 0
-
-            self.discards[card] += 1
             self.total_cards -= 1
+
+    def add_card(self, card: Card):
+        self.deck.append(card)
+        self.cards[card] = 1
+
+        if card.is_facecard:
+            self.facecards.append(card)
+
+        if card.suit not in self.suits:
+            self.suits[card.suit] = []
+        self.suits[card.suit].append(card)
+
+        if card.rank not in self.ranks:
+            self.ranks[card.rank] = []
+        self.ranks[card.rank].append(card)
+
+        suit_rank_key = card.suit << 4 | card.rank
+        if suit_rank_key not in self.suit_rank:
+            self.suit_rank[suit_rank_key] = []
+        self.suit_rank[suit_rank_key].append(card)
+
+        self.total_cards += 1
+
+    def shuffle(self) -> None:
+        random.shuffle(self.deck)
+
+    def draw(self, n: int) -> list[Card]:
+        cards_to_draw = [self.deck.pop() for _ in range(n) if len(self.deck) > 0]
+        self._filter(cards_to_draw)
+        return cards_to_draw
+
+    def add_to_discard_pile(self, cards: list[Card]) -> None:
+        self.discards.extend(cards)
+
+    def reset(self) -> None:
+        while len(self.discards) > 0:
+            self.add_card(self.discards.pop())
 
 
 @dataclass(slots=True)
@@ -588,8 +606,11 @@ class FinalScoringResults:
 
 @dataclass(slots=True)
 class GameState:
+    score_to_beat: int
     hands: int = 4
+    hands_played: int = 0
     discards: int = 3
+    discards_used: int = 0
     hand_size: int = 8
     flush_size: int = 5
     straight_size: int = 5
@@ -600,6 +621,21 @@ class GameState:
     all_cards_are_facecards: bool = False
     allow_duplicate_shop_items: bool = False
     suit_groups: list[list[str]] = field(default_factory=list)
+
+    def play_hand(self) -> None:
+        self.hands -= 1
+        self.hands_played += 1
+
+    def discard(self) -> None:
+        self.discards -= 1
+        self.discards_used += 1
+
+    def reset(self) -> None:
+        self.hands += self.hands_played
+        self.hands_played = 0
+
+        self.discards += self.discards_used
+        self.discards_used = 0
 
 
 @dataclass(slots=True)

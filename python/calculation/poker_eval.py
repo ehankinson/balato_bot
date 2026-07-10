@@ -13,7 +13,11 @@ def is_flush(cards: list[Card]) -> bool:
 def is_straight(cards: list[Card]) -> bool:
     cards = sorted(cards, key=lambda x: x.rank, reverse=True)
     for i in range(1, len(cards)):
-        if cards[i - 1].rank - cards[i].rank != 1:
+        diff = cards[i - 1].rank - cards[i].rank
+        if i == 1 and diff == 9:
+            continue
+            
+        if diff != 1:
             return False
 
     return True

@@ -1,5 +1,15 @@
 [
   {
+    "label": "Debug Simulations",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "simulation",
+    "cwd": "$ZED_WORKTREE_ROOT/python",
+    "env": {
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
+    }
+  },
+  {
     "label": "Debug Poker Discards",
     "adapter": "Debugpy",
     "request": "launch",
@@ -14,11 +24,11 @@
     "adapter": "Debugpy",
     "request": "launch",
     "program": "$ZED_WORKTREE_ROOT/python/best_hand.py",
-    "cwd": "$ZED_WORKTREE_ROOT",
+    "cwd": "$ZED_WORKTREE_ROOT/python",
     "args": ["worst"],
     "env": {
-      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",
-    },
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
+    }
   },
   {
     "label": "pytest: TEST_JOKER_RETRIGGER",
@@ -28,8 +38,8 @@
     "args": ["tests/test_joker_retrigger.py", "-s"],
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
-      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",
-    },
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
+    }
   },
   {
     "label": "pytest: TEST_JOKER_SCORING",
@@ -39,8 +49,8 @@
     "args": ["tests/test_joker_scoring.py", "-s"],
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
-      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",
-    },
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
+    }
   },
   {
     "label": "pytest: TEST_BEST_HAND",
@@ -50,7 +60,7 @@
     "args": ["tests/test_best_hand.py::test_0011_photograph_hanging_chad_vs_polychrome_lucky_king", "-s"],
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
-      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python",
-    },
-  },
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
+    }
+  }
 ]
