@@ -247,7 +247,7 @@ class Deck:
                     self.ranks[card.rank] = []
                 self.ranks[card.rank].append(card)
 
-                suit_rank_key = suit << 5 | rank
+                suit_rank_key = suit << 4 | rank
                 if suit_rank_key not in self.suit_rank:
                     self.suit_rank[suit_rank_key] = []
                 self.suit_rank[suit_rank_key].append(card)

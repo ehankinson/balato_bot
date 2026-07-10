@@ -260,6 +260,98 @@ def odds_for_straight(
     return best_option, best_probability, cards_to_discard
 
 
+def odds_for_straigh_flush(
+    deck: Deck, hand: list[Card], rank_bucket: list[int], straight_length: int
+):
+    rank_order = [
+        Rank.ACE,
+        Rank.KING,
+        Rank.QUEEN,
+        Rank.JACK,
+        Rank.TEN,
+        Rank.NINE,
+        Rank.EIGHT,
+        Rank.SEVEN,
+        Rank.SIX,
+        Rank.FIVE,
+        Rank.FOUR,
+        Rank.THREE,
+        Rank.TWO,
+        Rank.ACE,  # ace-low support
+    ]
+    total_cards = deck.total_cards
+    total_draws = math.comb(total_cards, 5)
+    best_probability = 0.0
+    best_option = (0, 0, 0, 0, 0)
+    best_score = 0
+    suit_rank_weights = {suit << 4 | rank: 0.0 for suit in Suit for rank in Rank}
+
+    for suit in Suit:
+        for cut_off in range(straight_length, len(rank_order)):
+            straight = rank_order[cut_off - straight_length : cut_off]
+            straight_cards_needed = [
+                1 - sum(1 for card in hand if card.rank == rank and card.suit == suit)
+                for rank in straight
+            ]
+
+            score = 0
+            for rank in straight:
+                max_score = 0
+                for card in hand:
+                    if card.rank == rank and card.suit == suit and card.score > max_score:
+                        max_score = card.score
+
+                score += max_score
+
+            good_draw = 1
+            fetch_count = 0
+            other_cards = total_cards
+            for i, amount_needed in enumerate(straight_cards_needed):
+                if amount_needed < 1:
+                    continue
+
+                fetch_count += 1
+                suit_rank_key = suit << 4 | straight[i]
+                deck_suit_rank = deck.suit_rank[suit_rank_key]
+                deck_suit_rank_amount = len(deck_suit_rank)
+                other_cards -= deck_suit_rank_amount
+                good_draw *= math.comb(deck_suit_rank_amount, amount_needed)
+
+                score += (
+                    sum(card.score for card in deck_suit_rank)
+                    / deck_suit_rank_amount
+                    * amount_needed
+                )
+
+            good_draw *= math.comb(other_cards, 5 - fetch_count)
+            probability = good_draw / total_draws
+
+            for rank in straight:
+                suit_rank_weights[suit << 4 | rank] += score * probability
+
+            if probability > best_probability:
+                best_probability = probability
+                best_option = tuple((rank, suit) for rank in straight)
+                best_score = score
+
+            elif probability == best_probability and score > best_score:
+                best_score = score
+                best_option = tuple((rank, suit) for rank in straight)
+
+    straight_weight = []
+    suit_rank_count = [0] * (Suit.SPADES << 4 | Rank.ACE)
+    for card in hand:
+        suit_rank_key = card.suit << 4 | card.rank
+        card_decay = math.pow(2, suit_rank_count[suit_rank_key])
+        straight_weight.append((card, suit_rank_weights[suit_rank_key] / card_decay))
+        suit_rank_count[suit_rank_key] += 1
+
+    ordered_hand = sorted(straight_weight, key=lambda x: x[1])
+    cards_to_discard = [card for card, _ in ordered_hand[:5]]
+
+    return best_option, best_probability, cards_to_discard
+
+
 def calculate_odds(deck: Deck, dealt_cards: list[Card]):
     suit_bucket = [0] * 4
     rank_bucket = [0] * 13
@@ -324,6 +416,13 @@ def calculate_odds(deck: Deck, dealt_cards: list[Card]):
     )
     straight_end = time.perf_counter_ns()
     print_timing("straight odds", straight_end - straight_start)
+
+    straight_flush_start = time.perf_counter_ns()
+    straight_flush_val, straight_flush_prob, straight_flush_discards = (
+        odds_for_straigh_flush(deck, dealt_cards, rank_bucket, 5)
+    )
+    straight_flush_end = time.perf_counter_ns()
+    print_timing("straight odds", straight_flush_end - straight_flush_start)
 
     total_end = time.perf_counter_ns()
     print_timing("total odds time", total_end - total_start)
