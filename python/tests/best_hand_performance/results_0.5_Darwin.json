@@ -1,67 +1,143 @@
 {
     "total": {
-        "test_count": 14,
-        "total_time_spend": 0.0017457510548410937,
-        "total_combinations": 228
+        "test_count": 28,
+        "total_time_spend_ns": 19818333,
+        "total_combinations": 3431,
+        "pretty_total_time_spend": "19.818 ms"
     },
     "test_1": {
-        "time_spend": 7.662500138394535e-05,
+        "time_spend_ns": 85125,
+        "pretty_time_spend": "85.125 µs",
         "combinations": 7
     },
     "test_2": {
-        "time_spend": 0.00010516701149754226,
+        "time_spend_ns": 108208,
+        "pretty_time_spend": "108.208 µs",
         "combinations": 11
     },
     "test_3": {
-        "time_spend": 9.191701246891171e-05,
+        "time_spend_ns": 93125,
+        "pretty_time_spend": "93.125 µs",
         "combinations": 13
     },
     "test_4": {
-        "time_spend": 7.61660048738122e-05,
+        "time_spend_ns": 77500,
+        "pretty_time_spend": "77.500 µs",
         "combinations": 11
     },
     "test_5": {
-        "time_spend": 0.00011516700033098459,
+        "time_spend_ns": 134166,
+        "pretty_time_spend": "134.166 µs",
         "combinations": 18
     },
     "test_6": {
-        "time_spend": 5.975000385660678e-05,
+        "time_spend_ns": 70541,
+        "pretty_time_spend": "70.541 µs",
         "combinations": 8
     },
     "test_7": {
-        "time_spend": 5.8999998145736754e-05,
+        "time_spend_ns": 64417,
+        "pretty_time_spend": "64.417 µs",
         "combinations": 8
     },
     "test_8": {
-        "time_spend": 0.00010124999971594661,
+        "time_spend_ns": 119750,
+        "pretty_time_spend": "119.750 µs",
         "combinations": 16
     },
     "test_9": {
-        "time_spend": 0.00011841701052617282,
+        "time_spend_ns": 128541,
+        "pretty_time_spend": "128.541 µs",
         "combinations": 17
     },
     "test_10": {
-        "time_spend": 0.0002762500080280006,
+        "time_spend_ns": 312000,
+        "pretty_time_spend": "312.000 µs",
         "combinations": 55
     },
     "test_11": {
-        "time_spend": 7.999999797903001e-05,
+        "time_spend_ns": 90334,
+        "pretty_time_spend": "90.334 µs",
         "combinations": 8
     },
     "test_12": {
-        "time_spend": 0.00012008400517515838,
+        "time_spend_ns": 134208,
+        "pretty_time_spend": "134.208 µs",
         "combinations": 13
     },
     "test_13": {
-        "time_spend": 0.0003656249900814146,
+        "time_spend_ns": 404250,
+        "pretty_time_spend": "404.250 µs",
         "combinations": 31
     },
     "test_14": {
-        "time_spend": 0.00029279099544510245,
+        "time_spend_ns": 323375,
+        "pretty_time_spend": "323.375 µs",
         "combinations": 31
     },
     "test_15": {
-        "time_spend": 0.0001731670054141432,
+        "time_spend_ns": 184333,
+        "pretty_time_spend": "184.333 µs",
         "combinations": 12
+    },
+    "test_16": {
+        "time_spend_ns": 346959,
+        "pretty_time_spend": "346.959 µs",
+        "combinations": 8
+    },
+    "test_17": {
+        "time_spend_ns": 230625,
+        "pretty_time_spend": "230.625 µs",
+        "combinations": 18
+    },
+    "test_18": {
+        "time_spend_ns": 154125,
+        "pretty_time_spend": "154.125 µs",
+        "combinations": 15
+    },
+    "test_20": {
+        "time_spend_ns": 5230417,
+        "pretty_time_spend": "5.230 ms",
+        "combinations": 1510
+    },
+    "test_21": {
+        "time_spend_ns": 10423500,
+        "pretty_time_spend": "10.424 ms",
+        "combinations": 1510
+    },
+    "test_22": {
+        "time_spend_ns": 93500,
+        "pretty_time_spend": "93.500 µs",
+        "combinations": 10
+    },
+    "test_23": {
+        "time_spend_ns": 119667,
+        "pretty_time_spend": "119.667 µs",
+        "combinations": 17
+    },
+    "test_24": {
+        "time_spend_ns": 116458,
+        "pretty_time_spend": "116.458 µs",
+        "combinations": 12
+    },
+    "test_25": {
+        "time_spend_ns": 140709,
+        "pretty_time_spend": "140.709 µs",
+        "combinations": 17
+    },
+    "test_26": {
+        "time_spend_ns": 102125,
+        "pretty_time_spend": "102.125 µs",
+        "combinations": 12
+    },
+    "test_27": {
+        "time_spend_ns": 227458,
+        "pretty_time_spend": "227.458 µs",
+        "combinations": 17
+    },
+    "test_28": {
+        "time_spend_ns": 136750,
+        "pretty_time_spend": "136.750 µs",
+        "combinations": 13
     }
 }

@@ -8,7 +8,9 @@ from core.models import Card, Deck
 def print_timing(label: str, elapsed_ns: int) -> None:
     elapsed_ms = elapsed_ns / 1_000_000
     elapsed_s = elapsed_ns / 1_000_000_000
-    print(f"{label:<20} {elapsed_s:>10.6f}s  {elapsed_ms:>10.3f}ms  {elapsed_ns:>12,d}ns")
+    print(
+        f"{label:<20} {elapsed_s:>10.6f}s  {elapsed_ms:>10.3f}ms  {elapsed_ns:>12,d}ns"
+    )
 
 
 def odds_for_single_value(deck: Deck, hand: list[Card], bucket: list[int], amount: int):
@@ -74,7 +76,7 @@ def odds_for_double_value(deck: Deck, hand: list[Card], bucket: list[int], amoun
     total_cards = deck.total_cards
     total_draws = math.comb(total_cards, 5)
     max_iter = len(bucket)
-    rank_weights = { i: 0.0 for i in range(max_iter) }
+    rank_weights = {i: 0.0 for i in range(max_iter)}
 
     is_two_pair = amount == 2
     left_amount = amount
@@ -103,7 +105,7 @@ def odds_for_double_value(deck: Deck, hand: list[Card], bucket: list[int], amoun
             right_amount_needed = right_amount - bucket[right_rank]
             if left_amount_needed + right_amount_needed == 0:
                 continue
-                
+
             right_score = sum(card.score for card in hand if card.rank == right_rank)
 
             left_deck_amount, right_deck_amount = left_deck_count, right_deck_count
@@ -141,10 +143,14 @@ def odds_for_double_value(deck: Deck, hand: list[Card], bucket: list[int], amoun
 
             key = (left_rank, right_rank)
             left_expected_score = (
-                sum(card.score for card in left_deck) / left_deck_count * left_amount_needed
+                sum(card.score for card in left_deck)
+                / left_deck_count
+                * left_amount_needed
             )
             right_expected_score = (
-                sum(card.score for card in right_deck) / right_deck_count * right_amount_needed
+                sum(card.score for card in right_deck)
+                / right_deck_count
+                * right_amount_needed
             )
 
             total_score = (
@@ -164,8 +170,92 @@ def odds_for_double_value(deck: Deck, hand: list[Card], bucket: list[int], amoun
                 best_score = total_score
                 best_option = key
 
-    ordered_hand = sorted(hand, key=lambda x: (rank_weights[x.rank]))
+    ordered_hand = sorted(hand, key=lambda x: rank_weights[x.rank])
     cards_to_discard = ordered_hand[:5]
+
+    return best_option, best_probability, cards_to_discard
+
+
+def odds_for_straight(
+    deck: Deck, hand: list[Card], rank_bucket: list[int], straight_length: int
+):
+    rank_order = [
+        Rank.ACE,
+        Rank.KING,
+        Rank.QUEEN,
+        Rank.JACK,
+        Rank.TEN,
+        Rank.NINE,
+        Rank.EIGHT,
+        Rank.SEVEN,
+        Rank.SIX,
+        Rank.FIVE,
+        Rank.FOUR,
+        Rank.THREE,
+        Rank.TWO,
+        Rank.ACE,  # ace-low support
+    ]
+    total_cards = deck.total_cards
+    total_draws = math.comb(total_cards, 5)
+    best_probability = 0.0
+    best_option = (0, 0, 0, 0, 0)
+    best_score = 0
+    rank_weights = {i: 0.0 for i in range(len(rank_bucket))}
+
+    for cut_off in range(straight_length, len(rank_order)):
+        straight = rank_order[cut_off - straight_length : cut_off]
+        straight_cards_needed = [1 - rank_bucket[rank] for rank in straight]
+
+        score = 0
+        for rank in straight:
+            max_score = 0
+            for card in hand:
+                if card.rank == rank and card.score > max_score:
+                    max_score = card.score
+
+            score += max_score
+
+        good_draw = 1
+        fetch_count = 0
+        other_cards = total_cards
+        for i, amount_needed in enumerate(straight_cards_needed):
+            if amount_needed < 1:
+                continue
+
+            fetch_count += 1
+            deck_rank = deck.ranks[straight[i]]
+            deck_rank_amount = len(deck_rank)
+            other_cards -= deck_rank_amount
+            good_draw *= math.comb(deck_rank_amount, amount_needed)
+
+            score += (
+                sum(card.score for card in deck_rank) / deck_rank_amount * amount_needed
+            )
+
+        good_draw *= math.comb(other_cards, 5 - fetch_count)
+        probability = good_draw / total_draws
+
+        for rank in straight:
+            rank_weights[rank] += score * probability
+
+        if probability > best_probability:
+            best_probability = probability
+            best_option = tuple(straight)
+            best_score = score
+
+        elif probability == best_probability and score > best_score:
+            best_score = score
+            best_option = tuple(straight)
+
+    straight_weight = []
+    rank_count = [0] * len(Rank)
+    for card in hand:
+        card_decay = math.pow(2, rank_count[card.rank])
+        straight_weight.append((card, rank_weights[card.rank] / card_decay))
+        rank_count[card.rank] += 1
+
+    ordered_hand = sorted(straight_weight, key=lambda x: x[1])
+    cards_to_discard = [card for card, _ in ordered_hand[:5]]
 
     return best_option, best_probability, cards_to_discard
 
@@ -228,9 +318,15 @@ def calculate_odds(deck: Deck, dealt_cards: list[Card]):
     full_house_end = time.perf_counter_ns()
     print_timing("full house odds", full_house_end - full_house_start)
 
+    straight_start = time.perf_counter_ns()
+    straight_val, straight_prob, straight_discards = odds_for_straight(
+        deck, dealt_cards, rank_bucket, 5
+    )
+    straight_end = time.perf_counter_ns()
+    print_timing("straight odds", straight_end - straight_start)
+
     total_end = time.perf_counter_ns()
     print_timing("total odds time", total_end - total_start)
-    # flush_discards, flush_prob, flush_val = flush_odds(deck, dealt_cards, suit_bucket)
 
 
 if __name__ == "__main__":

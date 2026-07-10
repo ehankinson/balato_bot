@@ -219,6 +219,7 @@ class Deck:
     suits: dict[int, list[Card]] = field(default_factory=dict)
     ranks: dict[int, list[Card]] = field(default_factory=dict)
     discards: dict[Card, int] = field(default_factory=dict)
+    suit_rank: dict[int, list[Card]] = field(default_factory=dict)
 
     def __post_init__(self):
         self._build_deck()
@@ -233,7 +234,6 @@ class Deck:
                     seal=Seal.NONE,
                     edition=Edition.NONE,
                 )
-
                 self.cards[card] = 1
 
                 if card.is_facecard:
@@ -246,6 +246,11 @@ class Deck:
                 if card.rank not in self.ranks:
                     self.ranks[card.rank] = []
                 self.ranks[card.rank].append(card)
+
+                suit_rank_key = suit << 5 | rank
+                if suit_rank_key not in self.suit_rank:
+                    self.suit_rank[suit_rank_key] = []
+                self.suit_rank[suit_rank_key].append(card)
 
                 self.total_cards += 1
 
