@@ -1,5 +1,3 @@
-from dataclasses import fields
-
 import torch
 import torch.nn.functional as F
 
@@ -21,13 +19,22 @@ def encode_card(card: Card, role: int) -> torch.Tensor:
     return torch.cat((rank, suit, scoring_role)).float()
 
 
-def encode_cards(hand_size: int, hand_scoring: HandScoring) -> torch.Tensor:
-    encoded_cards = [
-        encode_card(card, role - 1)
-        for role, field in enumerate(fields(hand_scoring))
-        for card in getattr(hand_scoring, field.name)
-        if field.name != "hand_stats"
-    ]
+def encode_cards(
+    hand_size: int, hand: list[Card], hand_scoring: HandScoring
+) -> torch.Tensor:
+    encoded_cards = []
+    for card in hand:
+        scoring_role = -1
+        if card in hand_scoring.scored_played:
+            scoring_role = 0
+        elif card in hand_scoring.scored_held:
+            scoring_role = 1
+        elif card in hand_scoring.unscored_played:
+            scoring_role = 2
+        else:
+            scoring_role = 3
+
+        encoded_cards.append(encode_card(card, scoring_role))
 
     padding = hand_size - len(encoded_cards)
     encoded_cards.extend(torch.zeros(CARD_FEATURES) for _ in range(padding))
@@ -48,7 +55,7 @@ def encode_game_state(
     best_hand_score = best_hand.best_hand.chips * best_hand.best_hand.worst_case_mult
     projected_best_score = best_hand_score + game_state.current_score
 
-    card_feature = encode_cards(game_state.hand_size, best_hand.hand_scoring)
+    card_feature = encode_cards(game_state.hand_size, hand, best_hand.hand_scoring)
     hand_stats_feature = F.one_hot(
         torch.tensor(best_hand.hand_scoring.hand_stats.name),
         num_classes=POKER_HAND_FEATURES,
@@ -67,7 +74,6 @@ def encode_game_state(
         info = torch.Tensor(
             [
                 discard_info["probability"],
-                discard_info["value"],
             ]
         )
         feature = torch.cat(
@@ -75,4 +81,9 @@ def encode_game_state(
         ).float()
         discard_features.append(feature)
 
-    pass
+    state_features = [card_feature.flatten(), hand_stats_feature.float(), game_state_feature]
+    for f in discard_features:
+        state_features.append(f.flatten())
+    tuple(state_features)
+    
+    return torch.cat(state_features)

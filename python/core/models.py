@@ -607,6 +607,7 @@ class FinalScoringResults:
 @dataclass(slots=True)
 class GameState:
     score_to_beat: int
+    ante=1
     current_score: float = 0.0
     hands: int = 4
     hands_played: int = 0

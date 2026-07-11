@@ -1,9 +1,9 @@
 [
   {
-    "label": "Debug Simulations",
+    "label": "Debug Simulation",
     "adapter": "Debugpy",
     "request": "launch",
-    "module": "simulation",
+    "module": "simulation.simulation",
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"

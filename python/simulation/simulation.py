@@ -3,6 +3,7 @@ from tqdm import tqdm
 from best_hand import get_best_scoring_hand
 from calculation.poker_discards import calculate_odds
 from core.models import Deck, GameState
+from simulation.encoder import encode_game_state
 
 if __name__ == "__main__":
     iterations = 100_000
@@ -17,7 +18,9 @@ if __name__ == "__main__":
         hand = deck.draw(game_state.hand_size)
         while game_state.hands > 0:
             best_score = get_best_scoring_hand(hand, jokers, game_state)
-            best_discards = calculate_odds(deck, hand)
+            discard_table = calculate_odds(deck, hand)
+
+            encoded_game_state = encode_game_state(hand, game_state, best_score, discard_table)
 
             # for now since we are only simulating the frist blind
             # we are going to just take chips * worst_case_mult
