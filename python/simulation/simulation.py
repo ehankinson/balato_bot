@@ -1,13 +1,7 @@
-import sys
-from pathlib import Path
-
-PYTHON_ROOT = Path(__file__).resolve().parent
-if str(PYTHON_ROOT) not in sys.path:
-    sys.path.insert(0, str(PYTHON_ROOT))
-
 from tqdm import tqdm
 
 from best_hand import get_best_scoring_hand
+from calculation.poker_discards import calculate_odds
 from core.models import Deck, GameState
 
 if __name__ == "__main__":
@@ -20,21 +14,22 @@ if __name__ == "__main__":
 
     for _ in tqdm(range(iterations)):
         deck.shuffle()
-        current_score = 0
         hand = deck.draw(game_state.hand_size)
         while game_state.hands > 0:
             best_score = get_best_scoring_hand(hand, jokers, game_state)
+            best_discards = calculate_odds(deck, hand)
 
             # for now since we are only simulating the frist blind
             # we are going to just take chips * worst_case_mult
             # but later we will dynamically calculate probability cards
             # like lucky, bloostone and others ...
             game_state.play_hand()
-            current_score += best_score.best_hand.chips * best_score.best_hand.worst_case_mult
+            game_state.current_score += best_score.best_hand.chips * best_score.best_hand.worst_case_mult
             
-            if current_score >= game_state.score_to_beat:
+            if game_state.current_score >= game_state.score_to_beat:
                 wins += 1
                 break
+
 
             cards_played = best_score.hand_scoring.scored_played + best_score.hand_scoring.unscored_played
             for card in cards_played:

@@ -356,7 +356,6 @@ def get_best_scoring_hand(
 
     for hand_scoring in hand_cache:
         for joker_plan in joker_plan_cache:
-            a = 5
             score = calculate_score(
                 hand_scoring, joker_plan, game_state, condition_args
             )

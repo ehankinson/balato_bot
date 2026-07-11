@@ -1,7 +1,7 @@
 import math
 import time
 
-from core.enums import Rank, Suit
+from core.enums import PokerHand, Rank, Suit
 from core.models import CARD_STRINGS, Card, Deck
 
 
@@ -542,136 +542,122 @@ def odds_for_flush_five(deck: Deck, hand: list[Card]) -> tuple[int, float, list[
                 best_score = total_card_score
                 best_option = rank
 
-    ordered_hand = sorted(
-        hand, key=lambda x: suit_rank_weights[x.suit << 4 | x.rank]
-    )
+    ordered_hand = sorted(hand, key=lambda x: suit_rank_weights[x.suit << 4 | x.rank])
 
     cards_to_discard = ordered_hand[:5]
     return best_option, best_probability, cards_to_discard
 
 
-def calculate_odds(deck: Deck, dealt_cards: list[Card]):
+def calculate_odds(
+    deck: Deck, dealt_cards: list[Card]
+) -> dict[PokerHand, dict[str, int | float | list[Card]]]:
     suit_bucket = [0] * 4
     rank_bucket = [0] * 13
     for card in dealt_cards:
         suit_bucket[card.suit] += 1
         rank_bucket[card.rank] += 1
 
-    total_start = time.perf_counter_ns()
-
-    pair_start = time.perf_counter_ns()
     pair_val, pair_prob, pair_discards = odds_for_single_value(
         deck, dealt_cards, rank_bucket, 2
     )
-    pair_end = time.perf_counter_ns()
-    print_timing("pair odds", pair_end - pair_start)
 
-    three_start = time.perf_counter_ns()
     three_val, three_prob, three_discards = odds_for_single_value(
         deck, dealt_cards, rank_bucket, 3
     )
-    three_end = time.perf_counter_ns()
-    print_timing("three of a kind", three_end - three_start)
 
-    four_start = time.perf_counter_ns()
     four_val, four_prob, four_discards = odds_for_single_value(
         deck, dealt_cards, rank_bucket, 4
     )
-    four_end = time.perf_counter_ns()
-    print_timing("four of a kind", four_end - four_start)
 
-    five_start = time.perf_counter_ns()
     five_val, five_prob, five_discards = odds_for_single_value(
         deck, dealt_cards, rank_bucket, 5
     )
-    five_end = time.perf_counter_ns()
-    print_timing("five of a kind", five_end - five_start)
 
-    flush_start = time.perf_counter_ns()
     flush_val, flush_prob, flush_discards = odds_for_single_value(
         deck, dealt_cards, suit_bucket, 5
     )
-    flush_end = time.perf_counter_ns()
-    print_timing("flush odds", flush_end - flush_start)
 
-    two_pair_start = time.perf_counter_ns()
     two_pair_val, two_pair_prob, two_pair_discards = odds_for_double_value(
         deck, dealt_cards, rank_bucket, 2
     )
-    two_pair_end = time.perf_counter_ns()
-    print_timing("two pair odds", two_pair_end - two_pair_start)
 
-    full_house_start = time.perf_counter_ns()
     full_house_val, full_house_prob, full_house_discards = odds_for_double_value(
         deck, dealt_cards, rank_bucket, 3
     )
-    full_house_end = time.perf_counter_ns()
-    print_timing("full house odds", full_house_end - full_house_start)
 
-    straight_start = time.perf_counter_ns()
     straight_val, straight_prob, straight_discards = odds_for_straight(
         deck, dealt_cards, rank_bucket, 5
     )
-    straight_end = time.perf_counter_ns()
-    print_timing("straight odds", straight_end - straight_start)
 
-    straight_flush_start = time.perf_counter_ns()
     straight_flush_val, straight_flush_prob, straight_flush_discards = (
         odds_for_straigh_flush(deck, dealt_cards, 5)
     )
-    straight_flush_end = time.perf_counter_ns()
-    print_timing("straight flush odds", straight_flush_end - straight_flush_start)
 
-    flush_house_start = time.perf_counter_ns()
     flush_house_val, flush_house_prob, flush_house_discards = odds_for_flush_house(
         deck, dealt_cards
     )
-    flush_house_end = time.perf_counter_ns()
-    print_timing("flush house odds", flush_house_end - flush_house_start)
 
-    flush_five_start = time.perf_counter_ns()
     flush_five_val, flush_five_prob, flush_five_discards = odds_for_flush_five(
         deck, dealt_cards
     )
-    flush_five_end = time.perf_counter_ns()
-    print_timing("flush five odds", flush_five_end - flush_five_start)
 
-    total_end = time.perf_counter_ns()
-    print_timing("total odds time", total_end - total_start)
-
-    _rank_short = {r: CARD_STRINGS[r] for r in Rank}
-    _suit_short = {s: s.name[0] for s in Suit}
-
-    def _short(card: Card) -> str:
-        return f"{_rank_short[card.rank]}{_suit_short[card.suit]}"
-
-    def _fmt_val(val) -> str:
-        if isinstance(val, tuple):
-            return "(" + ", ".join(str(v) for v in val) + ")"
-        return str(val)
-
-    rows = [
-        ("Pair", pair_val, pair_prob, pair_discards, pair_end - pair_start),
-        ("Three of a Kind", three_val, three_prob, three_discards, three_end - three_start),
-        ("Four of a Kind", four_val, four_prob, four_discards, four_end - four_start),
-        ("Five of a Kind", five_val, five_prob, five_discards, five_end - five_start),
-        ("Flush", flush_val, flush_prob, flush_discards, flush_end - flush_start),
-        ("Two Pair", two_pair_val, two_pair_prob, two_pair_discards, two_pair_end - two_pair_start),
-        ("Full House", full_house_val, full_house_prob, full_house_discards, full_house_end - full_house_start),
-        ("Straight", straight_val, straight_prob, straight_discards, straight_end - straight_start),
-        ("Straight Flush", straight_flush_val, straight_flush_prob, straight_flush_discards, straight_flush_end - straight_flush_start),
-        ("Flush House", flush_house_val, flush_house_prob, flush_house_discards, flush_house_end - flush_house_start),
-        ("Flush Five", flush_five_val, flush_five_prob, flush_five_discards, flush_five_end - flush_five_start),
-    ]
-
-    print()
-    print(f"{'Hand':<18} {'Probability':>12} {'Val':>10} {'Time':>10}  Discards")
-    print("-" * 80)
-    for name, val, prob, discards, elapsed_ns in rows:
-        disc_str = ", ".join(_short(c) for c in discards) if discards else "-"
-        print(f"{name:<18} {prob:>11.2%} {_fmt_val(val):>10} {elapsed_ns / 1_000_000:>9.3f}ms  {disc_str}")
-    print("-" * 80)
-    print(f"Total time taken was: {(total_end - total_start) / 1_000_000:.3f}ms")
+    return {
+        PokerHand.PAIR: {
+            "value": pair_val,
+            "probability": pair_prob,
+            "discard": pair_discards,
+        },
+        PokerHand.THREE_OF_A_KIND: {
+            "value": three_val,
+            "probability": three_prob,
+            "discard": three_discards,
+        },
+        PokerHand.FOUR_OF_A_KIND: {
+            "value": four_val,
+            "probability": four_prob,
+            "discard": four_discards,
+        },
+        PokerHand.FIVE_OF_A_KIND: {
+            "value": five_val,
+            "probability": five_prob,
+            "discard": five_discards,
+        },
+        PokerHand.FLUSH: {
+            "value": flush_val,
+            "probability": flush_prob,
+            "discard": flush_discards,
+        },
+        PokerHand.TWO_PAIR: {
+            "value": two_pair_val,
+            "probability": two_pair_prob,
+            "discard": two_pair_discards,
+        },
+        PokerHand.FULL_HOUSE: {
+            "value": full_house_val,
+            "probability": full_house_prob,
+            "discard": full_house_discards,
+        },
+        PokerHand.STRAIGHT: {
+            "value": straight_val,
+            "probability": straight_prob,
+            "discard": straight_discards,
+        },
+        PokerHand.STRAIGHT_FLUSH: {
+            "value": straight_flush_val,
+            "probability": straight_flush_prob,
+            "discard": straight_flush_discards,
+        },
+        PokerHand.FLUSH_HOUSE: {
+            "value": flush_house_val,
+            "probability": flush_house_prob,
+            "discard": flush_house_discards,
+        },
+        PokerHand.FLUSH_FIVE: {
+            "value": flush_five_val,
+            "probability": flush_five_prob,
+            "discard": flush_five_discards,
+        },
+    }
 
 
 if __name__ == "__main__":

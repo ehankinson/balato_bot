@@ -607,6 +607,7 @@ class FinalScoringResults:
 @dataclass(slots=True)
 class GameState:
     score_to_beat: int
+    current_score: float = 0.0
     hands: int = 4
     hands_played: int = 0
     discards: int = 3
@@ -631,6 +632,8 @@ class GameState:
         self.discards_used += 1
 
     def reset(self) -> None:
+        self.current_score = 0.0
+        
         self.hands += self.hands_played
         self.hands_played = 0
 
