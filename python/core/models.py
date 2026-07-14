@@ -7,7 +7,16 @@ from sympy.functions.combinatorial.numbers import E
 
 from config.settings import JOKER_CONFIG
 from core.class_indices import JOKER_TYPE_CLASSES
-from core.enums import Edition, Enhancement, JokersName, JokerTriggers, Rank, Seal, Suit
+from core.enums import (
+    DeckCheck,
+    Edition,
+    Enhancement,
+    JokersName,
+    JokerTriggers,
+    Rank,
+    Seal,
+    Suit,
+)
 from core.hand_stats import HandStats
 from core.scoring import (
     EDITION_SCORING,
@@ -212,15 +221,21 @@ class Hand:
 
 
 @dataclass(slots=True)
+class DeckCount:
+    score: int = 0
+    cards: list[Card] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class Deck:
     total_cards: int = 0
     deck: list[Card] = field(default_factory=list)
-    cards: dict[Card, int] = field(default_factory=dict)
-    facecards: list[Card] = field(default_factory=list)
-    suits: dict[int, list[Card]] = field(default_factory=dict)
-    ranks: dict[int, list[Card]] = field(default_factory=dict)
     discards: list[Card] = field(default_factory=list)
-    suit_rank: dict[int, list[Card]] = field(default_factory=dict)
+    facecards: list[Card] = field(default_factory=list)
+    cards: dict[Card, int] = field(default_factory=dict)
+    suits: dict[int, DeckCount] = field(default_factory=dict)
+    ranks: dict[int, DeckCount] = field(default_factory=dict)
+    suit_rank: dict[int, DeckCount] = field(default_factory=dict)
 
     def __post_init__(self):
         self._build_deck()
@@ -239,11 +254,18 @@ class Deck:
 
     def _filter(self, hand: list[Card]) -> None:
         for card in hand:
-            suit_rank_id = card.suit << 4 | card.rank
+            suit, rank, score = card.suit, card.rank, card.score
+            suit_rank_id = suit << 4 | card.rank
             self.cards[card] -= 1
-            self.suits[card.suit].remove(card)
-            self.ranks[card.rank].remove(card)
-            self.suit_rank[suit_rank_id].remove(card)
+            
+            self.suits[suit].cards.remove(card)
+            self.suits[suit].score -= score
+            
+            self.ranks[rank].cards.remove(card)
+            self.ranks[rank].score -= score
+            
+            self.suit_rank[suit_rank_id].cards.remove(card)
+            self.suit_rank[suit_rank_id].score -= score
 
             if card.is_facecard:
                 self.facecards.remove(card)
@@ -253,22 +275,28 @@ class Deck:
     def add_card(self, card: Card):
         self.deck.append(card)
         self.cards[card] = 1
+        score = card.score
 
         if card.is_facecard:
             self.facecards.append(card)
 
         if card.suit not in self.suits:
-            self.suits[card.suit] = []
-        self.suits[card.suit].append(card)
+            self.suits[card.suit] = DeckCount()
+        self.suits[card.suit].cards.append(card)
+        self.suits[card.suit].score += score
+        
 
         if card.rank not in self.ranks:
-            self.ranks[card.rank] = []
-        self.ranks[card.rank].append(card)
+            self.ranks[card.rank] = DeckCount()
+        self.ranks[card.rank].cards.append(card)
+        self.ranks[card.rank].score += score
 
         suit_rank_key = card.suit << 4 | card.rank
         if suit_rank_key not in self.suit_rank:
-            self.suit_rank[suit_rank_key] = []
-        self.suit_rank[suit_rank_key].append(card)
+            self.suit_rank[suit_rank_key] = DeckCount()
+        self.suit_rank[suit_rank_key].cards.append(card)
+        self.suit_rank[suit_rank_key].score += score
+        
 
         self.total_cards += 1
 
@@ -607,7 +635,7 @@ class FinalScoringResults:
 @dataclass(slots=True)
 class GameState:
     score_to_beat: int
-    ante=1
+    ante = 1
     current_score: float = 0.0
     hands: int = 4
     hands_played: int = 0
@@ -634,7 +662,7 @@ class GameState:
 
     def reset(self) -> None:
         self.current_score = 0.0
-        
+
         self.hands += self.hands_played
         self.hands_played = 0
 

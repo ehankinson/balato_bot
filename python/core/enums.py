@@ -1,5 +1,8 @@
 from enum import IntEnum
 
+class DeckCheck(IntEnum):
+    CARDS = 0
+    SCORE = 1
 
 class Rank(IntEnum):
     TWO = 0

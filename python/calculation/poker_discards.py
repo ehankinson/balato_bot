@@ -1,10 +1,17 @@
 import heapq
 import math
 import time
-from itertools import combinations, permutations, product
+from dataclasses import dataclass, field
+from itertools import combinations, permutations
 
 from core.enums import PokerHand, Rank, Suit
 from core.models import Card, Deck
+
+
+@dataclass(slots=True)
+class Holder:
+    count: int = 0
+    score: list[int] = field(default_factory=list)
 
 
 def format_duration(elapsed_ns: int) -> str:
@@ -20,15 +27,22 @@ def format_duration(elapsed_ns: int) -> str:
 def generate_draw_combos(
     remaining: list[int], minimums: list[int], cards_to_draw: int
 ) -> list[list[int]]:
+    if sum(minimums) > cards_to_draw:
+        return []
+
     results = []
-    for drawn in product(*(range(count + 1) for count in remaining)):
-        if any(drawn[i] < minimums[i] for i in range(len(drawn))):
-            continue
 
-        other_cards = cards_to_draw - sum(drawn)
+    def build_combo(index: int, used_cards: int, drawn: list[int]) -> None:
+        if index == len(remaining):
+            results.append([*drawn, cards_to_draw - used_cards])
+            return
 
-        if other_cards >= 0:
-            results.append([*drawn, other_cards])
+        min_draw = minimums[index]
+        max_draw = min(remaining[index], cards_to_draw - used_cards)
+        for amount in range(min_draw, max_draw + 1):
+            build_combo(index + 1, used_cards + amount, [*drawn, amount])
+
+    build_combo(0, 0, [])
 
     return results
 
@@ -36,7 +50,7 @@ def generate_draw_combos(
 def calculate_odds(
     deck: Deck,
     hand: list[Card],
-    bucket: list[int],
+    bucket: list[Holder],
     values: list[list[list[int]]],
 ):
     max_iter = len(bucket)
@@ -44,21 +58,16 @@ def calculate_odds(
     total_draws = math.comb(total_cards, 5)
     val_weights = [0.0] * max_iter
 
-    shift_amount, equal_val, attr = -1, -1, ""
+    attr = ""
     match max_iter:
         case 4:
-            (
-                shift_amount,
-                equal_val,
-                id_shift,
-                attr,
-            ) = 9, 0b11, 2, "suits"
+            id_shift, attr = 2, "suits"
 
         case 13:
-            shift_amount, equal_val, id_shift, attr = 11, 0b1111, 4, "ranks"
+            id_shift, attr = 4, "ranks"
 
         case _:
-            shift_amount, equal_val, id_shift, attr = 9, 0b111111, 6, "suit_rank"
+            id_shift, attr = 6, "suit_rank"
 
     best_val = -1
     best_score = -1
@@ -71,25 +80,21 @@ def calculate_odds(
         deck_val_amounts = []
 
         for val, req_amount in data:
-            needed = max(0, req_amount - bucket[val])
+            needed = max(0, req_amount - bucket[val].count)
+            if needed == 0:
+                continue
+                
             amount_needed.append(needed)
             deck_val = getattr(deck, attr)
-            deck_val_count = len(deck_val[val])
+            deck_val_count = len(deck_val[val].cards)
             if deck_val_count == 0:
                 continue
 
             deck_val_amounts.append(deck_val_count)
 
-            max_score = []
-            for card in hand:
-                if (card.card_id >> shift_amount) & equal_val == val:
-                    heapq.heappush_max(max_score, card.score)
+            expected_deck_score = deck_val[val].score / deck_val_count
 
-            expected_deck_score = (
-                sum(card.score for card in deck_val[val]) / deck_val_count * needed
-            )
-
-            score += sum(max_score[: bucket[val]]) + expected_deck_score
+            score += sum(bucket[val].score[: bucket[val].count]) + expected_deck_score
 
         draw_combos = generate_draw_combos(deck_val_amounts, amount_needed, 5)
         # we append this here since the generate combos adds a discard amount (like leftover is there is any)
@@ -141,15 +146,31 @@ def generate_discard_table(
     deck: Deck, dealt_cards: list[Card]
 ) -> dict[PokerHand, dict[str, int | float | list[Card]]]:
     total_start = time.perf_counter_ns()
-    suit_bucket = [0] * 4
-    rank_bucket = [0] * 13
-    suit_rank_bucket = [0] * ((Suit.SPADES << 4 | Rank.ACE) + 1)
+    suit_bucket = [Holder() for _ in range(4)]
+    rank_bucket = [Holder() for _ in range(13)]
+    suit_rank_bucket = [Holder() for _ in range((Suit.SPADES << 4 | Rank.ACE) + 1)]
     for card in dealt_cards:
         rank, suit = card.rank, card.suit
+
         suit_rank_key = suit << 4 | rank
-        suit_rank_bucket[suit_rank_key] += 1
-        suit_bucket[suit] += 1
-        rank_bucket[rank] += 1
+        suit_rank_bucket[suit_rank_key].count += 1
+        suit_rank_bucket[suit_rank_key].score.append(card.score)
+
+        suit_bucket[suit].count += 1
+        suit_bucket[suit].score.append(card.score)
+
+        rank_bucket[rank].count += 1
+        rank_bucket[rank].score.append(card.score)
+
+    for suit in suit_bucket:
+        suit.score.sort()
+
+    for rank in rank_bucket:
+        rank.score.sort()
+
+    for suit_rank in suit_rank_bucket:
+        suit_rank.score.sort()
+
 
     table = {}
 
