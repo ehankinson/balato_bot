@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from itertools import combinations, permutations
 
 from core.enums import PokerHand, Rank, Suit
-from core.models import Card, Deck
+from core.models import CARD_STRINGS, Card, Deck
 
 
 @dataclass(slots=True)
@@ -16,12 +16,12 @@ class Holder:
 
 def format_duration(elapsed_ns: int) -> str:
     if elapsed_ns < 1_000:
-        return f"{elapsed_ns} ns"
+        return f"{elapsed_ns}ns"
     if elapsed_ns < 1_000_000:
-        return f"{elapsed_ns / 1_000:.2f} us"
+        return f"{elapsed_ns / 1_000:.2f}us"
     if elapsed_ns < 1_000_000_000:
-        return f"{elapsed_ns / 1_000_000:.2f} ms"
-    return f"{elapsed_ns / 1_000_000_000:.2f} s"
+        return f"{elapsed_ns / 1_000_000:.2f}ms"
+    return f"{elapsed_ns / 1_000_000_000:.2f}s"
 
 
 def generate_draw_combos(
@@ -31,18 +31,17 @@ def generate_draw_combos(
         return []
 
     results = []
-
-    def build_combo(index: int, used_cards: int, drawn: list[int]) -> None:
+    stack = [(0, 0, [])]
+    while stack:
+        index, used_cards, drawn = stack.pop()
         if index == len(remaining):
             results.append([*drawn, cards_to_draw - used_cards])
-            return
+            continue
 
         min_draw = minimums[index]
         max_draw = min(remaining[index], cards_to_draw - used_cards)
-        for amount in range(min_draw, max_draw + 1):
-            build_combo(index + 1, used_cards + amount, [*drawn, amount])
-
-    build_combo(0, 0, [])
+        for amount in range(max_draw, min_draw - 1, -1):
+            stack.append((index + 1, used_cards + amount, [*drawn, amount]))
 
     return results
 
@@ -51,7 +50,8 @@ def calculate_odds(
     deck: Deck,
     hand: list[Card],
     bucket: list[Holder],
-    values: list[list[list[int]]],
+    values: list[list[int]],
+    amount: list[int],
 ):
     max_iter = len(bucket)
     total_cards = deck.total_cards
@@ -78,16 +78,19 @@ def calculate_odds(
         score = 0
         amount_needed = []
         deck_val_amounts = []
-
-        for val, req_amount in data:
+        
+        skip_count = 0
+        for val, req_amount in zip(data, amount):
             needed = max(0, req_amount - bucket[val].count)
             if needed == 0:
+                skip_count += 1
                 continue
-                
+
             amount_needed.append(needed)
             deck_val = getattr(deck, attr)
             deck_val_count = len(deck_val[val].cards)
-            if deck_val_count == 0:
+            if deck_val_count == 0 or needed > deck_val_count:
+                skip_count += 1
                 continue
 
             deck_val_amounts.append(deck_val_count)
@@ -95,6 +98,9 @@ def calculate_odds(
             expected_deck_score = deck_val[val].score / deck_val_count
 
             score += sum(bucket[val].score[: bucket[val].count]) + expected_deck_score
+
+        if skip_count == len(data):
+            continue
 
         draw_combos = generate_draw_combos(deck_val_amounts, amount_needed, 5)
         # we append this here since the generate combos adds a discard amount (like leftover is there is any)
@@ -111,9 +117,9 @@ def calculate_odds(
 
         probability = good_draws / total_draws
 
-        val_id = 0
+        val_id = 1
         weighted_score = probability * score
-        for val, _ in data:
+        for val in data:
             val_weights[val] += weighted_score
             val_id = val_id << id_shift
 
@@ -145,7 +151,6 @@ def calculate_odds(
 def generate_discard_table(
     deck: Deck, dealt_cards: list[Card]
 ) -> dict[PokerHand, dict[str, int | float | list[Card]]]:
-    total_start = time.perf_counter_ns()
     suit_bucket = [Holder() for _ in range(4)]
     rank_bucket = [Holder() for _ in range(13)]
     suit_rank_bucket = [Holder() for _ in range((Suit.SPADES << 4 | Rank.ACE) + 1)]
@@ -163,121 +168,106 @@ def generate_discard_table(
         rank_bucket[rank].score.append(card.score)
 
     for suit in suit_bucket:
-        suit.score.sort()
+        suit.score.sort(reverse=True)
 
     for rank in rank_bucket:
-        rank.score.sort()
+        rank.score.sort(reverse=True)
 
     for suit_rank in suit_rank_bucket:
-        suit_rank.score.sort()
-
+        suit_rank.score.sort(reverse=True)
 
     table = {}
+    rows: list[tuple[PokerHand, int, float, list[Card], int]] = []
 
     rank_array = [rank for rank in Rank]
     suit_array = [suit for suit in Suit]
+
     straight_array = rank_array[::-1]
     straight_array.append(straight_array[0])
+    straight_combo = []
+    for cutoff in range(5, len(straight_array) + 1):
+        straight_combo.append(straight_array[cutoff - 5 : cutoff])
+
     full_house_combo = list(permutations(rank_array, 2))
 
     for hand in PokerHand:
         if hand == PokerHand.HIGH_CARD:
             continue
 
-        start_time = time.perf_counter_ns()
-        val, prob, discard = -1, 0, []
+        val, prob, discard, amount = -1, 0, [], []
         values = []
         bucket = []
         match hand:
             case PokerHand.PAIR:
                 bucket = rank_bucket
-                values = [[[rank, 2]] for rank in rank_array]
+                values = [[rank] for rank in rank_array]
+                amount = [2]
 
             case PokerHand.THREE_OF_A_KIND:
                 bucket = rank_bucket
-                values = [[[rank, 3]] for rank in rank_array]
+                values = [[rank] for rank in rank_array]
+                amount = [3]
 
             case PokerHand.FOUR_OF_A_KIND:
                 bucket = rank_bucket
-                values = [[[rank, 4]] for rank in rank_array]
+                values = [[rank] for rank in rank_array]
+                amount = [4]
 
             case PokerHand.FIVE_OF_A_KIND:
                 bucket = rank_bucket
-                values = [[[rank, 5]] for rank in rank_array]
+                values = [[rank] for rank in rank_array]
+                amount = [5]
 
             case PokerHand.TWO_PAIR:
                 two_pair_combo = list(combinations(rank_array, 2))
                 bucket = rank_bucket
-                values = [[[val, 2] for val in two_pair] for two_pair in two_pair_combo]
+                values = [[val for val in two_pair] for two_pair in two_pair_combo]
+                amount = [2, 2]
 
             case PokerHand.STRAIGHT:
-                straight_combo = []
-                for cutoff in range(5, len(straight_array) + 1):
-                    straight_combo.append(straight_array[cutoff - 5 : cutoff])
-
                 bucket = rank_bucket
-                values = [[[x, 1] for x in straight] for straight in straight_combo]
+                values = straight_combo
+                amount = [1] * 5
 
             case PokerHand.FLUSH:
                 bucket = suit_bucket
-                values = [[[suit, 5]] for suit in suit_array]
+                values = [[suit] for suit in suit_array]
+                amount = [5]
 
             case PokerHand.FULL_HOUSE:
                 bucket = rank_bucket
                 values = [
-                    [[val, 3 if i == 0 else 2] for i, val in enumerate(full_house)]
-                    for full_house in full_house_combo
+                    [val for val in full_house] for full_house in full_house_combo
                 ]
+                amount = [3, 2]
 
             case PokerHand.STRAIGHT_FLUSH:
                 bucket = suit_rank_bucket
-                straight_flush_array = [
-                    suit << 4 | val for suit in suit_array for val in straight_array
-                ]
-
-                straight_flush_combo = []
-                cutoff = 5
-                while cutoff < len(straight_flush_array) + 1:
-                    straight_flush_combo.append(
-                        straight_flush_array[cutoff - 5 : cutoff]
-                    )
-                    add_val = 5 if cutoff % 14 == 0 else 1
-                    cutoff += add_val
-
                 values = [
-                    [[val, 1] for val in straight_flush]
-                    for straight_flush in straight_flush_combo
+                    [suit << 4 | rank for suit in suit_array for rank in straight]
+                    for straight in straight_combo
                 ]
+                amount = [1] * 5
 
             case PokerHand.FLUSH_HOUSE:
                 bucket = suit_rank_bucket
                 values = [
-                    [
-                        [suit << 4 | val, 3 if i == 0 else 2]
-                        for i, val in enumerate(full_house)
-                    ]
+                    [suit << 4 | rank for rank in full_house]
                     for full_house in full_house_combo
                     for suit in suit_array
                 ]
+                amount = [3, 2]
 
             case PokerHand.FLUSH_FIVE:
                 bucket = suit_rank_bucket
                 values = [
-                    [[suit << 4 | rank, 5]]
-                    for rank in rank_array
-                    for suit in suit_array
+                    [suit << 4 | rank] for rank in rank_array for suit in suit_array
                 ]
+                amount = [5]
 
-        val, prob, discard = calculate_odds(deck, dealt_cards, bucket, values)
-        end_time = time.perf_counter_ns()
-
-        print(f"{hand.name:<18} {format_duration(end_time - start_time)}")
+        val, prob, discard = calculate_odds(deck, dealt_cards, bucket, values, amount)
 
         table[hand] = {"value": val, "probability": prob, "discard": discard}
-
-    total_end = time.perf_counter_ns()
-
-    print(f"Total time taken was {format_duration(total_end - total_start)}")
 
     return table
 
