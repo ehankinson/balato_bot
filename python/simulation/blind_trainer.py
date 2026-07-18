@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 
-class BlindPolicy(nn.Module):
+class BlindModel(nn.Module):
     def __init__(self, input_size: int, hidden_size: int = 128):
         super().__init__()
 

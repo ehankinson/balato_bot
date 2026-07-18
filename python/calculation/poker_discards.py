@@ -1,27 +1,15 @@
-import heapq
 import math
-import time
 from dataclasses import dataclass, field
 from itertools import combinations, permutations
 
 from core.enums import PokerHand, Rank, Suit
-from core.models import CARD_STRINGS, Card, Deck
+from core.models import Card, Deck
 
 
 @dataclass(slots=True)
 class Holder:
     count: int = 0
     score: list[int] = field(default_factory=list)
-
-
-def format_duration(elapsed_ns: int) -> str:
-    if elapsed_ns < 1_000:
-        return f"{elapsed_ns}ns"
-    if elapsed_ns < 1_000_000:
-        return f"{elapsed_ns / 1_000:.2f}us"
-    if elapsed_ns < 1_000_000_000:
-        return f"{elapsed_ns / 1_000_000:.2f}ms"
-    return f"{elapsed_ns / 1_000_000_000:.2f}s"
 
 
 def generate_draw_combos(
@@ -78,7 +66,7 @@ def calculate_odds(
         score = 0
         amount_needed = []
         deck_val_amounts = []
-        
+
         skip_count = 0
         for val, req_amount in zip(data, amount):
             needed = max(0, req_amount - bucket[val].count)
@@ -150,7 +138,7 @@ def calculate_odds(
 
 def generate_discard_table(
     deck: Deck, dealt_cards: list[Card]
-) -> dict[PokerHand, dict[str, int | float | list[Card]]]:
+) -> dict[PokerHand, tuple[int, float, list[Card]]]:
     suit_bucket = [Holder() for _ in range(4)]
     rank_bucket = [Holder() for _ in range(13)]
     suit_rank_bucket = [Holder() for _ in range((Suit.SPADES << 4 | Rank.ACE) + 1)]
@@ -176,8 +164,7 @@ def generate_discard_table(
     for suit_rank in suit_rank_bucket:
         suit_rank.score.sort(reverse=True)
 
-    table = {}
-    rows: list[tuple[PokerHand, int, float, list[Card], int]] = []
+    table: dict[PokerHand, tuple[int, float, list[Card]]] = {}
 
     rank_array = [rank for rank in Rank]
     suit_array = [suit for suit in Suit]
@@ -267,7 +254,7 @@ def generate_discard_table(
 
         val, prob, discard = calculate_odds(deck, dealt_cards, bucket, values, amount)
 
-        table[hand] = {"value": val, "probability": prob, "discard": discard}
+        table[hand] = (val, prob, discard)
 
     return table
 
@@ -310,5 +297,9 @@ if __name__ == "__main__":
         ),
     ]
 
+    import time
     deck._filter(hand)
+    start_time = time.perf_counter()
     generate_discard_table(deck, hand)
+    end_time = time.perf_counter()
+    print(f"It took {end_time - start_time}s to build the discard table")

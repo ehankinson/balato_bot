@@ -1,3 +1,5 @@
+from numpy import _2DShapeT_co
+
 from calculation.util import bucket_rank, unique_cards
 from config.poker_hands import HAND_STATS
 from core.enums import PokerHand
@@ -16,7 +18,7 @@ def is_straight(cards: list[Card]) -> bool:
         diff = cards[i - 1].rank - cards[i].rank
         if i == 1 and diff == 9:
             continue
-            
+
         if diff != 1:
             return False
 
@@ -83,3 +85,68 @@ def get_hand_type(hand: list[Card]) -> HandStats:
     raise ValueError(
         f"The current hand: {hand} does not have a possible hand, This hand is impossible"
     )
+
+
+def find_best_hand_type(cards: list[Card]) -> tuple[HandStats, list[Card]]:
+    ranks = [0] * 13
+    for card in cards:
+        ranks[card.rank] += 1
+
+    card_count = sum(1 for rank in ranks if rank > 0)
+    max_count = max(ranks)
+    max_rank = max(card.rank for card in cards)
+
+    straight = is_straight(cards)
+    flush = is_flush(cards)
+    hand_stats = HandStats()
+    scored_cards = []
+
+    if straight:
+        hand_stats, scored_cards = (
+            (HAND_STATS[PokerHand.STRAIGHT], cards)
+            if flush
+            else (HAND_STATS[PokerHand.STRAIGHT_FLUSH], cards)
+        )
+
+    elif flush:
+        hand_stats, scored_cards = (
+            (HAND_STATS[PokerHand.FLUSH_FIVE], cards)
+            if max_count == 5
+            else (HAND_STATS[PokerHand.FLUSH_HOUSE], cards)
+            if card_count == 2
+            else (HAND_STATS[PokerHand.FLUSH], cards)
+        )
+
+    else:
+        hand_stats, scored_cards = (
+            (HAND_STATS[PokerHand.FULL_HOUSE], cards)
+            if all(count in ranks for count in [3, 2])
+            else (
+                HAND_STATS[PokerHand.TWO_PAIR],
+                [card for card in cards if ranks[card.rank] == 2],
+            )
+            if sum(1 for rank in ranks if rank >= 2)
+            else (HAND_STATS[PokerHand.FIVE_OF_A_KIND], cards)
+            if max_count == 5
+            else (
+                HAND_STATS[PokerHand.FOUR_OF_A_KIND],
+                [card for card in cards if ranks[card.rank] == 4],
+            )
+            if max_count == 4
+            else (
+                HAND_STATS[PokerHand.THREE_OF_A_KIND],
+                [card for card in cards if ranks[card.rank] == 3],
+            )
+            if max_count == 3
+            else (
+                HAND_STATS[PokerHand.PAIR],
+                [card for card in cards if ranks[card.rank] == 2],
+            )
+            if max_count == 2
+            else (
+                HAND_STATS[PokerHand.HIGH_CARD],
+                [card for card in cards if card.rank == max_rank],
+            )
+        )
+
+    return hand_stats, scored_cards

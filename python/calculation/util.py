@@ -1,10 +1,8 @@
 from collections.abc import Callable, Iterable
-from functools import reduce
 from itertools import combinations, permutations
 from typing import TypeVar
 
 from core.enums import Enhancement, Rank, Suit
-from core.hand_stats import HandStats
 from core.models import Card
 
 K = TypeVar("K")
@@ -49,6 +47,7 @@ def bucket_suit(cards: Iterable[Card]) -> dict[Suit, list[Card]]:
             bucket[card.suit].append(card)
 
     return bucket
+
 
 def bucket_by(
     cards: Iterable[Card],

@@ -1,14 +1,13 @@
 import random
 from dataclasses import dataclass, field
-from itertools import combinations
 
 from PIL import Image
 from sympy.functions.combinatorial.numbers import E
 
+from calculation.score import calculate_scoring_hand
 from config.settings import JOKER_CONFIG
 from core.class_indices import JOKER_TYPE_CLASSES
 from core.enums import (
-    DeckCheck,
     Edition,
     Enhancement,
     JokersName,
@@ -239,6 +238,10 @@ class Deck:
 
     def __post_init__(self):
         self._build_deck()
+        self._shuffle()
+
+    def _shuffle(self) -> None:
+        random.shuffle(self.deck)
 
     def _build_deck(self) -> None:
         for rank in Rank:
@@ -297,11 +300,7 @@ class Deck:
         self.suit_rank[suit_rank_key].cards.append(card)
         self.suit_rank[suit_rank_key].score += score
         
-
         self.total_cards += 1
-
-    def shuffle(self) -> None:
-        random.shuffle(self.deck)
 
     def draw(self, n: int) -> list[Card]:
         cards_to_draw = [self.deck.pop() for _ in range(n) if len(self.deck) > 0]
@@ -314,6 +313,8 @@ class Deck:
     def reset(self) -> None:
         while len(self.discards) > 0:
             self.add_card(self.discards.pop())
+
+        self._shuffle()
 
 
 @dataclass(slots=True)
@@ -652,13 +653,37 @@ class GameState:
     allow_duplicate_shop_items: bool = False
     suit_groups: list[list[str]] = field(default_factory=list)
 
-    def play_hand(self) -> None:
+    def play_hand(self, played_cards: list[Card], hand: list[Card], deck: Deck) -> bool:
         self.hands -= 1
         self.hands_played += 1
 
-    def discard(self) -> None:
+        i = 0
+        cards_not_played = []
+        while i < len(hand) + 1:
+            if hand[i] in played_cards:
+                cards_not_played.append(hand.pop(i))
+                continue
+
+            i += 1
+                
+        self.current_score += calculate_scoring_hand(played_cards, cards_not_played, self)
+        deck.add_to_discard_pile(played_cards)
+        if self.current_score >= self.score_to_beat:
+            return True # we beat the blind
+        
+        hand.extend(deck.draw(self.hand_size - len(hand)))
+        return False
+        
+
+    def discard(self, cards_to_discard: list[Card], hand: list[Card], deck: Deck) -> None:
         self.discards -= 1
         self.discards_used += 1
+
+        deck.add_to_discard_pile(cards_to_discard)
+        for card in cards_to_discard:
+            hand.remove(card)
+
+        hand.extend(deck.draw(self.hand_size - len(hand)))
 
     def reset(self) -> None:
         self.current_score = 0.0

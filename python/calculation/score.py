@@ -1,24 +1,18 @@
-import sys
-import time
 from copy import copy, deepcopy
 
-from cv2 import decomposeProjectionMatrix
-from tqdm import tqdm
 from typing_extensions import Literal, overload
 
 from calculation.joker_generation import generate_scoring_jokers_combinations
 from calculation.joker_retrigger import calculate_joker_retrigger
 from calculation.joker_scoring import calculate_joker_scoring
 from calculation.joker_update import calculate_joker_update
+from calculation.poker_eval import find_best_hand_type
 from calculation.poker_generation import generate_scoring_hand_combinations
 from core.enums import (
-    Edition,
     Enhancement,
     JokersName,
     JokerTriggers,
-    Rank,
-    Seal,
-    Suit,
+    PokerHand,
 )
 from core.models import (
     BestHand,
@@ -115,8 +109,8 @@ def apply_joker_update(
     list[JokerScoring],
     list[JokerScoring],
 ]:
-    # this code currently causes an issue since we are update references
-    # and each other instand in hand_scoring uses that same reference, so we need to
+    # this code currently causes an issue since we are updating references
+    # and each other instance in hand_scoring uses that same reference, so we need to
     # update it back to the original state of the card
     copy_update_jokers = [
         deepcopy(joker) if isinstance(joker, JokerScoring) else joker
@@ -267,7 +261,9 @@ def calculate_score(
         if joker.background_image == JokersName.LUCKY_CAT:
             j_x_mult = 0.25 * lucky_triggers * 2
         else:
-            j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(joker, condition_args)
+            j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(
+                joker, condition_args
+            )
 
         best_hand.chips += j_chips
         add_to_order(j_add_mult, j_x_mult, joker.prob, mult_scoring_order)
@@ -381,3 +377,22 @@ def get_best_scoring_hand(
         return final_results, len(hand_cache) * len(joker_plan_cache)
 
     return final_results
+
+
+def calculate_scoring_hand(played_cards: list[Card], cards_not_played: list[Card], game_state: GameState) -> float:
+    best_hand_type, scored_played = find_best_hand_type(played_cards)
+    unscored_played = [card for card in played_cards if card not in scored_played]
+
+    hand_scoring = HandScoring(
+        hand_stats=best_hand_type,
+        scored_played=scored_played,
+        unscored_played=unscored_played,
+        scored_held=[],
+        unscored_held=cards_not_played,
+    )
+
+    best_hand = calculate_score(hand_scoring, JokerPlan(), game_state, JokerScoringConditions())
+
+    return best_hand.chips * best_hand.worst_case_mult
+
+    

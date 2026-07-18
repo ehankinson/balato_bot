@@ -50,7 +50,7 @@ def encode_game_state(
     hand: list[Card],
     game_state: GameState,
     best_hand: FinalScoringResults,
-    discards: dict[PokerHand, dict[str, int | float | list[Card]]],
+    discards: dict[PokerHand, tuple[int, float, list[Card]]],
 ):
     best_hand_score = best_hand.best_hand.chips * best_hand.best_hand.worst_case_mult
     projected_best_score = best_hand_score + game_state.current_score
@@ -73,11 +73,11 @@ def encode_game_state(
     for discard_info in discards.values():
         info = torch.Tensor(
             [
-                discard_info["probability"],
+                discard_info[1],
             ]
         )
         feature = torch.cat(
-            (info, build_discard_bitmask(hand, discard_info["discard"]))
+            (info, build_discard_bitmask(hand, discard_info[2]))
         ).float()
         discard_features.append(feature)
 
