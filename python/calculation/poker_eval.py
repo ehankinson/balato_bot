@@ -1,5 +1,3 @@
-from numpy import _2DShapeT_co
-
 from calculation.util import bucket_rank, unique_cards
 from config.poker_hands import HAND_STATS
 from core.enums import PokerHand
@@ -96,16 +94,16 @@ def find_best_hand_type(cards: list[Card]) -> tuple[HandStats, list[Card]]:
     max_count = max(ranks)
     max_rank = max(card.rank for card in cards)
 
-    straight = is_straight(cards)
-    flush = is_flush(cards)
+    straight = is_straight(cards) and len(cards) == 5
+    flush = is_flush(cards) and len(cards) == 5
     hand_stats = HandStats()
     scored_cards = []
 
     if straight:
         hand_stats, scored_cards = (
-            (HAND_STATS[PokerHand.STRAIGHT], cards)
+            (HAND_STATS[PokerHand.STRAIGHT_FLUSH], cards)
             if flush
-            else (HAND_STATS[PokerHand.STRAIGHT_FLUSH], cards)
+            else (HAND_STATS[PokerHand.STRAIGHT], cards)
         )
 
     elif flush:
@@ -125,7 +123,7 @@ def find_best_hand_type(cards: list[Card]) -> tuple[HandStats, list[Card]]:
                 HAND_STATS[PokerHand.TWO_PAIR],
                 [card for card in cards if ranks[card.rank] == 2],
             )
-            if sum(1 for rank in ranks if rank >= 2)
+            if sum(1 for rank in ranks if rank >= 2) >= 2
             else (HAND_STATS[PokerHand.FIVE_OF_A_KIND], cards)
             if max_count == 5
             else (
