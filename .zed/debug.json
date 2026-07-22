@@ -20,10 +20,10 @@
     }
   },
   {
-    "label": "Debug best_hand",
+    "label": "Debug vision",
     "adapter": "Debugpy",
     "request": "launch",
-    "program": "$ZED_WORKTREE_ROOT/python/best_hand.py",
+    "program": "$ZED_WORKTREE_ROOT/python/vision.py",
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "args": ["worst"],
     "env": {

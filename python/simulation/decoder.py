@@ -87,6 +87,96 @@ def model_decoder(
     return mode, count, card_indices, log_prob, entropy
 
 
+def model_decoder_batch(
+    values: dict[str, torch.Tensor],
+    masks: ActionMasks,
+    stochastic: bool,
+) -> tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]:
+    """Decode one action per row without synchronizing with Python per game."""
+    mode_logits = values["mode_logits"]
+    device = mode_logits.device
+    batch_size = mode_logits.shape[0]
+    mode_mask = masks.mode.to(device)
+    count_mask = masks.count.to(device)
+    card_mask = masks.card.to(device)
+
+    mode_dist = Categorical(
+        logits=mode_logits.masked_fill(mode_mask == 0, float("-inf"))
+    )
+    if stochastic:
+        modes = mode_dist.sample()
+        log_probs = mode_dist.log_prob(modes)
+        entropies = mode_dist.entropy()
+    else:
+        modes = torch.argmax(mode_dist.logits, dim=1)
+        log_probs = torch.zeros(batch_size, device=device)
+        entropies = torch.zeros(batch_size, device=device)
+
+    is_discard = modes.bool().unsqueeze(1)
+    count_logits = torch.where(
+        is_discard,
+        values["discard_count_logits"],
+        values["play_count_logits"],
+    )
+    card_logits = torch.where(
+        is_discard,
+        values["discard_card_logits"],
+        values["play_card_logits"],
+    )
+
+    count_dist = Categorical(
+        logits=count_logits.masked_fill(count_mask == 0, float("-inf"))
+    )
+    if stochastic:
+        counts = count_dist.sample() + 1
+        log_probs = log_probs + count_dist.log_prob(counts - 1)
+        entropies = entropies + count_dist.entropy()
+    else:
+        counts = torch.argmax(count_dist.logits, dim=1) + 1
+
+    card_indices = torch.full(
+        (batch_size, 5), -1, dtype=torch.long, device=device
+    )
+    card_valid = torch.zeros(
+        (batch_size, 5), dtype=torch.float32, device=device
+    )
+    remaining = card_mask.clone()
+    batch_indices = torch.arange(batch_size, device=device)
+
+    for card_position in range(5):
+        active = counts > card_position
+        card_dist = Categorical(
+            logits=card_logits.masked_fill(remaining == 0, float("-inf"))
+        )
+        if stochastic:
+            selected = card_dist.sample()
+            log_probs = log_probs + torch.where(
+                active,
+                card_dist.log_prob(selected),
+                torch.zeros(batch_size, device=device),
+            )
+            entropies = entropies + torch.where(
+                active,
+                card_dist.entropy(),
+                torch.zeros(batch_size, device=device),
+            )
+        else:
+            selected = torch.argmax(card_dist.logits, dim=1)
+
+        card_indices[active, card_position] = selected[active]
+        card_valid[active, card_position] = 1.0
+        remaining[batch_indices[active], selected[active]] = 0.0
+
+    return modes, counts, card_indices, card_valid, log_probs, entropies
+
+
 def evaluate_actions(
     values: dict[str, torch.Tensor],
     mode_masks: torch.Tensor,

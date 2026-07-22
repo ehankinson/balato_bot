@@ -3,7 +3,11 @@ import torch
 from core.models import GameState
 from simulation.blind_env import ActionMasks
 from simulation.blind_trainer import BlindModel
-from simulation.decoder import evaluate_actions, model_decoder
+from simulation.decoder import (
+    evaluate_actions,
+    model_decoder,
+    model_decoder_batch,
+)
 from simulation.reward import (
     calculate_game_score,
     calculate_score_progress_reward,
@@ -96,3 +100,53 @@ def test_ppo_evaluation_updates_both_mode_specific_heads():
     assert model.discard_count_head.weight.grad is not None
     assert model.play_card_head.weight.grad is not None
     assert model.discard_card_head.weight.grad is not None
+
+
+def test_batched_decoder_uses_the_correct_heads_for_each_row():
+    play = _outputs(mode=0)
+    discard = _outputs(mode=1)
+    outputs = {
+        key: torch.cat((play[key], discard[key]))
+        for key in play
+    }
+    masks = ActionMasks(
+        mode=torch.ones(2, 2),
+        count=torch.ones(2, 5),
+        card=torch.ones(2, 8),
+    )
+
+    modes, counts, cards, valid, _, _ = model_decoder_batch(
+        outputs, masks, stochastic=False
+    )
+
+    assert modes.tolist() == [0, 1]
+    assert counts.tolist() == [2, 5]
+    assert cards.tolist() == [[0, 1, -1, -1, -1], [3, 4, 5, 6, 7]]
+    assert valid.tolist() == [[1.0, 1.0, 0.0, 0.0, 0.0], [1.0] * 5]
+
+
+def test_batched_decoder_log_probs_match_ppo_action_evaluation():
+    torch.manual_seed(123)
+    model = BlindModel(input_size=6, hidden_size=8)
+    outputs = model(torch.randn(4, 6))
+    masks = ActionMasks(
+        mode=torch.ones(4, 2),
+        count=torch.ones(4, 5),
+        card=torch.ones(4, 8),
+    )
+    modes, counts, cards, valid, sampled_log_probs, _ = model_decoder_batch(
+        outputs, masks, stochastic=True
+    )
+
+    evaluated_log_probs, _ = evaluate_actions(
+        outputs,
+        masks.mode,
+        masks.count,
+        masks.card,
+        modes,
+        counts,
+        cards,
+        valid,
+    )
+
+    assert torch.allclose(sampled_log_probs, evaluated_log_probs)

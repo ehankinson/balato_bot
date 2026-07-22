@@ -234,6 +234,7 @@ class Deck:
     suits: dict[int, DeckCount] = field(default_factory=dict)
     ranks: dict[int, DeckCount] = field(default_factory=dict)
     suit_rank: dict[int, DeckCount] = field(default_factory=dict)
+    removed_cards: list[Card] = field(default_factory=list)
 
     def __post_init__(self):
         self._build_deck()
@@ -254,12 +255,15 @@ class Deck:
                 )
                 self.add_card(card)
 
-    def _filter(self, hand: list[Card]) -> None:
+    def filter(self, hand: list[Card]) -> None:
         for card in hand:
+            if card in self.removed_cards:
+                continue
+    
             suit, rank, score = card.suit, card.rank, card.score
             suit_rank_id = suit << 4 | card.rank
             self.cards[card] -= 1
-
+            
             self.suits[suit].cards.remove(card)
             self.suits[suit].score -= score
 
@@ -272,6 +276,7 @@ class Deck:
             if card.is_facecard:
                 self.facecards.remove(card)
 
+            self.removed_cards.append(card)
             self.total_cards -= 1
 
     def add_card(self, card: Card):
@@ -302,17 +307,19 @@ class Deck:
 
     def draw(self, n: int) -> list[Card]:
         cards_to_draw = [self.deck.pop() for _ in range(n) if len(self.deck) > 0]
-        self._filter(cards_to_draw)
+        self.filter(cards_to_draw)
         return cards_to_draw
 
     def add_to_discard_pile(self, cards: list[Card]) -> None:
         self.discards.extend(cards)
 
     def reset(self) -> None:
+        self.removed_cards = []
         while len(self.discards) > 0:
             self.add_card(self.discards.pop())
 
         self._shuffle()
+        
 
 
 @dataclass(slots=True)
@@ -638,7 +645,7 @@ class GameState:
     current_score: float = 0.0
     hands: int = 4
     hands_played: int = 0
-    discards: int = 3
+    discards: int = 4
     discards_used: int = 0
     hand_size: int = 8
     flush_size: int = 5

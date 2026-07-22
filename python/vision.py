@@ -1,6 +1,8 @@
+import torch
 from PIL import Image
 
-from best_hand import get_best_scoring_hand
+from calculation.poker_discards import generate_discard_table
+from calculation.score import get_best_scoring_hand
 from config.model_registry import CARD_BOX_MODEL
 from config.settings import (
     EDITION_CROP,
@@ -9,9 +11,12 @@ from config.settings import (
     SEAL_CROP,
     SUIT_CROP,
 )
-from core.enums import Edition, Enhancement, Rank, Seal, Suit
-from core.models import Card, CardData, FinalScoringResults, GameState
+from core.enums import Edition, Enhancement, HandAction, Rank, Seal, Suit
+from core.models import Card, CardData, Deck, GameState
 from model import preload_models, run_model
+from simulation.blind_trainer import BlindModel
+from simulation.decoder import build_mask, model_decoder
+from simulation.encoder import encode_game_state
 from utils.images import card_crop
 
 
@@ -67,50 +72,58 @@ def get_card_information(card_images: list[Image.Image]) -> list[Card]:
 
 
 def get_played_hand(
-    img: Image.Image,
-) -> tuple[list[CardData], list[CardData], list[CardData]]:
+    img: Image.Image, deck: Deck, game_state: GameState
+) -> tuple[list[CardData], HandAction, list[Card]]:
     preload_models()
-    game_state = GameState()
+    checkpoint = torch.load("/home/hank/projects/balatro_bot/python/ppo_blind.pt")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = BlindModel(checkpoint["input_size"], checkpoint["hidden_size"]).to(device)
+    model.load_state_dict(checkpoint["state_dict"])
+    model.eval()
 
     card_locations = []
     results = CARD_BOX_MODEL(img, verbose=False)
 
     for res in results:
-        for i, box in enumerate(res.boxes):
+        for box in res.boxes:
             if float(box.conf) < 0.9:
                 continue
 
             location = [float(val) for val in box.xyxy[0]]
             card_locations.append(location)
 
+    card_locations.sort(key=lambda x: x[0])
+
     card_images = []
-    for i, location in enumerate(card_locations):
+    for location in card_locations:
         card_image = img.crop(location)
         card_images.append(card_image)
 
-    cards = get_card_information(card_images)
+    hand = get_card_information(card_images)
+    deck.filter(hand)
 
-    best_hand = get_best_scoring_hand(cards, [], game_state)
+    best_hand = get_best_scoring_hand(hand, [], game_state)
+    discard_table = generate_discard_table(deck, hand)
+    encoded_state = encode_game_state(hand, game_state, best_hand, discard_table)
 
-    scored_played = []
-    for card in best_hand.hand_scoring.scored_played:
-        index = cards.index(card)
+    outputs = model(encoded_state.unsqueeze(0).to(device))
+    masks = build_mask(game_state, hand, device)
+    mode, _, card_indices, _, _ = model_decoder(
+        outputs, masks, device, stochastic=False
+    )
+
+    return_data = []
+    selected_cards = [hand[index] for index in sorted(card_indices)]
+
+    for card in selected_cards:
+        index = hand.index(card)
         card_location = card_locations[index]
-        scored_played.append(CardData(card=card, location=card_location))
+        return_data.append(CardData(card=card, location=card_location))
 
-    unscored_played = []
-    for card in best_hand.hand_scoring.unscored_played:
-        index = cards.index(card)
-        card_location = card_locations[index]
-        unscored_played.append(CardData(card=card, location=card_location))
+    for card in selected_cards:
+        hand.remove(card)
 
-    scored_held = []
-    for card in best_hand.hand_scoring.scored_held:
-        index = cards.index(card)
-        card_location = card_locations[index]
-        scored_held.append(CardData(card=card, location=card_location))
-
-    return scored_played, unscored_played, scored_held
+    return return_data, mode, hand
 
 
 if __name__ == "__main__":

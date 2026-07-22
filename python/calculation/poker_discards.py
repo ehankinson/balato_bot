@@ -298,7 +298,7 @@ if __name__ == "__main__":
     ]
 
     import time
-    deck._filter(hand)
+    deck.filter(hand)
     start_time = time.perf_counter()
     generate_discard_table(deck, hand)
     end_time = time.perf_counter()
