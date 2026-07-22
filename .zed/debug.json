@@ -3,7 +3,7 @@
     "label": "Debug Simulation",
     "adapter": "Debugpy",
     "request": "launch",
-    "module": "simulation.simulation",
+    "module": "simulation.eval",
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
@@ -36,6 +36,17 @@
     "request": "launch",
     "module": "pytest",
     "args": ["tests/test_joker_retrigger.py", "-s"],
+    "cwd": "$ZED_WORKTREE_ROOT/python",
+    "env": {
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
+    }
+  },
+  {
+    "label": "pytest: TEST_POKER_HAND_CLASSIFICATION",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "pytest",
+    "args": ["tests/test_poker_hand_classification.py", "-s"],
     "cwd": "$ZED_WORKTREE_ROOT/python",
     "env": {
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"

@@ -1,5 +1,9 @@
 from enum import IntEnum
 
+class HandAction(IntEnum):
+    PLAY_HAND = 0
+    DISCARD = 1
+
 class DeckCheck(IntEnum):
     CARDS = 0
     SCORE = 1

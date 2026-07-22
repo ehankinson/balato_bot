@@ -1,23 +1,23 @@
+from dataclasses import dataclass
+
 import torch
 
-from calculation.poker_discards import generate_discard_table
-from calculation.score import get_best_scoring_hand
-from core.models import Card, Deck, GameState
-from simulation.encoder import encode_game_state
+# Action mode constants: 0 = play a hand, 1 = discard cards.
+MODE_PLAY = 0
+MODE_DISCARD = 1
+
+# Max cards the model can select per action.
+MAX_PLAY_CARDS = 5
+MAX_DISCARD_CARDS = 5
+
+# Output head sizes — used by BlindModel in blind_trainer.py.
+COUNT_HEAD_SIZE = 5
+CARD_HEAD_SIZE = 8
 
 
-def reset(hand: list[Card], deck: Deck, game_state: GameState) -> torch.Tensor:
-    deck.add_to_discard_pile(hand)
-    deck.reset()
-    game_state.reset()
-    hand = deck.draw(game_state.hand_size)
-
-    best_hand = get_best_scoring_hand(hand, [], game_state)
-    discard_table = generate_discard_table(deck, hand)
-    encoded_game_state = encode_game_state(hand, game_state, best_hand, discard_table)
-    return encoded_game_state
-
-
-def play_hand(card_indices: list[int], hand: list[Card], game_state: GameState, deck: Deck):
-    playing_hand = [hand[i] for i in card_indices]
-    return game_state.play_hand(playing_hand, hand, deck)
+@dataclass(slots=True)
+class ActionMasks:
+    """1/0 mask tensors blocking illegal choices for each output head."""
+    mode: torch.Tensor   # shape [2]: legal modes (play, discard)
+    count: torch.Tensor   # shape [5]: legal card counts (1..5)
+    card: torch.Tensor    # shape [8]: legal hand slots
