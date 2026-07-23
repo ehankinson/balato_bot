@@ -658,7 +658,7 @@ class GameState:
     allow_duplicate_shop_items: bool = False
     suit_groups: list[list[str]] = field(default_factory=list)
 
-    def execute_hand_action(self, mode: HandAction, selected_cards: list[Card], hand: list[Card], deck: Deck) -> bool:
+    def execute_hand_action(self, mode: HandAction, selected_cards: list[Card], hand: list[Card], deck: Deck, draw: bool=True) -> bool:
         from calculation.score import calculate_scoring_hand
 
         has_won = False
@@ -673,7 +673,8 @@ class GameState:
             self.discards_used += 1
 
         deck.add_to_discard_pile(selected_cards)
-        hand.extend(deck.draw(self.hand_size - len(hand)))
+        if draw:
+            hand.extend(deck.draw(self.hand_size - len(hand)))
         
         return has_won
 

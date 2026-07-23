@@ -74,7 +74,6 @@ def get_card_information(card_images: list[Image.Image]) -> list[Card]:
 def get_played_hand(
     img: Image.Image, deck: Deck, game_state: GameState
 ) -> tuple[list[CardData], HandAction, list[Card]]:
-    preload_models()
     checkpoint = torch.load("/home/hank/projects/balatro_bot/python/ppo_blind.pt")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = BlindModel(checkpoint["input_size"], checkpoint["hidden_size"]).to(device)
