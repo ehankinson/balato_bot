@@ -298,8 +298,28 @@ if __name__ == "__main__":
     ]
 
     import time
+
     deck.filter(hand)
+    benchmark_duration = 1.0
     start_time = time.perf_counter()
-    generate_discard_table(deck, hand)
+    tables_generated = 0
+    discard_table = {}
+    while time.perf_counter() - start_time < benchmark_duration:
+        discard_table = generate_discard_table(deck, hand)
+        tables_generated += 1
     end_time = time.perf_counter()
-    print(f"It took {end_time - start_time}s to build the discard table")
+    elapsed = end_time - start_time
+
+    print("\nDiscard table")
+    print(f"{'Hand':<18} {'Probability':>12}  Discard")
+    print("-" * 78)
+    for poker_hand, (_value, probability, discard) in discard_table.items():
+        cards = ", ".join(repr(card) for card in discard) or "-"
+        hand_name = poker_hand.name.replace("_", " ").title()
+        print(f"{hand_name:<18} {probability:>11.2%}  {cards}")
+
+    print(
+        f"\nGenerated {tables_generated} discard tables in {elapsed:.3f} s "
+        f"({tables_generated / elapsed:.0f} tables/sec, "
+        f"{elapsed * 1_000 / tables_generated:.3f} ms/table)"
+    )

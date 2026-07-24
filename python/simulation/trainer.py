@@ -333,8 +333,14 @@ def main() -> None:
     requested_workers = int(os.getenv("BALATRO_ROLLOUT_WORKERS", str(default_workers)))
     rollout_workers = min(requested_workers, episodes_per_update)
     requested_device = os.getenv(
-        "BALATRO_DEVICE", "cuda" if torch.cuda.is_available() else "cpu"
+        "BALATRO_DEVICE",
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu",
     )
+
     if requested_device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError(
             "BALATRO_DEVICE requests CUDA, but torch.cuda.is_available() is false"

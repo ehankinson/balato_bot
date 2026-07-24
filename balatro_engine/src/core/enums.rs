@@ -1,21 +1,21 @@
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[repr(u8)]
 pub(crate) enum PokerHand {
-  HighCard = 1,
-  Pair = 2,
-  ThreeOfAKind = 3,
-  FourOfAKind = 4,
-  FiveOfAKind = 5,
-  TwoPair = 6,
-  Straight = 7,
-  Flush = 8,
-  FullHouse = 9,
-  StraightFlush = 10,
-  FlushHouse = 11,
-  FlushFive = 12
+    HighCard = 1,
+    Pair = 2,
+    ThreeOfAKind = 3,
+    FourOfAKind = 4,
+    FiveOfAKind = 5,
+    TwoPair = 6,
+    Straight = 7,
+    Flush = 8,
+    FullHouse = 9,
+    StraightFlush = 10,
+    FlushHouse = 11,
+    FlushFive = 12,
 }
 
-impl PokerHand{
+impl PokerHand {
     pub(crate) const DISCARD_HANDS: [PokerHand; 11] = [
         PokerHand::Pair,
         PokerHand::ThreeOfAKind,
@@ -27,6 +27,6 @@ impl PokerHand{
         PokerHand::FullHouse,
         PokerHand::StraightFlush,
         PokerHand::FlushHouse,
-        PokerHand::FlushFive
+        PokerHand::FlushFive,
     ];
 }

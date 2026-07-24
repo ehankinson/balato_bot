@@ -9,7 +9,7 @@ from simulation.encoder import encode_game_state
 from simulation.reward import calculate_game_score
 
 if __name__ == "__main__":
-    checkpoint = torch.load("/home/hank/projects/balatro_bot/python/ppo_blind.pt")
+    checkpoint = torch.load("/Users/ethanhankinson/projects/balatro_bot/python/ppo_blind.pt")
     # if checkpoint.get("architecture_version") != 2:
     #     raise ValueError(
     #         "ppo_blind.pt uses the old shared action heads; retrain with "
