@@ -1,7 +1,54 @@
 use crate::core::enums::PokerHand;
 use itertools::Itertools;
+use std::sync::LazyLock;
 use std::{collections::HashMap, panic};
 use use_combinatorics::combinations;
+
+static HAND_POSSIBILITIES: LazyLock<Vec<Vec<Vec<u8>>>> = LazyLock::new(|| {
+    let rank_combos: Vec<Vec<u8>> = (0..13).map(|rank| vec![rank]).collect();
+    let suit_combos: Vec<Vec<u8>> = (0u8..4).map(|suit| vec![suit]).collect();
+    let suit_rank_combos: Vec<Vec<u8>> = (0u8..64).map(|suit_rank| vec![suit_rank]).collect();
+    let two_pair_combos: Vec<Vec<u8>> = (0u8..13).combinations(2).collect();
+    let full_house_combos: Vec<Vec<u8>> = (0u8..13).permutations(2).collect();
+
+    let mut straight_array: Vec<u8> = (0u8..13).rev().collect();
+    straight_array.push(12); // for the wrap around A, 2, 3, 4, 5 straight
+
+    let mut straight_combos = Vec::new();
+    for cutoff in 5..=straight_array.len() {
+        straight_combos.push(straight_array[cutoff - 5..cutoff].to_vec());
+    }
+
+    let mut straight_flush_combos = Vec::new();
+    for straight in &straight_combos {
+        for suit in 0u8..4 {
+            let combination: Vec<u8> = straight.iter().map(|&rank| (suit << 4) | rank).collect();
+            straight_flush_combos.push(combination);
+        }
+    }
+
+    let mut flush_house_combos = Vec::new();
+    for full_house in full_house_combos.iter() {
+        for suit in 0u8..4 {
+            let combination: Vec<u8> = full_house.iter().map(|&rank| (suit << 4) | rank).collect();
+            flush_house_combos.push(combination);
+        }
+    }
+
+    vec![
+        rank_combos.clone(),   // Pair
+        rank_combos.clone(),   // Three of a kind
+        rank_combos.clone(),   // Four of a kind
+        rank_combos,           // Five of a kind
+        two_pair_combos,       // Two Pair
+        straight_combos,       // Straight
+        suit_combos,           // Flush
+        full_house_combos,     // Full House
+        straight_flush_combos, // Straight Flush
+        flush_house_combos,    // Flush House
+        suit_rank_combos,      // Flush Five
+    ]
+});
 
 #[derive(Clone)]
 struct Holder {
@@ -65,10 +112,11 @@ fn calculate_odds(
         _ => 6,
     };
 
+    let mut amount_needed = Vec::with_capacity(6);
+    let mut deck_val_amounts = Vec::with_capacity(6);
+
     for hand in values.iter() {
         let mut score = 0.0;
-        let mut amount_needed = Vec::new();
-        let mut deck_val_amounts: Vec<usize> = Vec::new();
 
         let mut skip_count = 0;
         for (val, req_amount) in hand.iter().zip(amount.iter()) {
@@ -114,6 +162,10 @@ fn calculate_odds(
             })
             .sum();
 
+        // resetting the arrays instead of needing to re-allocate them
+        amount_needed.clear();
+        deck_val_amounts.clear();
+
         let probability = good_draws as f64 / total_draws as f64;
         let weighted_score = probability * score;
         let mut val_id = 1;
@@ -125,9 +177,10 @@ fn calculate_odds(
         if probability > best_prob {
             best_prob = probability;
             best_score = score;
-            best_val = 0;
+            best_val = val_id;
         } else if probability == best_prob && score > best_score {
             best_score = score;
+            best_val = val_id;
         }
     }
 
@@ -216,44 +269,16 @@ pub(crate) fn generate_discard_table(
     }
 
     let mut table = HashMap::new();
-    let rank_array: Vec<Vec<u8>> = (0u8..13).map(|rank| vec![rank]).collect();
-    let suit_array = (0u8..4).map(|suit| vec![suit]).collect();
-    let suit_rank_array = (0u8..64).map(|suit_rank| vec![suit_rank]).collect();
-    let two_pair_combos: Vec<Vec<u8>> = (0u8..13).combinations(2).collect();
-    let full_house_combos: Vec<Vec<u8>> = (0u8..13).permutations(2).collect();
-
-    let mut straight_array: Vec<u8> = (0u8..13).rev().collect();
-    straight_array.push(12); // for the wrap around A, 2, 3, 4, 5 straight
-
-    let mut straight_combos = Vec::new();
-    for cutoff in 5..=straight_array.len() {
-        straight_combos.push(straight_array[cutoff - 5..cutoff].to_vec());
-    }
-
-    let mut straight_flush_combos = Vec::new();
-    for straight in &straight_combos {
-        for suit in 0u8..4 {
-            let combination = straight.iter().map(|&rank| (suit << 4) | rank).collect();
-            straight_flush_combos.push(combination);
-        }
-    }
-
-    let mut flush_house_combos = Vec::new();
-    for full_house in full_house_combos.iter() {
-        for suit in 0u8..4 {
-            let combination: Vec<u8> = full_house.iter().map(|&rank| (suit << 4) | rank).collect();
-            flush_house_combos.push(combination);
-        }
-    }
 
     for hand in PokerHand::DISCARD_HANDS {
+        let index = hand as usize - 2;
         let (bucket, values, amount, counts, scores) = match hand {
             PokerHand::Pair
             | PokerHand::ThreeOfAKind
             | PokerHand::FourOfAKind
             | PokerHand::FiveOfAKind => {
                 let bucket = &rank_bucket;
-                let values = &rank_array;
+                let values = &HAND_POSSIBILITIES[index];
                 let amount = vec![hand as usize];
                 let counts = &rank_counts;
                 let scores = &rank_scores;
@@ -262,7 +287,7 @@ pub(crate) fn generate_discard_table(
             }
             PokerHand::TwoPair => {
                 let bucket = &rank_bucket;
-                let values = &two_pair_combos;
+                let values = &HAND_POSSIBILITIES[index];
                 let amount = vec![2, 2];
                 let counts = &rank_counts;
                 let scores = &rank_scores;
@@ -271,7 +296,7 @@ pub(crate) fn generate_discard_table(
             }
             PokerHand::Straight => {
                 let bucket = &rank_bucket;
-                let values = &straight_combos;
+                let values = &HAND_POSSIBILITIES[index];
                 let amount = vec![1usize; 5];
                 let counts = &rank_counts;
                 let scores = &rank_scores;
@@ -280,7 +305,7 @@ pub(crate) fn generate_discard_table(
             }
             PokerHand::Flush => {
                 let bucket = &suit_bucket;
-                let values = &suit_array;
+                let values = &HAND_POSSIBILITIES[index];
                 let amount = vec![5];
                 let counts = &suit_counts;
                 let scores = &suit_scores;
@@ -289,7 +314,7 @@ pub(crate) fn generate_discard_table(
             }
             PokerHand::FullHouse => {
                 let bucket = &rank_bucket;
-                let values = &full_house_combos;
+                let values = &HAND_POSSIBILITIES[index];
                 let amount = vec![3, 2];
                 let counts = &rank_counts;
                 let scores = &rank_scores;
@@ -298,7 +323,7 @@ pub(crate) fn generate_discard_table(
             }
             PokerHand::StraightFlush => {
                 let bucket = &suit_rank_bucket;
-                let values = &straight_flush_combos;
+                let values = &HAND_POSSIBILITIES[index];
                 let amount = vec![1usize; 5];
                 let counts = &suit_rank_counts;
                 let scores = &suit_rank_scores;
@@ -307,7 +332,7 @@ pub(crate) fn generate_discard_table(
             }
             PokerHand::FlushHouse => {
                 let bucket = &suit_rank_bucket;
-                let values = &flush_house_combos;
+                let values = &HAND_POSSIBILITIES[index];
                 let amount = vec![3, 2];
                 let counts = &suit_rank_counts;
                 let scores = &suit_rank_scores;
@@ -316,7 +341,7 @@ pub(crate) fn generate_discard_table(
             }
             PokerHand::FlushFive => {
                 let bucket = &suit_rank_bucket;
-                let values = &suit_rank_array;
+                let values = &HAND_POSSIBILITIES[index];
                 let amount = vec![5];
                 let counts = &suit_rank_counts;
                 let scores = &suit_rank_scores;
