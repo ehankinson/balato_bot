@@ -1,4 +1,3 @@
-use pyo3::prelude::*;
 mod calculation;
 mod core;
 
@@ -19,13 +18,8 @@ mod balatro_engine {
         suit_rank_counts: Vec<usize>,
         suit_rank_scores: Vec<i64>,
         hand: Vec<(u8, u8, i64)>,
-    ) -> PyResult<()> {
-        // Validate inputs.
-        // Construct DeckSummary.
-        // Construct Vec<CardInput>.
-        // Call the internal Rust calculation.
-
-        crate::calculation::poker_discards::generate_discard_table(
+    ) -> PyResult<Vec<(i128, f64, Vec<(u8, u8, i64)>)>> {
+        let table = crate::calculation::poker_discards::generate_discard_table(
             total_cards,
             suit_counts,
             suit_scores,
@@ -36,6 +30,6 @@ mod balatro_engine {
             hand,
         );
 
-        Ok(())
+        Ok(table)
     }
 }

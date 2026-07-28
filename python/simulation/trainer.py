@@ -4,10 +4,11 @@ import secrets
 from dataclasses import dataclass
 from multiprocessing import get_context
 from multiprocessing.connection import Connection
-from time import perf_counter
+from time import perf_counter, strftime
 
 import torch
 from torch.optim import Adam
+from torch.utils.tensorboard import SummaryWriter
 
 from calculation.poker_discards import generate_discard_table
 from calculation.score import get_best_scoring_hand
@@ -50,6 +51,9 @@ class SharedRolloutBuffers:
     old_values: torch.Tensor
     rewards: torch.Tensor
     won: torch.Tensor
+    final_scores: torch.Tensor
+    final_targets: torch.Tensor
+    hands_used: torch.Tensor
     score_seconds: torch.Tensor
     discard_seconds: torch.Tensor
     encode_seconds: torch.Tensor
@@ -77,6 +81,9 @@ class SharedRolloutBuffers:
             old_values=shared(*prefix, dtype=torch.float32),
             rewards=shared(*prefix, dtype=torch.float32),
             won=shared(*prefix, dtype=torch.bool),
+            final_scores=shared(*prefix, dtype=torch.float64),
+            final_targets=shared(*prefix, dtype=torch.float64),
+            hands_used=shared(*prefix, dtype=torch.long),
             score_seconds=shared(*prefix, dtype=torch.float64),
             discard_seconds=shared(*prefix, dtype=torch.float64),
             encode_seconds=shared(*prefix, dtype=torch.float64),
@@ -87,6 +94,9 @@ class SharedRolloutBuffers:
         self.valid.zero_()
         self.rewards.zero_()
         self.won.zero_()
+        self.final_scores.zero_()
+        self.final_targets.zero_()
+        self.hands_used.zero_()
         self.score_seconds.zero_()
         self.discard_seconds.zero_()
         self.encode_seconds.zero_()
@@ -193,6 +203,15 @@ def _apply_shared_actions(
             )
             slot.active = False
             buffers.won[round_index, episode] = has_won
+            buffers.final_scores[round_index, episode] = (
+                slot.game_state.current_score
+            )
+            buffers.final_targets[round_index, episode] = (
+                slot.game_state.score_to_beat
+            )
+            buffers.hands_used[round_index, episode] = (
+                slot.game_state.hands_played
+            )
 
         if profile:
             buffers.env_seconds[round_index, episode] = perf_counter() - started
@@ -307,7 +326,7 @@ def _synchronize(device: torch.device) -> None:
 
 
 def main() -> None:
-    iterations = int(os.getenv("BALATRO_ITERATIONS", "600"))
+    iterations = int(os.getenv("BALATRO_ITERATIONS", "1200"))
     episodes_per_update = int(os.getenv("BALATRO_EPISODES_PER_UPDATE", "1024"))
     ppo_epochs = int(os.getenv("BALATRO_PPO_EPOCHS", "4"))
     minibatch_size = int(os.getenv("BALATRO_MINIBATCH_SIZE", "512"))
@@ -354,7 +373,13 @@ def main() -> None:
 
     model = BlindModel(observation_dim(8), hidden_size=hidden_size).to(update_device)
     optimizer = Adam(model.parameters(), lr=lr)
-    recent_wins: list[float] = []
+    run_name = os.getenv(
+        "BALATRO_RUN_NAME",
+        f"{strftime('%Y%m%d-%H%M%S')}_{run_seed}",
+    )
+    log_root = os.getenv("BALATRO_LOG_DIR", "runs")
+    tensorboard_log_dir = os.path.join(log_root, run_name)
+    writer = SummaryWriter(log_dir=tensorboard_log_dir, flush_secs=10)
 
     worker_counts, worker_offsets = _worker_distribution(
         episodes_per_update, rollout_workers
@@ -390,7 +415,7 @@ def main() -> None:
         f"device={update_device} workers={rollout_workers} "
         f"episodes/update={episodes_per_update} minibatch={minibatch_size} "
         f"seed={run_seed} batched_inference=true shared_memory=true"
-        f" profile={str(profile).lower()}"
+        f" profile={str(profile).lower()} tensorboard={tensorboard_log_dir}"
     )
 
     try:
@@ -478,7 +503,35 @@ def main() -> None:
             batch_episode_ids = episode_grid[valid]
             total_steps = len(batch_rewards)
 
-            wins_in_batch = int(buffers.won.sum())
+            terminal_mask = buffers.final_targets > 0
+            terminal_scores = buffers.final_scores[terminal_mask]
+            terminal_targets = buffers.final_targets[terminal_mask]
+            terminal_wins = buffers.won[terminal_mask]
+            terminal_hands_used = buffers.hands_used[terminal_mask]
+            completed_episodes = max(int(terminal_mask.sum()), 1)
+
+            wins_in_batch = int(terminal_wins.sum())
+            win_rate = wins_in_batch / completed_episodes
+            average_score_in_batch = terminal_scores.mean().item()
+            average_progress = (
+                (terminal_scores / terminal_targets).clamp(max=1.0).mean().item()
+            )
+
+            winning_hands_used = terminal_hands_used[terminal_wins]
+            average_hands_used_on_win = (
+                winning_hands_used.double().mean().item()
+                if wins_in_batch
+                else 0.0
+            )
+            one_hand_wins = int((winning_hands_used == 1).sum())
+            one_hand_win_rate = one_hand_wins / completed_episodes
+            one_hand_share_of_wins = one_hand_wins / max(wins_in_batch, 1)
+
+            losing_scores = terminal_scores[~terminal_wins]
+            average_losing_score = (
+                losing_scores.mean().item() if len(losing_scores) else 0.0
+            )
+
             discard_mask = batch_modes == HandAction.DISCARD
             play_mask = batch_modes == HandAction.PLAY_HAND
             discards_in_batch = int(discard_mask.sum())
@@ -568,36 +621,78 @@ def main() -> None:
             update_seconds = perf_counter() - update_started
             iteration_seconds = perf_counter() - iteration_started
 
-            recent_wins.append(wins_in_batch / episodes_per_update)
+            average_policy_loss = policy_loss_total / update_count
+            average_value_loss = value_loss_total / update_count
+            average_entropy_loss = entropy_total / update_count
+            discards_per_episode = discards_in_batch / completed_episodes
+            cards_per_discard = discarded_cards / max(discards_in_batch, 1)
+            cards_per_play = played_cards / max(plays_in_batch, 1)
+            average_episode_reward = (
+                batch_rewards.sum().item() / completed_episodes
+            )
+            steps_per_second = total_steps / max(iteration_seconds, 1e-9)
+
+            metrics = {
+                "performance/win_rate": win_rate,
+                "performance/average_score": average_score_in_batch,
+                "performance/average_progress": average_progress,
+                "performance/average_losing_score": average_losing_score,
+                "performance/average_hands_used_on_win": average_hands_used_on_win,
+                "performance/one_hand_win_rate": one_hand_win_rate,
+                "performance/one_hand_share_of_wins": one_hand_share_of_wins,
+                "reward/average_episode_reward": average_episode_reward,
+                "loss/policy": average_policy_loss,
+                "loss/value": average_value_loss,
+                "loss/entropy": average_entropy_loss,
+                "behavior/discards_per_episode": discards_per_episode,
+                "behavior/cards_per_discard": cards_per_discard,
+                "behavior/cards_per_play": cards_per_play,
+                "throughput/steps": total_steps,
+                "throughput/steps_per_second": steps_per_second,
+                "throughput/inference_batches": inference_batches,
+                "throughput/optimizer_updates": update_count,
+                "timing/iteration_seconds": iteration_seconds,
+            }
+            for name, value in metrics.items():
+                writer.add_scalar(name, value, outer)
+
+            if profile:
+                milliseconds_per_step = 1000.0 / total_steps
+                profile_metrics = {
+                    "timing/rollout_seconds": rollout_seconds,
+                    "timing/gpu_inference_seconds": inference_seconds,
+                    "timing/gae_seconds": gae_seconds,
+                    "timing/transfer_seconds": transfer_seconds,
+                    "timing/ppo_seconds": update_seconds,
+                    "timing_ms_per_step/scoring": (
+                        buffers.score_seconds[valid].sum().item()
+                        * milliseconds_per_step
+                    ),
+                    "timing_ms_per_step/discard_table": (
+                        buffers.discard_seconds[valid].sum().item()
+                        * milliseconds_per_step
+                    ),
+                    "timing_ms_per_step/encoding": (
+                        buffers.encode_seconds[valid].sum().item()
+                        * milliseconds_per_step
+                    ),
+                    "timing_ms_per_step/environment": (
+                        buffers.env_seconds[valid].sum().item()
+                        * milliseconds_per_step
+                    ),
+                }
+                for name, value in profile_metrics.items():
+                    writer.add_scalar(name, value, outer)
+
             if outer % 5 == 0:
-                win_average = sum(recent_wins[-10:]) / len(recent_wins[-10:])
                 print(
-                    f"iter {outer:4d}: win={win_average:.2f} "
-                    f"policy={policy_loss_total / update_count:.3f} "
-                    f"value={value_loss_total / update_count:.3f} "
-                    f"entropy={entropy_total / update_count:.3f} "
-                    f"discards/ep={discards_in_batch / episodes_per_update:.2f} "
-                    f"cards/discard={discarded_cards / max(discards_in_batch, 1):.2f} "
-                    f"cards/play={played_cards / max(plays_in_batch, 1):.2f} "
-                    f"steps={total_steps} inference_batches={inference_batches} "
-                    f"updates={update_count}"
+                    f"iter {outer:4d}: win={win_rate:.1%} "
+                    f"score={average_score_in_batch:.1f} "
+                    f"progress={average_progress:.1%} "
+                    f"hands/win={average_hands_used_on_win:.2f} "
+                    f"one-hand={one_hand_win_rate:.1%} "
+                    f"steps/s={steps_per_second:.0f}"
                 )
-                if profile:
-                    milliseconds_per_step = 1000.0 / total_steps
-                    print(
-                        "  profile: "
-                        f"rollout={rollout_seconds:.3f}s "
-                        f"gpu_inference={inference_seconds:.3f}s "
-                        f"gae={gae_seconds:.3f}s "
-                        f"transfer={transfer_seconds:.3f}s "
-                        f"ppo={update_seconds:.3f}s "
-                        f"total={iteration_seconds:.3f}s | "
-                        "avg/step: "
-                        f"score={buffers.score_seconds[valid].sum() * milliseconds_per_step:.3f}ms "
-                        f"discard={buffers.discard_seconds[valid].sum() * milliseconds_per_step:.3f}ms "
-                        f"encode={buffers.encode_seconds[valid].sum() * milliseconds_per_step:.3f}ms "
-                        f"env={buffers.env_seconds[valid].sum() * milliseconds_per_step:.3f}ms"
-                    )
     finally:
         for connection in connections:
             try:
@@ -610,6 +705,7 @@ def main() -> None:
             if process.is_alive():
                 process.terminate()
                 process.join()
+        writer.close()
 
     torch.save(
         {

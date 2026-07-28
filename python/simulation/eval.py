@@ -1,5 +1,6 @@
 import torch
 
+from tqdm import tqdm
 from calculation.poker_discards import generate_discard_table
 from calculation.score import get_best_scoring_hand
 from core.models import Deck, GameState
@@ -9,7 +10,7 @@ from simulation.encoder import encode_game_state
 from simulation.reward import calculate_game_score
 
 if __name__ == "__main__":
-    checkpoint = torch.load("/Users/ethanhankinson/projects/balatro_bot/python/ppo_blind.pt")
+    checkpoint = torch.load("/home/hank/projects/balatro_bot/python/ppo_blind.pt")
     # if checkpoint.get("architecture_version") != 2:
     #     raise ValueError(
     #         "ppo_blind.pt uses the old shared action heads; retrain with "
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     game_state = GameState(score_to_beat=0)
     jokers = []
 
-    for ep in range(iter):
+    for ep in tqdm(range(iter)):
         score_to_beat = 300
         game_state.score_to_beat = score_to_beat
         hand = deck.draw(game_state.hand_size)

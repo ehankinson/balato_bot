@@ -1,260 +1,76 @@
-import math
-from dataclasses import dataclass, field
-from itertools import combinations, permutations
-
+import balatro_engine
 from core.enums import PokerHand, Rank, Suit
 from core.models import Card, Deck
-
-
-@dataclass(slots=True)
-class Holder:
-    count: int = 0
-    score: list[int] = field(default_factory=list)
-
-
-def generate_draw_combos(
-    remaining: list[int], minimums: list[int], cards_to_draw: int
-) -> list[list[int]]:
-    if sum(minimums) > cards_to_draw:
-        return []
-
-    results = []
-    stack = [(0, 0, [])]
-    while stack:
-        index, used_cards, drawn = stack.pop()
-        if index == len(remaining):
-            results.append([*drawn, cards_to_draw - used_cards])
-            continue
-
-        min_draw = minimums[index]
-        max_draw = min(remaining[index], cards_to_draw - used_cards)
-        for amount in range(max_draw, min_draw - 1, -1):
-            stack.append((index + 1, used_cards + amount, [*drawn, amount]))
-
-    return results
-
-
-def calculate_odds(
-    deck: Deck,
-    hand: list[Card],
-    bucket: list[Holder],
-    values: list[list[int]],
-    amount: list[int],
-):
-    max_iter = len(bucket)
-    total_cards = deck.total_cards
-    total_draws = math.comb(total_cards, 5)
-    val_weights = [0.0] * max_iter
-
-    attr = ""
-    match max_iter:
-        case 4:
-            id_shift, attr = 2, "suits"
-
-        case 13:
-            id_shift, attr = 4, "ranks"
-
-        case _:
-            id_shift, attr = 6, "suit_rank"
-
-    best_val = -1
-    best_score = -1
-    best_prob = 0.0
-
-    for data in values:
-        good_draws = 0
-        score = 0
-        amount_needed = []
-        deck_val_amounts = []
-
-        skip_count = 0
-        for val, req_amount in zip(data, amount):
-            needed = max(0, req_amount - bucket[val].count)
-            if needed == 0:
-                skip_count += 1
-                continue
-
-            amount_needed.append(needed)
-            deck_val = getattr(deck, attr)
-            deck_val_count = len(deck_val[val].cards)
-            if deck_val_count == 0 or needed > deck_val_count:
-                skip_count += 1
-                continue
-
-            deck_val_amounts.append(deck_val_count)
-
-            expected_deck_score = deck_val[val].score / deck_val_count
-
-            score += sum(bucket[val].score[: bucket[val].count]) + expected_deck_score
-
-        if skip_count == len(data):
-            continue
-
-        draw_combos = generate_draw_combos(deck_val_amounts, amount_needed, 5)
-        # we append this here since the generate combos adds a discard amount (like leftover is there is any)
-        # that way we can use zip when iterating over the good draws
-        deck_val_amounts.append(total_cards - sum(deck_val_amounts))
-
-        good_draws += sum(
-            math.prod(
-                math.comb(available, amount)
-                for available, amount in zip(deck_val_amounts, draw)
-            )
-            for draw in draw_combos
-        )
-
-        probability = good_draws / total_draws
-
-        val_id = 1
-        weighted_score = probability * score
-        for val in data:
-            val_weights[val] += weighted_score
-            val_id = val_id << id_shift
-
-        if probability > best_prob:
-            best_prob = probability
-            best_score = score
-            best_val = val_id
-
-        elif probability == best_prob and score > best_score:
-            best_score = score
-            best_val = val_id
-
-    ordered_hand = sorted(
-        hand,
-        key=lambda x: val_weights[
-            x.suit
-            if max_iter == 4
-            else x.rank
-            if max_iter == 13
-            else x.suit << 4 | x.rank
-        ],
-    )
-
-    discard = ordered_hand[:5]
-
-    return best_val, best_prob, discard
 
 
 def generate_discard_table(
     deck: Deck, dealt_cards: list[Card]
 ) -> dict[PokerHand, tuple[int, float, list[Card]]]:
-    suit_bucket = [Holder() for _ in range(4)]
-    rank_bucket = [Holder() for _ in range(13)]
-    suit_rank_bucket = [Holder() for _ in range((Suit.SPADES << 4 | Rank.ACE) + 1)]
-    for card in dealt_cards:
-        rank, suit = card.rank, card.suit
+    suit_counts = [0] * 4
+    suit_scores = [0] * 4
+    for suit, bucket in deck.suits.items():
+        index = int(suit)
+        suit_counts[index] = len(bucket.cards)
+        suit_scores[index] = bucket.score
 
-        suit_rank_key = suit << 4 | rank
-        suit_rank_bucket[suit_rank_key].count += 1
-        suit_rank_bucket[suit_rank_key].score.append(card.score)
+    rank_counts = [0] * 13
+    rank_scores = [0] * 13
+    for rank, bucket in deck.ranks.items():
+        index = int(rank)
+        rank_counts[index] = len(bucket.cards)
+        rank_scores[index] = bucket.score
 
-        suit_bucket[suit].count += 1
-        suit_bucket[suit].score.append(card.score)
+    suit_rank_counts = [0] * 64
+    suit_rank_scores = [0] * 64
+    for suit_rank, bucket in deck.suit_rank.items():
+        index = int(suit_rank)
+        suit_rank_counts[index] = len(bucket.cards)
+        suit_rank_scores[index] = bucket.score
 
-        rank_bucket[rank].count += 1
-        rank_bucket[rank].score.append(card.score)
+    rust_hand = [(int(card.rank), int(card.suit), card.score) for card in dealt_cards]
+    rust_table = balatro_engine.generate_discard_table(
+        deck.total_cards,
+        suit_counts,
+        suit_scores,
+        rank_counts,
+        rank_scores,
+        suit_rank_counts,
+        suit_rank_scores,
+        rust_hand,
+    )
 
-    for suit in suit_bucket:
-        suit.score.sort(reverse=True)
-
-    for rank in rank_bucket:
-        rank.score.sort(reverse=True)
-
-    for suit_rank in suit_rank_bucket:
-        suit_rank.score.sort(reverse=True)
+    discard_hands = tuple(
+        poker_hand for poker_hand in PokerHand if poker_hand != PokerHand.HIGH_CARD
+    )
+    if len(rust_table) != len(discard_hands):
+        raise RuntimeError(
+            "Rust returned an unexpected number of discard-table entries: "
+            f"expected {len(discard_hands)}, received {len(rust_table)}"
+        )
 
     table: dict[PokerHand, tuple[int, float, list[Card]]] = {}
+    for poker_hand, (value, probability, rust_discard) in zip(
+        discard_hands, rust_table, strict=True
+    ):
+        available_cards = list(dealt_cards)
+        discard: list[Card] = []
 
-    rank_array = [rank for rank in Rank]
-    suit_array = [suit for suit in Suit]
+        for rank, suit, score in rust_discard:
+            for index, card in enumerate(available_cards):
+                if (
+                    int(card.rank) == rank
+                    and int(card.suit) == suit
+                    and card.score == score
+                ):
+                    discard.append(available_cards.pop(index))
+                    break
+            else:
+                raise RuntimeError(
+                    "Rust returned a discard card that was not present "
+                    f"in the dealt hand: {(rank, suit, score)}"
+                )
 
-    straight_array = rank_array[::-1]
-    straight_array.append(straight_array[0])
-    straight_combo = []
-    for cutoff in range(5, len(straight_array) + 1):
-        straight_combo.append(straight_array[cutoff - 5 : cutoff])
-
-    full_house_combo = list(permutations(rank_array, 2))
-
-    for hand in PokerHand:
-        if hand == PokerHand.HIGH_CARD:
-            continue
-
-        val, prob, discard, amount = -1, 0, [], []
-        values = []
-        bucket = []
-        match hand:
-            case PokerHand.PAIR:
-                bucket = rank_bucket
-                values = [[rank] for rank in rank_array]
-                amount = [2]
-
-            case PokerHand.THREE_OF_A_KIND:
-                bucket = rank_bucket
-                values = [[rank] for rank in rank_array]
-                amount = [3]
-
-            case PokerHand.FOUR_OF_A_KIND:
-                bucket = rank_bucket
-                values = [[rank] for rank in rank_array]
-                amount = [4]
-
-            case PokerHand.FIVE_OF_A_KIND:
-                bucket = rank_bucket
-                values = [[rank] for rank in rank_array]
-                amount = [5]
-
-            case PokerHand.TWO_PAIR:
-                two_pair_combo = list(combinations(rank_array, 2))
-                bucket = rank_bucket
-                values = [[val for val in two_pair] for two_pair in two_pair_combo]
-                amount = [2, 2]
-
-            case PokerHand.STRAIGHT:
-                bucket = rank_bucket
-                values = straight_combo
-                amount = [1] * 5
-
-            case PokerHand.FLUSH:
-                bucket = suit_bucket
-                values = [[suit] for suit in suit_array]
-                amount = [5]
-
-            case PokerHand.FULL_HOUSE:
-                bucket = rank_bucket
-                values = [
-                    [val for val in full_house] for full_house in full_house_combo
-                ]
-                amount = [3, 2]
-
-            case PokerHand.STRAIGHT_FLUSH:
-                bucket = suit_rank_bucket
-                values = [
-                    [suit << 4 | rank for suit in suit_array for rank in straight]
-                    for straight in straight_combo
-                ]
-                amount = [1] * 5
-
-            case PokerHand.FLUSH_HOUSE:
-                bucket = suit_rank_bucket
-                values = [
-                    [suit << 4 | rank for rank in full_house]
-                    for full_house in full_house_combo
-                    for suit in suit_array
-                ]
-                amount = [3, 2]
-
-            case PokerHand.FLUSH_FIVE:
-                bucket = suit_rank_bucket
-                values = [
-                    [suit << 4 | rank] for rank in rank_array for suit in suit_array
-                ]
-                amount = [5]
-
-        val, prob, discard = calculate_odds(deck, dealt_cards, bucket, values, amount)
-
-        table[hand] = (val, prob, discard)
+        table[poker_hand] = (value, probability, discard)
 
     return table
 

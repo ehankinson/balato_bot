@@ -1,8 +1,46 @@
 use crate::core::enums::PokerHand;
 use itertools::Itertools;
 use std::sync::LazyLock;
-use std::{collections::HashMap, panic};
 use use_combinatorics::combinations;
+
+const MAX_CARDS: usize = 64;
+const MAX_DRAW: usize = 5;
+
+const fn choose(n: usize, k: usize) -> u128 {
+    if k > n {
+        return 0;
+    }
+
+    let k = if k > n - k { n - k } else { k };
+    let mut result = 1u128;
+    let mut i = 0;
+
+    while i < k {
+        result = result * (n - i) as u128 / (i + 1) as u128;
+        i += 1;
+    }
+
+    result
+}
+
+const COMBINATION: [[u128; MAX_DRAW + 1]; MAX_CARDS + 1] = {
+    let mut table = [[0u128; MAX_DRAW + 1]; MAX_CARDS + 1];
+    let mut n = 0;
+
+    while n <= MAX_CARDS {
+        let mut k = 0;
+
+        while k <= MAX_DRAW {
+            table[n][k] =  choose(n, k);
+            k += 1;
+        }
+
+        n += 1;
+    }
+
+    table
+};
+
 
 static HAND_POSSIBILITIES: LazyLock<Vec<Vec<Vec<u8>>>> = LazyLock::new(|| {
     let rank_combos: Vec<Vec<u8>> = (0..13).map(|rank| vec![rank]).collect();
@@ -21,10 +59,11 @@ static HAND_POSSIBILITIES: LazyLock<Vec<Vec<Vec<u8>>>> = LazyLock::new(|| {
 
     let mut straight_flush_combos = Vec::new();
     for straight in &straight_combos {
+        let mut combination = Vec::with_capacity(20);
         for suit in 0u8..4 {
-            let combination: Vec<u8> = straight.iter().map(|&rank| (suit << 4) | rank).collect();
-            straight_flush_combos.push(combination);
+            combination.extend(straight.iter().map(|&rank| (suit << 4) | rank));
         }
+        straight_flush_combos.push(combination);
     }
 
     let mut flush_house_combos = Vec::new();
@@ -49,6 +88,7 @@ static HAND_POSSIBILITIES: LazyLock<Vec<Vec<Vec<u8>>>> = LazyLock::new(|| {
         suit_rank_combos,      // Flush Five
     ]
 });
+
 
 #[derive(Clone)]
 struct Holder {
@@ -97,7 +137,7 @@ fn calculate_odds(
     amount: Vec<usize>,
     counts: &Vec<usize>,
     scores: &Vec<i64>,
-) -> (i32, f64, Vec<(u8, u8, i64)>) {
+) -> (i128, f64, Vec<(u8, u8, i64)>) {
     let max_iter = bucket.len();
     let total_draws = combinations(total_cards as u64, 5).unwrap_or(0);
     let mut val_weights = vec![0.0f64; max_iter];
@@ -116,6 +156,8 @@ fn calculate_odds(
     let mut deck_val_amounts = Vec::with_capacity(6);
 
     for hand in values.iter() {
+        amount_needed.clear();
+        deck_val_amounts.clear();
         let mut score = 0.0;
 
         let mut skip_count = 0;
@@ -128,13 +170,13 @@ fn calculate_odds(
 
             amount_needed.push(needed);
             let deck_val_count = counts[*val as usize];
-            if (deck_val_count == 0) | (needed > deck_val_count) {
+            if deck_val_count == 0 || needed > deck_val_count {
                 skip_count += 1;
                 continue;
             }
 
             deck_val_amounts.push(deck_val_count);
-            let expected_deck_score = (scores[*val as usize] as usize / deck_val_count) as f64;
+            let expected_deck_score = scores[*val as usize] as f64 / deck_val_count as f64;
             let card_holder = &bucket[*val as usize];
             let card_score: f64 = card_holder.score[..card_holder.count as usize]
                 .iter()
@@ -156,22 +198,18 @@ fn calculate_odds(
                 draw.iter()
                     .zip(deck_val_amounts.iter())
                     .map(|(&amount, &available)| {
-                        combinations(available as u64, amount as u64).unwrap_or(0)
+                        COMBINATION[available][amount]
                     })
                     .product::<u128>()
             })
             .sum();
 
-        // resetting the arrays instead of needing to re-allocate them
-        amount_needed.clear();
-        deck_val_amounts.clear();
-
         let probability = good_draws as f64 / total_draws as f64;
         let weighted_score = probability * score;
-        let mut val_id = 1;
+        let mut val_id = 1_i128;
         for val in hand.iter() {
             val_weights[*val as usize] += weighted_score;
-            val_id = (*val as i32) << id_shft;
+            val_id <<= id_shft;
         }
 
         if probability > best_prob {
@@ -220,7 +258,7 @@ pub(crate) fn generate_discard_table(
     suit_rank_counts: Vec<usize>,
     suit_rank_scores: Vec<i64>,
     current_hand: Vec<(u8, u8, i64)>,
-) -> HashMap<PokerHand, (i32, f64, Vec<(u8, u8, i64)>)> {
+) -> Vec<(i128, f64, Vec<(u8, u8, i64)>)> {
     let mut suit_bucket: Vec<Holder> = vec![
         Holder {
             count: 0,
@@ -268,7 +306,7 @@ pub(crate) fn generate_discard_table(
         suit_rank.score.sort_unstable_by(|a, b| b.cmp(a));
     }
 
-    let mut table = HashMap::new();
+    let mut table = vec![(0, 0.0, Vec::new()); PokerHand::DISCARD_HANDS.len()];
 
     for hand in PokerHand::DISCARD_HANDS {
         let index = hand as usize - 2;
@@ -363,7 +401,7 @@ pub(crate) fn generate_discard_table(
             scores,
         );
 
-        table.insert(hand, (val, prob, discard));
+        table[index] = (val, prob, discard);
     }
     table
 }

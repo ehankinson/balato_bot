@@ -3,3 +3,4 @@ __pycache__/
 image_output/
 training_data/
 models/
+python/runs/

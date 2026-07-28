@@ -49,9 +49,8 @@ fn python_example_produces_the_expected_pair_probability() {
 
     assert_eq!(table.len(), PokerHand::DISCARD_HANDS.len());
 
-    let (_, pair_probability, _) = table
-        .get(&PokerHand::Pair)
-        .expect("the table must include a Pair entry");
+    let pair_index = PokerHand::Pair as usize - 2;
+    let (_, pair_probability, _) = &table[pair_index];
 
     // Reference value from python/calculation/poker_discards.py using the
     // same deck and eight-card hand.

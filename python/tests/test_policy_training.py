@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from core.models import GameState
@@ -65,15 +66,71 @@ def test_reward_values_progress_and_wins_without_rewarding_discard_usage():
     state.discards_used = 3
     state.discards = 0
 
-    assert calculate_score_progress_reward(0, state) == 0.25
+    assert calculate_score_progress_reward(0, state) == pytest.approx(0.08125)
     assert calculate_terminal_reward(state) == -1.0
     assert calculate_game_score(state) == -0.75
 
     state.current_score = 400
     state.hands = 2
-    assert calculate_score_progress_reward(100, state) == 0.75
-    assert calculate_terminal_reward(state) == 5.5
-    assert calculate_game_score(state) == 6.5
+    state.hands_played = 2
+    assert calculate_score_progress_reward(100, state) == 1.03125
+    assert calculate_terminal_reward(state) == 3.0
+    assert calculate_game_score(state) == 4.0
+
+
+def test_non_winning_hand_cost_accumulates_until_the_winning_play():
+    state = GameState(score_to_beat=300)
+
+    state.current_score = 50
+    first_weak_play = calculate_score_progress_reward(0, state)
+
+    state.current_score = 100
+    second_weak_play = calculate_score_progress_reward(50, state)
+
+    state.current_score = 300
+    winning_play = calculate_score_progress_reward(100, state)
+
+    assert first_weak_play == pytest.approx(-7 / 360)
+    assert second_weak_play == pytest.approx(-7 / 360)
+    assert winning_play == pytest.approx(8 / 9)
+
+
+@pytest.mark.parametrize(
+    ("hands_played", "hands_remaining", "expected_reward"),
+    [
+        (1, 3, 5.0),
+        (2, 2, 3.0),
+        (3, 1, 2.0),
+        (4, 0, 1.5),
+    ],
+)
+def test_terminal_reward_scales_exponentially_with_preserved_hands(
+    hands_played: int,
+    hands_remaining: int,
+    expected_reward: float,
+):
+    state = GameState(score_to_beat=300)
+    state.current_score = 300
+    state.hands_played = hands_played
+    state.hands = hands_remaining
+
+    assert calculate_terminal_reward(state) == pytest.approx(expected_reward)
+
+
+def test_score_reward_prefers_one_large_hand_over_equal_small_hands():
+    state = GameState(score_to_beat=300)
+
+    previous_score = 0.0
+    small_hand_reward = 0.0
+    for current_score in (50.0, 100.0, 150.0):
+        state.current_score = current_score
+        small_hand_reward += calculate_score_progress_reward(previous_score, state)
+        previous_score = current_score
+
+    state.current_score = 150.0
+    large_hand_reward = calculate_score_progress_reward(0.0, state)
+
+    assert large_hand_reward > small_hand_reward
 
 
 def test_ppo_evaluation_updates_both_mode_specific_heads():
