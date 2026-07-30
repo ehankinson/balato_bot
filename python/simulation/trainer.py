@@ -1,722 +1,240 @@
 import os
 import random
-import secrets
-from dataclasses import dataclass
-from multiprocessing import get_context
-from multiprocessing.connection import Connection
-from time import perf_counter, strftime
+from time import perf_counter
 
 import torch
 from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 
-from calculation.poker_discards import generate_discard_table
-from calculation.score import get_best_scoring_hand
-from core.enums import HandAction
-from core.models import Card, Deck, GameState
-from simulation.blind_env import ActionMasks
+from core.enums import PokerHand
 from simulation.blind_trainer import BlindModel
-from simulation.decoder import (
-    build_mask,
-    evaluate_actions,
-    model_decoder_batch,
+from simulation.encoder import observation_dim
+from simulation.ppo import update_policy
+from simulation.rollout import RolloutPool
+from simulation.training_config import TrainingConfig
+from simulation.training_evaluation import (
+    EvaluationMetrics,
+    checkpoint_state,
+    evaluate_model,
+    evaluation_is_better,
+    load_checkpoint,
+    save_checkpoint,
 )
-from simulation.encoder import encode_game_state, observation_dim
-from simulation.reward import calculate_score_progress_reward, calculate_terminal_reward
+from simulation.training_logging import (
+    format_evaluation,
+    format_iteration,
+    write_evaluation_metrics,
+    write_iteration_metrics,
+)
 
 
-@dataclass(slots=True)
-class GameSlot:
-    deck: Deck
-    game_state: GameState
-    hand: list[Card]
-    steps: int = 0
-    active: bool = True
-
-
-@dataclass(slots=True)
-class SharedRolloutBuffers:
-    """Fixed shared-memory storage indexed by [round, episode]."""
-
-    observations: torch.Tensor
-    mode_masks: torch.Tensor
-    count_masks: torch.Tensor
-    card_masks: torch.Tensor
-    valid: torch.Tensor
-    modes: torch.Tensor
-    counts: torch.Tensor
-    cards: torch.Tensor
-    card_valid: torch.Tensor
-    old_log_probs: torch.Tensor
-    old_values: torch.Tensor
-    rewards: torch.Tensor
-    won: torch.Tensor
-    final_scores: torch.Tensor
-    final_targets: torch.Tensor
-    hands_used: torch.Tensor
-    score_seconds: torch.Tensor
-    discard_seconds: torch.Tensor
-    encode_seconds: torch.Tensor
-    env_seconds: torch.Tensor
-
-    @classmethod
-    def create(
-        cls, rollout_rounds: int, episode_count: int, input_size: int
-    ) -> "SharedRolloutBuffers":
-        def shared(*shape: int, dtype: torch.dtype) -> torch.Tensor:
-            return torch.zeros(shape, dtype=dtype).share_memory_()
-
-        prefix = (rollout_rounds, episode_count)
-        return cls(
-            observations=shared(*prefix, input_size, dtype=torch.float32),
-            mode_masks=shared(*prefix, 2, dtype=torch.float32),
-            count_masks=shared(*prefix, 5, dtype=torch.float32),
-            card_masks=shared(*prefix, 8, dtype=torch.float32),
-            valid=shared(*prefix, dtype=torch.bool),
-            modes=shared(*prefix, dtype=torch.long),
-            counts=shared(*prefix, dtype=torch.long),
-            cards=shared(*prefix, 5, dtype=torch.long),
-            card_valid=shared(*prefix, 5, dtype=torch.float32),
-            old_log_probs=shared(*prefix, dtype=torch.float32),
-            old_values=shared(*prefix, dtype=torch.float32),
-            rewards=shared(*prefix, dtype=torch.float32),
-            won=shared(*prefix, dtype=torch.bool),
-            final_scores=shared(*prefix, dtype=torch.float64),
-            final_targets=shared(*prefix, dtype=torch.float64),
-            hands_used=shared(*prefix, dtype=torch.long),
-            score_seconds=shared(*prefix, dtype=torch.float64),
-            discard_seconds=shared(*prefix, dtype=torch.float64),
-            encode_seconds=shared(*prefix, dtype=torch.float64),
-            env_seconds=shared(*prefix, dtype=torch.float64),
-        )
-
-    def clear(self) -> None:
-        self.valid.zero_()
-        self.rewards.zero_()
-        self.won.zero_()
-        self.final_scores.zero_()
-        self.final_targets.zero_()
-        self.hands_used.zero_()
-        self.score_seconds.zero_()
-        self.discard_seconds.zero_()
-        self.encode_seconds.zero_()
-        self.env_seconds.zero_()
-
-
-def _write_observations(
-    slots: list[GameSlot],
-    buffers: SharedRolloutBuffers,
-    round_index: int,
-    episode_offset: int,
-    profile: bool,
-) -> int:
-    active_count = 0
-    with torch.inference_mode():
-        for local_episode, slot in enumerate(slots):
-            if not slot.active:
-                continue
-
-            episode = episode_offset + local_episode
-            started = perf_counter()
-            best_hand = get_best_scoring_hand(slot.hand, [], slot.game_state)
-            scored = perf_counter()
-            discard_table = generate_discard_table(slot.deck, slot.hand)
-            discarded = perf_counter()
-            observation = encode_game_state(
-                slot.hand, slot.game_state, best_hand, discard_table
-            )
-            masks = build_mask(slot.game_state, slot.hand, torch.device("cpu"))
-            encoded = perf_counter()
-
-            if profile:
-                buffers.score_seconds[round_index, episode] = scored - started
-                buffers.discard_seconds[round_index, episode] = discarded - scored
-                buffers.encode_seconds[round_index, episode] = encoded - discarded
-
-            buffers.observations[round_index, episode].copy_(observation)
-            buffers.mode_masks[round_index, episode].copy_(masks.mode)
-            buffers.count_masks[round_index, episode].copy_(masks.count)
-            buffers.card_masks[round_index, episode].copy_(masks.card)
-            buffers.valid[round_index, episode] = True
-            active_count += 1
-
-    return active_count
-
-
-def _create_game_slots(
-    episode_count: int,
-    episode_offset: int,
-    batch_seed: int,
-    score_to_beat: int,
-) -> list[GameSlot]:
-    slots: list[GameSlot] = []
-    for local_episode in range(episode_count):
-        random.seed(batch_seed + episode_offset + local_episode)
-        deck = Deck()
-        game_state = GameState(score_to_beat=score_to_beat)
-        hand = deck.draw(game_state.hand_size)
-        slots.append(GameSlot(deck=deck, game_state=game_state, hand=hand))
-    return slots
-
-
-def _apply_shared_actions(
-    slots: list[GameSlot],
-    buffers: SharedRolloutBuffers,
-    round_index: int,
-    episode_offset: int,
-    max_steps: int,
-    profile: bool,
-) -> bool:
-    for local_episode, slot in enumerate(slots):
-        if not slot.active:
-            continue
-
-        episode = episode_offset + local_episode
-        started = perf_counter()
-        mode = HandAction(int(buffers.modes[round_index, episode]))
-        count = int(buffers.counts[round_index, episode])
-        card_indices = [
-            int(index) for index in buffers.cards[round_index, episode, :count]
-        ]
-        selected_cards = [slot.hand[index] for index in card_indices]
-        for selected_card in selected_cards:
-            slot.hand.remove(selected_card)
-
-        score_before = slot.game_state.current_score
-        has_won = slot.game_state.execute_hand_action(
-            mode,
-            selected_cards,
-            slot.hand,
-            slot.deck,
-        )
-        slot.steps += 1
-
-        if mode == HandAction.PLAY_HAND:
-            buffers.rewards[round_index, episode] += calculate_score_progress_reward(
-                score_before, slot.game_state
-            )
-
-        is_terminal = has_won or slot.game_state.hands == 0 or slot.steps >= max_steps
-        if is_terminal:
-            buffers.rewards[round_index, episode] += calculate_terminal_reward(
-                slot.game_state
-            )
-            slot.active = False
-            buffers.won[round_index, episode] = has_won
-            buffers.final_scores[round_index, episode] = (
-                slot.game_state.current_score
-            )
-            buffers.final_targets[round_index, episode] = (
-                slot.game_state.score_to_beat
-            )
-            buffers.hands_used[round_index, episode] = (
-                slot.game_state.hands_played
-            )
-
-        if profile:
-            buffers.env_seconds[round_index, episode] = perf_counter() - started
-
-    return any(slot.active for slot in slots)
-
-
-def _rollout_actor(
-    connection: Connection,
-    buffers: SharedRolloutBuffers,
-    episode_count: int,
-    episode_offset: int,
-    score_to_beat: int,
-    max_steps: int,
-    profile: bool,
-) -> None:
-    """Own a group of games while the main process performs GPU inference."""
-    torch.set_num_threads(1)
-    try:
-        while True:
-            command, payload = connection.recv()
-            if command == "close":
-                return
-            if command != "start":
-                raise RuntimeError(f"unexpected actor command: {command}")
-
-            slots = _create_game_slots(
-                episode_count,
-                episode_offset,
-                int(payload),
-                score_to_beat,
-            )
-            for round_index in range(max_steps):
-                active_count = _write_observations(
-                    slots, buffers, round_index, episode_offset, profile
-                )
-                connection.send(("observations_ready", active_count))
-
-                command, _action_payload = connection.recv()
-                if command == "close":
-                    return
-                if command != "actions_ready":
-                    raise RuntimeError(f"unexpected actor command: {command}")
-
-                still_active = _apply_shared_actions(
-                    slots,
-                    buffers,
-                    round_index,
-                    episode_offset,
-                    max_steps,
-                    profile,
-                )
-                connection.send(("results_ready", still_active))
-                if not still_active:
-                    break
-    finally:
-        connection.close()
-
-
-def _compute_gae(
-    rewards: torch.Tensor,
-    old_values: torch.Tensor,
-    episode_ids: torch.Tensor,
-    episode_count: int,
-    gamma: float,
-    lam: float,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    advantages = torch.zeros_like(rewards)
-    episode_steps: list[list[int]] = [[] for _ in range(episode_count)]
-    for step, episode_id in enumerate(episode_ids.tolist()):
-        episode_steps[episode_id].append(step)
-
-    for steps in episode_steps:
-        gae = 0.0
-        for position in range(len(steps) - 1, -1, -1):
-            step = steps[position]
-            terminal = position == len(steps) - 1
-            next_value = 0.0 if terminal else float(old_values[steps[position + 1]])
-            delta = float(rewards[step]) + gamma * next_value - float(old_values[step])
-            gae = delta + gamma * lam * (0.0 if terminal else gae)
-            advantages[step] = gae
-
-    returns = advantages + old_values
-    normalized_advantages = (advantages - advantages.mean()) / (
-        advantages.std(unbiased=False) + 1e-8
-    )
-    return returns, normalized_advantages
-
-
-def _cpu_state_dict(model: BlindModel) -> dict[str, torch.Tensor]:
-    return {
-        name: parameter.detach().cpu() for name, parameter in model.state_dict().items()
-    }
-
-
-def _worker_distribution(
-    episode_count: int, worker_count: int
-) -> tuple[list[int], list[int]]:
-    base, remainder = divmod(episode_count, worker_count)
-    counts = [base + int(worker < remainder) for worker in range(worker_count)]
-    offsets: list[int] = []
-    offset = 0
-    for count in counts:
-        offsets.append(offset)
-        offset += count
-    return counts, offsets
-
-
-def _synchronize(device: torch.device) -> None:
+def _seed_everything(seed: int, device: torch.device) -> None:
+    random.seed(seed)
+    torch.manual_seed(seed)
     if device.type == "cuda":
-        torch.cuda.synchronize(device)
+        torch.cuda.manual_seed_all(seed)
+
+
+def _load_resume_checkpoint(
+    config: TrainingConfig,
+    model: BlindModel,
+    optimizer: Adam,
+    device: torch.device,
+) -> tuple[int, EvaluationMetrics | None]:
+    if config.resume_checkpoint is None:
+        return 0, None
+    if not os.path.exists(config.resume_checkpoint):
+        raise FileNotFoundError(
+            f"resume checkpoint does not exist: {config.resume_checkpoint}"
+        )
+
+    state = load_checkpoint(
+        config.resume_checkpoint,
+        model,
+        optimizer,
+        device,
+        load_optimizer=config.resume_optimizer,
+    )
+    # A resumed optimizer may contain its original learning rate. The current
+    # configuration is authoritative so fine-tuning can deliberately lower it.
+    for parameter_group in optimizer.param_groups:
+        parameter_group["lr"] = config.learning_rate
+
+    print(
+        f"resumed {config.resume_checkpoint} after "
+        f"{state.iterations_completed} completed iterations "
+        f"(optimizer={str(config.resume_optimizer).lower()})"
+    )
+    return state.iterations_completed, state.evaluation
+
+
+def train(config: TrainingConfig) -> None:
+    device = torch.device(config.device)
+    _seed_everything(config.seed, device)
+
+    input_size = observation_dim(8)
+    model = BlindModel(input_size, hidden_size=config.hidden_size).to(device)
+    optimizer = Adam(model.parameters(), lr=config.learning_rate)
+    start_iteration, last_evaluation = _load_resume_checkpoint(
+        config,
+        model,
+        optimizer,
+        device,
+    )
+
+    saved_best = checkpoint_state(config.best_checkpoint_path)
+    best_evaluation = saved_best.evaluation if saved_best is not None else None
+    if saved_best is None and last_evaluation is not None:
+        save_checkpoint(
+            config.best_checkpoint_path,
+            model,
+            optimizer,
+            input_size,
+            config.hidden_size,
+            start_iteration,
+            last_evaluation,
+            config,
+        )
+        best_evaluation = last_evaluation
+        print(f"seeded best checkpoint from {config.resume_checkpoint}")
+    cumulative_hand_counts = torch.zeros(len(PokerHand), dtype=torch.long)
+    writer = SummaryWriter(log_dir=config.tensorboard_log_dir, flush_secs=10)
+
+    print(config.summary())
+    interrupted = False
+    last_completed_iteration = start_iteration
+
+    try:
+        with RolloutPool(
+            episode_count=config.episodes_per_update,
+            worker_count=config.effective_rollout_workers,
+            worker_targets=config.worker_targets(),
+            max_steps=config.max_steps_per_episode,
+            input_size=input_size,
+            profile=config.profile,
+        ) as rollouts:
+            try:
+                for iteration in range(start_iteration, config.iterations):
+                    iteration_started = perf_counter()
+                    batch_seed = (
+                        config.seed + iteration * config.episodes_per_update
+                    )
+                    batch, rollout_timings = rollouts.collect(
+                        model,
+                        device,
+                        batch_seed,
+                    )
+                    ppo_metrics = update_policy(
+                        model,
+                        optimizer,
+                        batch,
+                        config,
+                        device,
+                    )
+                    iteration_seconds = perf_counter() - iteration_started
+                    summary = write_iteration_metrics(
+                        writer,
+                        iteration,
+                        batch,
+                        rollout_timings,
+                        ppo_metrics,
+                        iteration_seconds,
+                        cumulative_hand_counts,
+                        config.chart_interval,
+                        config.profile,
+                    )
+
+                    completed_iterations = iteration + 1
+                    last_completed_iteration = completed_iterations
+                    if completed_iterations % config.evaluation_interval == 0:
+                        evaluation_started = perf_counter()
+                        evaluation = evaluate_model(
+                            model,
+                            device,
+                            config.evaluation_episodes,
+                            config.evaluation_seed,
+                            config.max_steps_per_episode,
+                            config.evaluation_targets,
+                        )
+                        evaluation_seconds = (
+                            perf_counter() - evaluation_started
+                        )
+                        last_evaluation = evaluation
+                        write_evaluation_metrics(
+                            writer,
+                            iteration,
+                            evaluation,
+                            evaluation_seconds,
+                        )
+                        save_checkpoint(
+                            config.checkpoint_path,
+                            model,
+                            optimizer,
+                            input_size,
+                            config.hidden_size,
+                            completed_iterations,
+                            evaluation,
+                            config,
+                        )
+
+                        is_best = evaluation_is_better(
+                            evaluation,
+                            best_evaluation,
+                        )
+                        if is_best:
+                            best_evaluation = evaluation
+                            save_checkpoint(
+                                config.best_checkpoint_path,
+                                model,
+                                optimizer,
+                                input_size,
+                                config.hidden_size,
+                                completed_iterations,
+                                evaluation,
+                                config,
+                            )
+
+                        print(
+                            format_evaluation(
+                                completed_iterations,
+                                evaluation,
+                                config.checkpoint_path,
+                                (
+                                    config.best_checkpoint_path
+                                    if is_best
+                                    else None
+                                ),
+                            )
+                        )
+
+                    if iteration % config.console_log_interval == 0:
+                        print(format_iteration(iteration, summary))
+            except KeyboardInterrupt:
+                interrupted = True
+                print("\ntraining interrupted; saving the latest model")
+    finally:
+        writer.close()
+
+    save_checkpoint(
+        config.checkpoint_path,
+        model,
+        optimizer,
+        input_size,
+        config.hidden_size,
+        last_completed_iteration,
+        last_evaluation,
+        config,
+    )
+    print(
+        f"saved {config.checkpoint_path} after "
+        f"{last_completed_iteration} completed iterations"
+    )
+    if interrupted:
+        return
 
 
 def main() -> None:
-    iterations = int(os.getenv("BALATRO_ITERATIONS", "1200"))
-    episodes_per_update = int(os.getenv("BALATRO_EPISODES_PER_UPDATE", "1024"))
-    ppo_epochs = int(os.getenv("BALATRO_PPO_EPOCHS", "4"))
-    minibatch_size = int(os.getenv("BALATRO_MINIBATCH_SIZE", "512"))
-    max_steps_per_episode = 20
-    clip_ratio = 0.2
-    lr = 3e-4
-    entropy_coef = 0.001
-    gamma = 0.99
-    lam = 0.95
-    hidden_size = 256
-    checkpoint_path = os.getenv("BALATRO_CHECKPOINT", "ppo_blind.pt")
-    profile = os.getenv("BALATRO_PROFILE", "0").lower() not in {
-        "0",
-        "false",
-        "no",
-    }
-    configured_seed = os.getenv("BALATRO_SEED")
-    run_seed = (
-        int(configured_seed) if configured_seed is not None else secrets.randbits(63)
-    )
-
-    default_workers = min(8, max((os.cpu_count() or 2) - 1, 1))
-    requested_workers = int(os.getenv("BALATRO_ROLLOUT_WORKERS", str(default_workers)))
-    rollout_workers = min(requested_workers, episodes_per_update)
-    requested_device = os.getenv(
-        "BALATRO_DEVICE",
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu",
-    )
-
-    if requested_device.startswith("cuda") and not torch.cuda.is_available():
-        raise RuntimeError(
-            "BALATRO_DEVICE requests CUDA, but torch.cuda.is_available() is false"
-        )
-    update_device = torch.device(requested_device)
-
-    random.seed(run_seed)
-    torch.manual_seed(run_seed)
-    if update_device.type == "cuda":
-        torch.cuda.manual_seed_all(run_seed)
-
-    model = BlindModel(observation_dim(8), hidden_size=hidden_size).to(update_device)
-    optimizer = Adam(model.parameters(), lr=lr)
-    run_name = os.getenv(
-        "BALATRO_RUN_NAME",
-        f"{strftime('%Y%m%d-%H%M%S')}_{run_seed}",
-    )
-    log_root = os.getenv("BALATRO_LOG_DIR", "runs")
-    tensorboard_log_dir = os.path.join(log_root, run_name)
-    writer = SummaryWriter(log_dir=tensorboard_log_dir, flush_secs=10)
-
-    worker_counts, worker_offsets = _worker_distribution(
-        episodes_per_update, rollout_workers
-    )
-    buffers = SharedRolloutBuffers.create(
-        max_steps_per_episode,
-        episodes_per_update,
-        observation_dim(8),
-    )
-    worker_context = get_context("spawn")
-    connections: list[Connection] = []
-    processes = []
-    for worker in range(rollout_workers):
-        parent_connection, child_connection = worker_context.Pipe()
-        process = worker_context.Process(
-            target=_rollout_actor,
-            args=(
-                child_connection,
-                buffers,
-                worker_counts[worker],
-                worker_offsets[worker],
-                random.choice([300, 450, 600]),
-                max_steps_per_episode,
-                profile,
-            ),
-        )
-        process.start()
-        child_connection.close()
-        connections.append(parent_connection)
-        processes.append(process)
-
-    print(
-        f"device={update_device} workers={rollout_workers} "
-        f"episodes/update={episodes_per_update} minibatch={minibatch_size} "
-        f"seed={run_seed} batched_inference=true shared_memory=true"
-        f" profile={str(profile).lower()} tensorboard={tensorboard_log_dir}"
-    )
-
-    try:
-        for outer in range(iterations):
-            iteration_started = perf_counter()
-            buffers.clear()
-            batch_seed = run_seed + outer * episodes_per_update
-            for connection in connections:
-                connection.send(("start", batch_seed))
-
-            active_workers = list(range(rollout_workers))
-            inference_batches = 0
-            inference_seconds = 0.0
-            round_index = 0
-            while active_workers:
-                for worker in active_workers:
-                    command, _active_count = connections[worker].recv()
-                    if command != "observations_ready":
-                        raise RuntimeError(f"unexpected actor response: {command}")
-
-                inference_started = perf_counter()
-                active_mask = buffers.valid[round_index]
-                observation_gpu = buffers.observations[round_index, active_mask].to(
-                    update_device
-                )
-                masks_gpu = ActionMasks(
-                    mode=buffers.mode_masks[round_index, active_mask].to(update_device),
-                    count=buffers.count_masks[round_index, active_mask].to(
-                        update_device
-                    ),
-                    card=buffers.card_masks[round_index, active_mask].to(update_device),
-                )
-                model.eval()
-                with torch.inference_mode():
-                    outputs = model(observation_gpu)
-                    (
-                        modes_gpu,
-                        counts_gpu,
-                        cards_gpu,
-                        card_valid_gpu,
-                        log_probs_gpu,
-                        _entropies_gpu,
-                    ) = model_decoder_batch(outputs, masks_gpu, stochastic=True)
-                    values_gpu = outputs["value"]
-
-                buffers.modes[round_index, active_mask] = modes_gpu.cpu()
-                buffers.counts[round_index, active_mask] = counts_gpu.cpu()
-                buffers.cards[round_index, active_mask] = cards_gpu.cpu()
-                buffers.card_valid[round_index, active_mask] = card_valid_gpu.cpu()
-                buffers.old_log_probs[round_index, active_mask] = log_probs_gpu.cpu()
-                buffers.old_values[round_index, active_mask] = values_gpu.cpu()
-                if profile:
-                    inference_seconds += perf_counter() - inference_started
-
-                for worker in active_workers:
-                    connections[worker].send(("actions_ready", None))
-
-                next_active_workers = []
-                for worker in active_workers:
-                    command, still_active = connections[worker].recv()
-                    if command != "results_ready":
-                        raise RuntimeError(f"unexpected actor response: {command}")
-                    if still_active:
-                        next_active_workers.append(worker)
-
-                active_workers = next_active_workers
-                inference_batches += 1
-                round_index += 1
-
-            valid = buffers.valid
-            batch_obs = buffers.observations[valid]
-            batch_modes = buffers.modes[valid]
-            batch_counts = buffers.counts[valid]
-            batch_cards = buffers.cards[valid]
-            batch_card_valid = buffers.card_valid[valid]
-            batch_old_log_probs = buffers.old_log_probs[valid]
-            batch_old_values = buffers.old_values[valid]
-            batch_rewards = buffers.rewards[valid]
-            batch_mode_masks = buffers.mode_masks[valid]
-            batch_count_masks = buffers.count_masks[valid]
-            batch_card_masks = buffers.card_masks[valid]
-            episode_grid = torch.arange(episodes_per_update).expand(
-                max_steps_per_episode, -1
-            )
-            batch_episode_ids = episode_grid[valid]
-            total_steps = len(batch_rewards)
-
-            terminal_mask = buffers.final_targets > 0
-            terminal_scores = buffers.final_scores[terminal_mask]
-            terminal_targets = buffers.final_targets[terminal_mask]
-            terminal_wins = buffers.won[terminal_mask]
-            terminal_hands_used = buffers.hands_used[terminal_mask]
-            completed_episodes = max(int(terminal_mask.sum()), 1)
-
-            wins_in_batch = int(terminal_wins.sum())
-            win_rate = wins_in_batch / completed_episodes
-            average_score_in_batch = terminal_scores.mean().item()
-            average_progress = (
-                (terminal_scores / terminal_targets).clamp(max=1.0).mean().item()
-            )
-
-            winning_hands_used = terminal_hands_used[terminal_wins]
-            average_hands_used_on_win = (
-                winning_hands_used.double().mean().item()
-                if wins_in_batch
-                else 0.0
-            )
-            one_hand_wins = int((winning_hands_used == 1).sum())
-            one_hand_win_rate = one_hand_wins / completed_episodes
-            one_hand_share_of_wins = one_hand_wins / max(wins_in_batch, 1)
-
-            losing_scores = terminal_scores[~terminal_wins]
-            average_losing_score = (
-                losing_scores.mean().item() if len(losing_scores) else 0.0
-            )
-
-            discard_mask = batch_modes == HandAction.DISCARD
-            play_mask = batch_modes == HandAction.PLAY_HAND
-            discards_in_batch = int(discard_mask.sum())
-            plays_in_batch = int(play_mask.sum())
-            discarded_cards = int(batch_counts[discard_mask].sum())
-            played_cards = int(batch_counts[play_mask].sum())
-            rollout_seconds = perf_counter() - iteration_started
-
-            gae_started = perf_counter()
-            batch_returns, advantages = _compute_gae(
-                batch_rewards,
-                batch_old_values,
-                batch_episode_ids,
-                episodes_per_update,
-                gamma,
-                lam,
-            )
-            gae_seconds = perf_counter() - gae_started
-
-            if profile:
-                _synchronize(update_device)
-            transfer_started = perf_counter()
-            batch_obs = batch_obs.to(update_device)
-            batch_modes = batch_modes.to(update_device)
-            batch_counts = batch_counts.to(update_device)
-            batch_cards = batch_cards.to(update_device)
-            batch_card_valid = batch_card_valid.to(update_device)
-            batch_old_log_probs = batch_old_log_probs.to(update_device)
-            batch_returns = batch_returns.to(update_device)
-            advantages = advantages.to(update_device)
-            batch_mode_masks = batch_mode_masks.to(update_device)
-            batch_count_masks = batch_count_masks.to(update_device)
-            batch_card_masks = batch_card_masks.to(update_device)
-            if profile:
-                _synchronize(update_device)
-            transfer_seconds = perf_counter() - transfer_started
-
-            policy_loss_total = 0.0
-            value_loss_total = 0.0
-            entropy_total = 0.0
-            update_count = 0
-            if profile:
-                _synchronize(update_device)
-            update_started = perf_counter()
-            model.train()
-            for _epoch in range(ppo_epochs):
-                permutation = torch.randperm(total_steps, device=update_device)
-                for start in range(0, total_steps, minibatch_size):
-                    indices = permutation[start : start + minibatch_size]
-                    outputs = model(batch_obs[indices])
-                    new_log_probs, new_entropies = evaluate_actions(
-                        outputs,
-                        batch_mode_masks[indices],
-                        batch_count_masks[indices],
-                        batch_card_masks[indices],
-                        batch_modes[indices],
-                        batch_counts[indices],
-                        batch_cards[indices],
-                        batch_card_valid[indices],
-                    )
-                    new_values = outputs["value"]
-
-                    ratio = torch.exp(new_log_probs - batch_old_log_probs[indices])
-                    minibatch_advantages = advantages[indices]
-                    surrogate_1 = ratio * minibatch_advantages
-                    surrogate_2 = (
-                        torch.clamp(ratio, 1 - clip_ratio, 1 + clip_ratio)
-                        * minibatch_advantages
-                    )
-                    policy_loss = -torch.min(surrogate_1, surrogate_2).mean()
-                    value_loss = ((new_values - batch_returns[indices]) ** 2).mean()
-                    entropy_loss = -new_entropies.mean()
-                    loss = policy_loss + 0.5 * value_loss + entropy_coef * entropy_loss
-
-                    optimizer.zero_grad(set_to_none=True)
-                    loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-                    optimizer.step()
-
-                    policy_loss_total += policy_loss.item()
-                    value_loss_total += value_loss.item()
-                    entropy_total += entropy_loss.item()
-                    update_count += 1
-
-            if profile:
-                _synchronize(update_device)
-            update_seconds = perf_counter() - update_started
-            iteration_seconds = perf_counter() - iteration_started
-
-            average_policy_loss = policy_loss_total / update_count
-            average_value_loss = value_loss_total / update_count
-            average_entropy_loss = entropy_total / update_count
-            discards_per_episode = discards_in_batch / completed_episodes
-            cards_per_discard = discarded_cards / max(discards_in_batch, 1)
-            cards_per_play = played_cards / max(plays_in_batch, 1)
-            average_episode_reward = (
-                batch_rewards.sum().item() / completed_episodes
-            )
-            steps_per_second = total_steps / max(iteration_seconds, 1e-9)
-
-            metrics = {
-                "performance/win_rate": win_rate,
-                "performance/average_score": average_score_in_batch,
-                "performance/average_progress": average_progress,
-                "performance/average_losing_score": average_losing_score,
-                "performance/average_hands_used_on_win": average_hands_used_on_win,
-                "performance/one_hand_win_rate": one_hand_win_rate,
-                "performance/one_hand_share_of_wins": one_hand_share_of_wins,
-                "reward/average_episode_reward": average_episode_reward,
-                "loss/policy": average_policy_loss,
-                "loss/value": average_value_loss,
-                "loss/entropy": average_entropy_loss,
-                "behavior/discards_per_episode": discards_per_episode,
-                "behavior/cards_per_discard": cards_per_discard,
-                "behavior/cards_per_play": cards_per_play,
-                "throughput/steps": total_steps,
-                "throughput/steps_per_second": steps_per_second,
-                "throughput/inference_batches": inference_batches,
-                "throughput/optimizer_updates": update_count,
-                "timing/iteration_seconds": iteration_seconds,
-            }
-            for name, value in metrics.items():
-                writer.add_scalar(name, value, outer)
-
-            if profile:
-                milliseconds_per_step = 1000.0 / total_steps
-                profile_metrics = {
-                    "timing/rollout_seconds": rollout_seconds,
-                    "timing/gpu_inference_seconds": inference_seconds,
-                    "timing/gae_seconds": gae_seconds,
-                    "timing/transfer_seconds": transfer_seconds,
-                    "timing/ppo_seconds": update_seconds,
-                    "timing_ms_per_step/scoring": (
-                        buffers.score_seconds[valid].sum().item()
-                        * milliseconds_per_step
-                    ),
-                    "timing_ms_per_step/discard_table": (
-                        buffers.discard_seconds[valid].sum().item()
-                        * milliseconds_per_step
-                    ),
-                    "timing_ms_per_step/encoding": (
-                        buffers.encode_seconds[valid].sum().item()
-                        * milliseconds_per_step
-                    ),
-                    "timing_ms_per_step/environment": (
-                        buffers.env_seconds[valid].sum().item()
-                        * milliseconds_per_step
-                    ),
-                }
-                for name, value in profile_metrics.items():
-                    writer.add_scalar(name, value, outer)
-
-            if outer % 5 == 0:
-                print(
-                    f"iter {outer:4d}: win={win_rate:.1%} "
-                    f"score={average_score_in_batch:.1f} "
-                    f"progress={average_progress:.1%} "
-                    f"hands/win={average_hands_used_on_win:.2f} "
-                    f"one-hand={one_hand_win_rate:.1%} "
-                    f"steps/s={steps_per_second:.0f}"
-                )
-    finally:
-        for connection in connections:
-            try:
-                connection.send(("close", None))
-            except (BrokenPipeError, EOFError):
-                pass
-            connection.close()
-        for process in processes:
-            process.join(timeout=5)
-            if process.is_alive():
-                process.terminate()
-                process.join()
-        writer.close()
-
-    torch.save(
-        {
-            "state_dict": _cpu_state_dict(model),
-            "input_size": observation_dim(8),
-            "hidden_size": hidden_size,
-            "architecture_version": 2,
-        },
-        checkpoint_path,
-    )
-    print(f"saved {checkpoint_path}")
+    train(TrainingConfig.from_env())
 
 
 if __name__ == "__main__":

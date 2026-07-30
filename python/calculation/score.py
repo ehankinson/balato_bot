@@ -381,6 +381,7 @@ def get_best_scoring_hand(
 
 def calculate_scoring_hand(played_cards: list[Card], cards_not_played: list[Card], game_state: GameState) -> float:
     best_hand_type, scored_played = find_best_hand_type(played_cards)
+    game_state.played_hands[int(best_hand_type.name) - 1] += 1
     unscored_played = [card for card in played_cards if card not in scored_played]
 
     hand_scoring = HandScoring(

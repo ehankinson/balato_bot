@@ -66,19 +66,19 @@ def test_reward_values_progress_and_wins_without_rewarding_discard_usage():
     state.discards_used = 3
     state.discards = 0
 
-    assert calculate_score_progress_reward(0, state) == pytest.approx(0.08125)
-    assert calculate_terminal_reward(state) == -1.0
-    assert calculate_game_score(state) == -0.75
+    assert calculate_score_progress_reward(0, state) == pytest.approx(0.0425)
+    assert calculate_terminal_reward(state) == -10.0
+    assert calculate_game_score(state) == -9.75
 
     state.current_score = 400
     state.hands = 2
     state.hands_played = 2
-    assert calculate_score_progress_reward(100, state) == 1.03125
-    assert calculate_terminal_reward(state) == 3.0
-    assert calculate_game_score(state) == 4.0
+    assert calculate_score_progress_reward(100, state) == pytest.approx(0.1675)
+    assert calculate_terminal_reward(state) == pytest.approx(10.1)
+    assert calculate_game_score(state) == pytest.approx(11.1)
 
 
-def test_non_winning_hand_cost_accumulates_until_the_winning_play():
+def test_hand_cost_accumulates_across_every_play():
     state = GameState(score_to_beat=300)
 
     state.current_score = 50
@@ -90,21 +90,24 @@ def test_non_winning_hand_cost_accumulates_until_the_winning_play():
     state.current_score = 300
     winning_play = calculate_score_progress_reward(100, state)
 
-    assert first_weak_play == pytest.approx(-7 / 360)
-    assert second_weak_play == pytest.approx(-7 / 360)
-    assert winning_play == pytest.approx(8 / 9)
+    assert first_weak_play == pytest.approx(13 / 600)
+    assert second_weak_play == pytest.approx(13 / 600)
+    assert winning_play == pytest.approx(11 / 75)
+    assert first_weak_play + second_weak_play + winning_play == pytest.approx(
+        0.19
+    )
 
 
 @pytest.mark.parametrize(
     ("hands_played", "hands_remaining", "expected_reward"),
     [
-        (1, 3, 5.0),
-        (2, 2, 3.0),
-        (3, 1, 2.0),
-        (4, 0, 1.5),
+        (1, 3, 10.15),
+        (2, 2, 10.10),
+        (3, 1, 10.05),
+        (4, 0, 10.0),
     ],
 )
-def test_terminal_reward_scales_exponentially_with_preserved_hands(
+def test_terminal_reward_adds_small_bonus_per_preserved_hand(
     hands_played: int,
     hands_remaining: int,
     expected_reward: float,
@@ -117,7 +120,7 @@ def test_terminal_reward_scales_exponentially_with_preserved_hands(
     assert calculate_terminal_reward(state) == pytest.approx(expected_reward)
 
 
-def test_score_reward_prefers_one_large_hand_over_equal_small_hands():
+def test_score_reward_prefers_fewer_plays_for_equal_progress():
     state = GameState(score_to_beat=300)
 
     previous_score = 0.0

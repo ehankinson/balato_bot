@@ -139,7 +139,7 @@ fn calculate_odds(
     scores: &Vec<i64>,
 ) -> (i128, f64, Vec<(u8, u8, i64)>) {
     let max_iter = bucket.len();
-    let total_draws = combinations(total_cards as u64, 5).unwrap_or(0);
+    let total_draws = COMBINATION[total_cards][5];
     let mut val_weights = vec![0.0f64; max_iter];
 
     let mut best_val = -1;

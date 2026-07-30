@@ -11,6 +11,7 @@ from core.enums import (
     HandAction,
     JokersName,
     JokerTriggers,
+    PokerHand,
     Rank,
     Seal,
     Suit,
@@ -339,14 +340,6 @@ class JokerScoringConditions:
     scoring_played: list[Card] = field(default_factory=list)
 
 
-# @dataclass(slots=True)
-# class JokerConfig:
-#     rarity: str
-#     buy_price: int
-#     copyable: bool
-#     life: int | None = None
-
-
 @dataclass(slots=True)
 class JokerReq:
     rank: Rank | None = None
@@ -657,6 +650,10 @@ class GameState:
     all_cards_are_facecards: bool = False
     allow_duplicate_shop_items: bool = False
     suit_groups: list[list[str]] = field(default_factory=list)
+    played_hands: list[int] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.played_hands = [0] * len(PokerHand)
 
     def execute_hand_action(self, mode: HandAction, selected_cards: list[Card], hand: list[Card], deck: Deck, draw: bool=True) -> bool:
         from calculation.score import calculate_scoring_hand

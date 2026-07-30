@@ -1,6 +1,10 @@
 __pycache__/
 .DS_Store
+.env
 image_output/
 training_data/
 models/
 python/runs/
+python/tmp/*
+!python/tmp/.gitkeep
+tmp/

@@ -1,3 +1,5 @@
+import os
+
 import torch
 from PIL import Image
 
@@ -8,6 +10,7 @@ from config.settings import (
     EDITION_CROP,
     ENHANCEMENT_CROP,
     RANK_CROP,
+    ROOT_DIR,
     SEAL_CROP,
     SUIT_CROP,
 )
@@ -19,6 +22,11 @@ from simulation.decoder import build_mask, model_decoder
 from simulation.encoder import encode_game_state
 from utils.images import card_crop
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+BLIND_MODEL_CHECKPOINT = torch.load(os.path.join(ROOT_DIR, "models", "blind_model.pt"), map_location="cuda")
+BLIND_MODEL = BlindModel(BLIND_MODEL_CHECKPOINT["input_size"], BLIND_MODEL_CHECKPOINT["hidden_size"]).to(DEVICE)
+BLIND_MODEL.load_state_dict(BLIND_MODEL_CHECKPOINT["state_dict"])
+BLIND_MODEL.eval()
 
 def get_card_locations(img: Image.Image):
     results = CARD_BOX_MODEL(img)
@@ -74,12 +82,6 @@ def get_card_information(card_images: list[Image.Image]) -> list[Card]:
 def get_played_hand(
     img: Image.Image, deck: Deck, game_state: GameState
 ) -> tuple[list[CardData], HandAction, list[Card]]:
-    checkpoint = torch.load("/home/hank/projects/balatro_bot/python/ppo_blind.pt")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = BlindModel(checkpoint["input_size"], checkpoint["hidden_size"]).to(device)
-    model.load_state_dict(checkpoint["state_dict"])
-    model.eval()
-
     card_locations = []
     results = CARD_BOX_MODEL(img, verbose=False)
 
@@ -105,10 +107,10 @@ def get_played_hand(
     discard_table = generate_discard_table(deck, hand)
     encoded_state = encode_game_state(hand, game_state, best_hand, discard_table)
 
-    outputs = model(encoded_state.unsqueeze(0).to(device))
-    masks = build_mask(game_state, hand, device)
+    outputs = BLIND_MODEL(encoded_state.unsqueeze(0).to(DEVICE))
+    masks = build_mask(game_state, hand, DEVICE)
     mode, _, card_indices, _, _ = model_decoder(
-        outputs, masks, device, stochastic=False
+        outputs, masks, DEVICE, stochastic=False
     )
 
     return_data = []
