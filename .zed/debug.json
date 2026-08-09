@@ -10,6 +10,16 @@
     }
   },
   {
+    "label": "Debug Consumables",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "rendering.consumable",
+    "cwd": "$ZED_WORKTREE_ROOT/python",
+    "env": {
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
+    }
+  },
+  {
     "label": "Debug Poker Discards",
     "adapter": "Debugpy",
     "request": "launch",

@@ -31,3 +31,22 @@ def resize_card(img: Image.Image) -> Image.Image:
     new_height = int(round(HAND_HEIGHT * HAND_HEIGHT_RATION, 0))
     return img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
+
+def yolo_box_to_crop(box: list[float], image: Image.Image) -> tuple[int, int, int, int]:
+    _, center_x, center_y, width, height = box
+    image_width, image_height = image.size
+
+    box_width = width * image_width
+    box_height = height * image_height
+    left = round(center_x * image_width - box_width / 2)
+    top = round(center_y * image_height - box_height / 2)
+    right = round(center_x * image_width + box_width / 2)
+    bottom = round(center_y * image_height + box_height / 2)
+
+    left = max(0, min(left, image_width - 1))
+    top = max(0, min(top, image_height - 1))
+    right = max(left + 1, min(right, image_width))
+    bottom = max(top + 1, min(bottom, image_height))
+
+    return left, top, right, bottom
+

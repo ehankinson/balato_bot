@@ -1,5 +1,6 @@
 from enum import IntEnum
 
+
 class HandAction(IntEnum):
     PLAY_HAND = 0
     DISCARD = 1

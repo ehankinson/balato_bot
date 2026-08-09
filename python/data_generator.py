@@ -1,3 +1,4 @@
+import inspect
 import os
 import random
 import sys
@@ -9,6 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from config.settings import (
+    CONSUMABLE_CROP,
     EDITION_CROP,
     ENHANCEMENT_CROP,
     FOLDER_TRAINING_NAMES,
@@ -39,7 +41,7 @@ from rendering.consumable import Consumable, render_consumables
 from rendering.hand import render_hand
 from rendering.joker import render_jokers
 from utils.files import build_folder, rebuild_folder
-from utils.images import card_crop
+from utils.images import card_crop, yolo_box_to_crop
 
 CUTOFF = 0.9  # split between training and val
 CPU_COUNT = os.cpu_count()
@@ -119,6 +121,18 @@ def generate_rendered_jokers(
     return name, split, jokers_render
 
 
+def generate_rendered_consumables(
+    hand_index: int, cutoff: float
+) -> tuple[str, str, RenderedHand]:
+    consumables_amount = random.randint(1, 4)
+    consumables = [generate_random_consumable() for _ in range(consumables_amount)]
+    consumable_render = render_consumables(consumables, training=True)
+
+    name = f"{hand_index}_{consumables_amount}"
+    split = "train" if hand_index < cutoff else "val"
+    return name, split, consumable_render
+
+
 def generate_random_joker(joker_name: JokersName | None = None) -> Joker:
     """Build a visually randomized Joker, optionally with a required identity."""
     return Joker(
@@ -133,21 +147,17 @@ def generate_random_joker(joker_name: JokersName | None = None) -> Joker:
     )
 
 
-def generate_rendered_consumables(
-    sample_index: int,
-    cutoff: float,
-    sample: Consumable | tuple[Consumable, str],
-) -> tuple[str, str, RenderedHand]:
-    """Render one consumable sample on a training background."""
-    if isinstance(sample, tuple):
-        consumable, split = sample
+def generate_random_consumable() -> Consumable:
+    rng = random.randint(1, 3)
+    val = None
+    if rng == 1:
+        val = random.choice(list(Tarot))
+    elif rng == 2:
+        val = random.choice(list(Planet))
     else:
-        consumable = sample
-        split = "train" if sample_index < cutoff else "val"
+        val = random.choice(list(Spectral))
 
-    rendered_consumables = render_consumables([consumable], True)
-    name = f"{sample_index}_{type(consumable).__name__.lower()}_{int(consumable)}"
-    return name, split, rendered_consumables
+    return val
 
 
 def build_folders(start_path: str, features: list[Any]) -> None:
@@ -258,26 +268,22 @@ def joker_feature_info(
             )
 
 
-def yolo_box_to_crop(box: list[float], image: Image.Image) -> tuple[int, int, int, int]:
-    _, center_x, center_y, width, height = box
-    image_width, image_height = image.size
+def consumable_feature_info(
+    consumable_image: Image.Image, consumable: Consumable
+) -> tuple[int, CropBox]:
+    w, h = consumable_image.size
+    name = None
+    if consumable in list(Tarot):
+        name = Consumables.TAROT
+    elif consumable in list(Planet):
+        name = Consumables.PLANET
+    else:
+        name = Consumables.SPECTRAL
 
-    box_width = width * image_width
-    box_height = height * image_height
-    left = round(center_x * image_width - box_width / 2)
-    top = round(center_y * image_height - box_height / 2)
-    right = round(center_x * image_width + box_width / 2)
-    bottom = round(center_y * image_height + box_height / 2)
-
-    left = max(0, min(left, image_width - 1))
-    top = max(0, min(top, image_height - 1))
-    right = max(left + 1, min(right, image_width))
-    bottom = max(top + 1, min(bottom, image_height))
-
-    return left, top, right, bottom
+    return name, card_crop(w, h, CONSUMABLE_CROP)
 
 
-def generate_box_training_data(
+def generate_location_training_data(
     size: int,
     data_type: str,
     function: Callable[..., tuple[str, str, RenderedHand]],
@@ -285,7 +291,7 @@ def generate_box_training_data(
 ) -> None:
     cutoff = size * CUTOFF
 
-    start_path = f"training_data/{data_type}"
+    start_path = os.path.join(ROOT_DIR, "training_data", data_type)
     rebuild_folder(start_path)
     image_root = f"{start_path}/images"
     build_folder(image_root)
@@ -331,14 +337,6 @@ def generate_box_training_data(
             list(executor.map(lambda chunk: process_hands(chunk, progress), chunks))
 
 
-def generate_hand_training_data(hand_amount: int = 5000) -> None:
-    generate_box_training_data(hand_amount, "hand_data", generate_rendered_hand)
-
-
-def generate_joker_training_data(joker_amount: int = 5000) -> None:
-    generate_box_training_data(joker_amount, "joker_data", generate_rendered_jokers)
-
-
 def render_feature_sample(
     sample_index: int,
     cutoff: float,
@@ -361,13 +359,19 @@ def extract_feature_image(
     train_type: Any,
     item_image: Image.Image,
     item_data: Any,
-    feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]] | None,
+    feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]]
+    | Callable[[Image.Image, Any], tuple[Any, CropBox]]
+    | None,
 ) -> tuple[Any, Image.Image]:
     """Return the class label and optional smaller feature crop for one item."""
     if feature_function is None:
         return item_data, item_image
 
-    feature, crop_box = feature_function(train_type, item_image, item_data)
+    if inspect.signature(feature_function) == 2:
+        feature, crop_box = feature_function(item_image, item_data)
+    else:
+        feature, crop_box = feature_function(train_type, item_image, item_data)
+
     return feature, item_image.crop(crop_box)
 
 
@@ -381,9 +385,7 @@ def save_feature_image(
 ) -> None:
     """Save a prepared feature image into its train/val class folder."""
     feature_label = str(int(feature))
-    filename = (
-        f"{threading.get_ident()}_{sample_name}_{item_index}_{feature_label}.png"
-    )
+    filename = f"{threading.get_ident()}_{sample_name}_{item_index}_{feature_label}.png"
     image.save(os.path.join(start_path, split, feature_label, filename))
 
 
@@ -393,7 +395,9 @@ def process_rendered_features(
     sample_name: str,
     split: str,
     rendered_data: RenderedHand,
-    feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]] | None,
+    feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]]
+    | Callable[[Image.Image, Any], tuple[Any, CropBox]]
+    | None,
     skip_function: Callable[[Any], bool] | None,
 ) -> None:
     """Crop, optionally refine, and save every annotated item in one scene."""
@@ -423,6 +427,7 @@ def _generate_feature_dataset(
     features: list[Any],
     render_function: Callable[..., tuple[str, str, RenderedHand]],
     feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]]
+    | Callable[[Image.Image, Any], tuple[Any, CropBox]]
     | None = None,
     skip_function: Callable[[Any], bool] | None = None,
     special_data: list[Any] | None = None,
@@ -526,6 +531,7 @@ def generate_feature_data(
             ),
             features=list(CONSUMABLE_FEATURE_ENUMS[train_type]),
             render_function=generate_rendered_consumables,
+            feature_function=consumable_feature_info,
             special_data=schedule,
         )
         return
@@ -572,8 +578,18 @@ if __name__ == "__main__":
             "function": generate_feature_data,
             "args": [CardFeatureTrainingType.SEAL],
         },
-        "playing_hands": {"function": generate_hand_training_data},
-        "jokers": {"function": generate_joker_training_data},
+        "card_locations": {
+            "function": generate_location_training_data,
+            "args": [5000, "card_location", generate_rendered_hand],
+        },
+        "joker_locations": {
+            "function": generate_location_training_data,
+            "args": [5000, "joker_location", generate_rendered_hand],
+        },
+        "consumable_locations": {
+            "function": generate_location_training_data,
+            "args": [5000, "consumable_location", generate_rendered_consumables],
+        },
         "all_joker_features": {"function": generate_all_joker_feature_data},
         "joker_type": {
             "function": generate_feature_data,

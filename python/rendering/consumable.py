@@ -8,9 +8,10 @@ from config.settings import CARD_HEIGHT, CARD_WIDTH, ROOT_DIR
 from core.enums import Consumables, Planet, Spectral, Tarot
 from core.models import CardAnnotation, RenderedHand
 from rendering.backgrounds import render_background
+from rendering.card import ENHANCEMENT_LOCATIONS, ENHANCEMENTS
 from rendering.layout import calculate_angle, calculate_box_dimensions, y_jitter
 from utils.files import load_yaml
-from utils.images import crop_image, resize_card
+from utils.images import card_crop, crop_image, resize_card, yolo_box_to_crop
 
 Consumable = Tarot | Planet | Spectral
 
@@ -29,10 +30,8 @@ def crop_consumable(
     location: dict[int, dict[int, dict[str, int]]],
     consumable: Consumable,
 ) -> Image.Image:
-    is_soul = False
     if isinstance(consumable, Tarot):
         consumable_type = Consumables.TAROT
-        is_soul = consumable == Tarot.SOUL
 
     elif isinstance(consumable, Planet):
         consumable_type = Consumables.PLANET
@@ -40,9 +39,20 @@ def crop_consumable(
         consumable_type = Consumables.SPECTRAL
 
     inner_location = location[consumable_type][consumable]
-    return crop_image(
+    img = crop_image(
         CONSUMABLES, inner_location["x"], inner_location["y"], CARD_WIDTH, CARD_HEIGHT
     )
+    if consumable == Tarot.SOUL:
+        soul = crop_image(
+            ENHANCEMENTS,
+            ENHANCEMENT_LOCATIONS["soul"]["x_pos"],
+            ENHANCEMENT_LOCATIONS["soul"]["y_pos"],
+            CARD_WIDTH,
+            CARD_HEIGHT,
+        )
+        img.paste(soul, (0, 0), soul)
+
+    return img
 
 
 @lru_cache(maxsize=None, typed=True)
@@ -102,7 +112,7 @@ def render_consumables(
 if __name__ == "__main__":
     target = None
     values = []
-    for _ in range(random.randint(1, 5)):
+    for _ in range(random.randint(4, 4)):
         var = random.choice([0, 1, 2])
         if var == 1:
             target = Tarot(random.choice(list(Tarot)))
@@ -114,4 +124,14 @@ if __name__ == "__main__":
         values.append(target)
 
     img = render_consumables(values)
+    w, h = img.image.size
+    for i, info in enumerate(img.annotations):
+        print(info.box)
+        values = yolo_box_to_crop(info.box, img.image)
+        print(values)
+        individual_card = img.image.crop(values)
+        crop = card_crop(w, h, [0.0, 115.0, 0.25, 0.95])
+        individual_card = individual_card.crop(crop)
+        individual_card.save(f"card_{i}.png")
+        
     img.image.save("img.png")

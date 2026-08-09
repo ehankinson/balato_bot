@@ -1,15 +1,34 @@
 import os
-import sys
 
-if sys.platform == "darwin":
-    hand_dimenstions = [845, 224]
-elif sys.platform.startswith("linux"):
-    hand_dimenstions = [1445, 393]
-else:
-    raise OSError("Don't support this system")
+import mss
 
-HAND_WIDTH = hand_dimenstions[0]
-HAND_HEIGHT = hand_dimenstions[1]
+# Baseline resolution the bot was originally tuned for
+BASE_SCREEN_WIDTH = 2560
+BASE_SCREEN_HEIGHT = 1440
+
+
+def _get_screen_ratios() -> tuple[float, float]:
+    """Return width and height scale ratios relative to the baseline resolution.
+
+    Falls back to 1.0 (baseline) if no physical monitor is detected.
+    """
+    with mss.mss() as sct:
+        if len(sct.monitors) < 2:
+            return 1.0, 1.0
+        primary = sct.monitors[1]
+        screen_w = primary["width"]
+        screen_h = primary["height"]
+    return screen_w / BASE_SCREEN_WIDTH, screen_h / BASE_SCREEN_HEIGHT
+
+
+W_RATIO, H_RATIO = _get_screen_ratios()
+
+# Original hand crop dimensions at the baseline 2560x1440 resolution
+_BASE_HAND_WIDTH = 1445
+_BASE_HAND_HEIGHT = 393
+
+HAND_WIDTH = int(_BASE_HAND_WIDTH * W_RATIO)
+HAND_HEIGHT = int(_BASE_HAND_HEIGHT * H_RATIO)
 
 HAND_CROP_TOP = 800
 HAND_CROP_LEFT = 670
@@ -65,6 +84,7 @@ ENHANCEMENT_CROP = [5.0, 75.0, 0.25, 0.85]
 EDITION_CROP = [5.0, 75.0, 0.25, 0.85]
 JOKER_TYPE_CROP = [10.0, 10.0, 0.6, 0.95]
 JOKER_EDITION_CROP = JOKER_TYPE_CROP
+CONSUMABLE_CROP = [0.0, 115.0, 0.25, 0.95]
 
 BACKGROUND_PALETTES = [
     ((31, 122, 77), (68, 164, 95), (18, 78, 62)),

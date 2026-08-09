@@ -21,6 +21,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "debugpy>=1.8.21",
+    "maturin>=1.14.1",
     "pytest>=9.0.3",
     "tensorboard>=2.21.0",
 ]

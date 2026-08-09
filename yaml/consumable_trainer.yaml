@@ -1,0 +1,7 @@
+path: /Users/ethanhankinson/projects/balato_bot/training_data/consumable_location
+
+train: images/train
+val: images/val
+
+names:
+  0: consumable

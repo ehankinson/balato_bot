@@ -2,12 +2,12 @@ import os
 import sys
 
 import torch
-from config.settings import FOLDER_TRAINING_NAMES, ROOT_DIR, TRAINING_CONFIG
-from core.enums import CardFeatureTrainingType
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, models, transforms
 from ultralytics import YOLO
+
+from config.settings import ROOT_DIR, TRAINING_CONFIG
 from utils.files import load_json
 
 EPOCHS = 5
@@ -19,15 +19,24 @@ def train_card_box(config: str):
     trainer_config = os.path.join(ROOT_DIR, config)
 
     model = YOLO("yolo11n.pt")
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
+    threads = 1 if os.cpu_count() is None else os.cpu_count()
+    assert isinstance(threads, int)
 
     model.train(
         data=trainer_config,
         epochs=EPOCHS,
-        imgsz=640,  # scales input to be this square
+        imgsz=640,            # scales input to be this square
         batch=BATCH_SIZE,
-        device="cpu" if sys.platform == "darwin" else 0,  # 0 GPU / 1 CPU
-        workers=4,  # how many threads to use to load the data
-        patience=PATIENCE,  # after x epchos if no change quite
+        device=device,
+        workers=threads - 1,  # how many threads to use to load the data
+        patience=PATIENCE,    # after x epchos if no change quite
     )
 
 
@@ -53,8 +62,12 @@ def train_model(model_type: str):
     )
 
     # ===== LOAD DATA =====
-    train_dataset = datasets.ImageFolder(f"{ROOT_DIR}/{data_dir}/train", transform=transform)
-    val_dataset = datasets.ImageFolder(f"{ROOT_DIR}/{data_dir}/val", transform=transform)
+    train_dataset = datasets.ImageFolder(
+        f"{ROOT_DIR}/{data_dir}/train", transform=transform
+    )
+    val_dataset = datasets.ImageFolder(
+        f"{ROOT_DIR}/{data_dir}/val", transform=transform
+    )
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
@@ -127,7 +140,7 @@ def train_model(model_type: str):
         print(f"Val Loss: {val_loss:.3f} | Val Acc: {val_acc:.3f}\n")
 
     # ===== SAVE MODEL =====
-    output_path = f"{ROOT_DIR}/{model_config["output_path"]}"
+    output_path = f"{ROOT_DIR}/{model_config['output_path']}"
 
     torch.save(
         {
@@ -138,7 +151,7 @@ def train_model(model_type: str):
             "class_names": train_dataset.classes,
             "state_dict": model.state_dict(),
         },
-        output_path
+        output_path,
     )
 
 
@@ -160,15 +173,22 @@ if __name__ == "__main__":
         "card_rank": {"function": train_model, "args": ["rank"]},
         "card_suit": {"function": train_model, "args": ["suit"]},
         "card_seal": {"function": train_model, "args": ["seal"]},
-        "playing_hands": {
+        "card_locations": {
             "function": train_card_box,
             "args": ["yaml/card_trainer.yaml"],
         },
-        "jokers": {"function": train_card_box, "args": ["yaml/joker_trainer.yaml"]},
+        "joker_locations": {
+            "function": train_card_box,
+            "args": ["yaml/joker_trainer.yaml"],
+        },
+        "consumable_locations": {
+            "function": train_card_box,
+            "args": ["yaml/consumable_trainer.yaml"],
+        },
         "joker_edition": {"function": train_model, "args": ["joker_edition"]},
         "joker_type": {"function": train_model, "args": ["joker_type"]},
         "all_joker_features": {"function": train_joker_features},
-        "tarot": {"function": train_model, "args": ["tarot"]}
+        "tarot": {"function": train_model, "args": ["tarot"]},
     }
 
     if len(sys.argv) < 2 or sys.argv[1] not in available_commands:
