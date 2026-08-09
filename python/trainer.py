@@ -168,6 +168,7 @@ if __name__ == "__main__":
         "joker_edition": {"function": train_model, "args": ["joker_edition"]},
         "joker_type": {"function": train_model, "args": ["joker_type"]},
         "all_joker_features": {"function": train_joker_features},
+        "tarot": {"function": train_model, "args": ["tarot"]}
     }
 
     if len(sys.argv) < 2 or sys.argv[1] not in available_commands:

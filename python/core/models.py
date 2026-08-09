@@ -11,10 +11,13 @@ from core.enums import (
     HandAction,
     JokersName,
     JokerTriggers,
+    Planet,
     PokerHand,
     Rank,
     Seal,
+    Spectral,
     Suit,
+    Tarot,
 )
 from core.hand_stats import HandStats
 from core.scoring import (
@@ -734,7 +737,7 @@ class ShopState:
 
 @dataclass
 class CardAnnotation:
-    card: Card | Joker
+    card: Card | Joker | Tarot | Planet | Spectral
     box: list[float]
 
 

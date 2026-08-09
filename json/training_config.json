@@ -40,5 +40,11 @@
         "features": 5,
         "img_size": [128, 128],
         "output_path": "models/joker_edition_model.pt"
+    },
+    "tarot": {
+        "data_dir": "training_data/tarot_data",
+        "features": 23,
+        "img_size": [250, 250],
+        "output_path": "models/tarot_model.pt"
     }
 }

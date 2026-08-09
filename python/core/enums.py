@@ -58,6 +58,75 @@ class Edition(IntEnum):
     POLYCHROME = 2
 
 
+class Consumables(IntEnum):
+    TAROT = 0
+    PLANET = 1
+    SPECTRAL = 2
+
+
+
+class Tarot(IntEnum):
+    FOOL = 0
+    MAGICIAN = 1
+    HIGH_PRIESTESS = 2
+    EMPRESS = 3
+    EMPEROR = 4
+    HEIROPHANT = 5
+    LOVERS = 6
+    CHARIOT = 7
+    JUSTICE = 8
+    HERMIT = 9
+    WHEEL_OF_FORTUNE = 10
+    STENGHT = 11
+    HANGED_MAN = 12
+    DEATH = 13
+    TEMPERANCE = 14
+    DEVIL = 15
+    TOWER = 16
+    STAR = 17
+    MOON = 18
+    SUN = 19
+    JUDGEMENT = 20
+    WORLD = 21
+    SOUL = 22
+
+
+class Planet(IntEnum):
+    ERIS = 0
+    CERES = 1
+    PLANET_X = 2
+    MERCURY = 3
+    VENUS = 4
+    EARTH = 5
+    MARS = 6
+    JUPITER = 7
+    SATURN = 8
+    URANUS = 9
+    NEPTUNE = 10
+    PLUTO = 11
+    BLACK_HOLE = 12
+
+
+class Spectral(IntEnum):
+    FAMILIAR = 0
+    GRIM = 1
+    INCANTATION = 2
+    TALISMAN = 3
+    AURA = 4
+    WRAITH = 5
+    SIGIL = 6
+    OUIJA = 7
+    ECTOPLASM = 8
+    IMMOLATE = 9
+    ANKH = 10
+    DEJA_VU = 11
+    HEX = 12
+    TRANCE = 13
+    MEDIUM = 14
+    CRYPTID = 15
+
+
+
 class CardFeatureTrainingType(IntEnum):
     RANK = 0
     SUIT = 1

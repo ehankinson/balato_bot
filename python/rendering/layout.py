@@ -9,7 +9,8 @@ MAX_Y_LIFT = 18
 ANGLE_JITTER = 0.5
 
 
-def calculate_angle(card_index: int, card_amount: int) -> float:
+def calculate_angle(card_index: int, card_amount: int, custom_angle: float | None = None) -> float:
+    angle = custom_angle if custom_angle is not None else ANGLE
     mid = (card_amount - 1) / 2
     if mid == 0:
         return 0.0
@@ -17,7 +18,7 @@ def calculate_angle(card_index: int, card_amount: int) -> float:
     offset_from_center = card_index - mid
     normalized_offset = offset_from_center / mid
     jitter = random.uniform(-ANGLE_JITTER, ANGLE_JITTER)
-    return -normalized_offset * ANGLE + jitter
+    return -normalized_offset * angle + jitter
 
 
 def calculate_card_y_lift(card_index: int, card_amount: int) -> float:
