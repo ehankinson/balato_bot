@@ -1,10 +1,9 @@
-import inspect
 import os
 import random
 import sys
 import threading
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable
 
 from PIL import Image
 from tqdm import tqdm
@@ -13,7 +12,6 @@ from config.settings import (
     CONSUMABLE_CROP,
     EDITION_CROP,
     ENHANCEMENT_CROP,
-    FOLDER_TRAINING_NAMES,
     JOKER_EDITION_CROP,
     JOKER_TYPE_CROP,
     RANK_CROP,
@@ -23,8 +21,6 @@ from config.settings import (
 )
 from core.class_indices import NEGATIVE_JOKER_EDITION_ID
 from core.enums import (
-    CardFeatureTrainingType,
-    Consumables,
     Edition,
     Enhancement,
     JokerFeatureTrainingType,
@@ -36,23 +32,30 @@ from core.enums import (
     Suit,
     Tarot,
 )
-from core.models import RANDOM_JOKERS, Card, Hand, Joker, JokerReq, RenderedHand
-from rendering.consumable import Consumable, render_consumables
-from rendering.hand import render_hand
+from core.models import RANDOM_JOKERS, Hand, Joker, JokerReq, RenderedHand
+from rendering.consumable import (
+    Consumable,
+    generate_consumables,
+    render_consumables,
+)
+from rendering.hand import generate_hand, render_hand
 from rendering.joker import render_jokers
 from utils.files import build_folder, rebuild_folder
 from utils.images import card_crop, yolo_box_to_crop
 
 CUTOFF = 0.9  # split between training and val
-CPU_COUNT = os.cpu_count()
+CPU_COUNT = int(os.cpu_count() if os.cpu_count() is not None else 1)
 CropBox = tuple[int | float, int | float, int | float, int | float]
 
-CARD_FEATURE_ENUMS = {
-    CardFeatureTrainingType.RANK: Rank,
-    CardFeatureTrainingType.SUIT: Suit,
-    CardFeatureTrainingType.ENHANCEMENT: Enhancement,
-    CardFeatureTrainingType.SEAL: Seal,
-    CardFeatureTrainingType.EDITION: Edition,
+FEATURES = {
+    "rank": Rank,
+    "suit": Suit,
+    "enhancement": Enhancement,
+    "edition": Edition,
+    "seal": Seal,
+    "tarot": Tarot,
+    "planet": Planet,
+    "spectral": Spectral,
 }
 
 JOKER_FEATURE_ENUMS = {
@@ -60,11 +63,7 @@ JOKER_FEATURE_ENUMS = {
     JokerFeatureTrainingType.JOKER_EDITION: list(Edition) + [NEGATIVE_JOKER_EDITION_ID],
 }
 
-CONSUMABLE_FEATURE_ENUMS = {
-    Consumables.TAROT: Tarot,
-    Consumables.PLANET: Planet,
-    Consumables.SPECTRAL: Spectral,
-}
+type Feature = Rank | Suit | Enhancement | Edition | Seal | Tarot | Planet | Spectral
 
 
 def random_full_card_amount() -> int:
@@ -160,7 +159,10 @@ def generate_random_consumable() -> Consumable:
     return val
 
 
-def build_folders(start_path: str, features: list[Any]) -> None:
+def build_folders(
+    start_path: str,
+    features: list[Feature],
+) -> None:
     rebuild_folder(start_path)
 
     for split in ("train", "val"):
@@ -171,42 +173,43 @@ def build_folders(start_path: str, features: list[Any]) -> None:
             build_folder(f"{image_path}/{int(feature)}")
 
 
-def build_balanced_joker_type_schedule(
-    samples_per_joker: int,
-) -> list[tuple[JokersName, int, str]]:
-    schedule: list[tuple[JokersName, int, str]] = []
-    train_amount = round(samples_per_joker * CUTOFF)
+def build_schedule(
+    training_amount: int,
+    item_amounts: tuple[int, int],
+    render_function: Callable[[int, str], RenderedHand],
+    command: str,
+) -> list[tuple[str, RenderedHand]]:
+    """
+    training_amount: Is the number of times we will call the render function
+    per_image_amount: Is the number of items within those images, like cards/jokers...
+    render_function: A function that takes in a list of items, and then generates the image
+    """
+    worker_amount = 4
+    chunks = split_work(training_amount, worker_amount)
 
-    for joker in RANDOM_JOKERS:
-        for sample_index in range(samples_per_joker):
-            joker_amount = sample_index % 9 + 1
-            split = "train" if sample_index < train_amount else "val"
-            schedule.append((joker, joker_amount, split))
+    schedule: list[tuple[str, RenderedHand]] = [
+        ("", RenderedHand(None, []))
+    ] * training_amount
+    val_cutoff = training_amount * CUTOFF
 
-    random.shuffle(schedule)
-    return schedule
+    progress_lock = threading.Lock()
 
+    def render_images(chunk: range, progress: tqdm):
+        for index in chunk:
+            rng = random.randint(item_amounts[0], item_amounts[1])
+            rendered_data = render_function(rng, command)
+            split = "train" if index < val_cutoff else "val"
 
-def build_balanced_consumable_schedule(
-    train_type: Consumables, sample_amount: int
-) -> list[tuple[Consumable, str]]:
-    """Distribute a total sample count evenly across consumable classes."""
-    if sample_amount < 0:
-        raise ValueError("sample_amount cannot be negative")
+            schedule[index] = (split, rendered_data)
 
-    consumables = list(CONSUMABLE_FEATURE_ENUMS[train_type])
-    samples_per_class, extra_samples = divmod(sample_amount, len(consumables))
-    schedule: list[tuple[Consumable, str]] = []
+            with progress_lock:
+                progress.update(1)
 
-    for class_index, consumable in enumerate(consumables):
-        class_amount = samples_per_class + (class_index < extra_samples)
-        train_amount = round(class_amount * CUTOFF)
-        if class_amount >= 2:
-            train_amount = min(class_amount - 1, max(1, train_amount))
-
-        for sample_index in range(class_amount):
-            split = "train" if sample_index < train_amount else "val"
-            schedule.append((consumable, split))
+    with (
+        tqdm(total=training_amount) as progress,
+        ThreadPoolExecutor(max_workers=worker_amount) as executor,
+    ):
+        list(executor.map(lambda chunk: render_images(chunk, progress), chunks))
 
     random.shuffle(schedule)
     return schedule
@@ -231,25 +234,35 @@ def generate_targeted_rendered_jokers(
     return name, split, jokers_render
 
 
-def card_feature_info(
-    train_type: CardFeatureTrainingType, card_image: Image.Image, card: Card
-) -> tuple[Rank | Suit | Enhancement | Seal | Edition, tuple[int, int, int, int]]:
-    w, h = card_image.size
-    match train_type:
-        case CardFeatureTrainingType.RANK:
-            return card.rank, card_crop(w, h, RANK_CROP)
+def feature_crop(feature: Feature, img: Image.Image) -> tuple[int, int, int, int]:
+    w, h = img.size
+    crop_values = []
+    match feature:
+        case Rank():
+            crop_values = RANK_CROP
 
-        case CardFeatureTrainingType.SUIT:
-            return card.suit, card_crop(w, h, SUIT_CROP)
+        case Suit():
+            crop_values = SUIT_CROP
 
-        case CardFeatureTrainingType.ENHANCEMENT:
-            return card.enhancement, card_crop(w, h, ENHANCEMENT_CROP)
+        case Enhancement():
+            crop_values = ENHANCEMENT_CROP
 
-        case CardFeatureTrainingType.SEAL:
-            return card.seal, card_crop(w, h, SEAL_CROP)
+        case Seal():
+            crop_values = SEAL_CROP
 
-        case CardFeatureTrainingType.EDITION:
-            return card.edition, card_crop(w, h, EDITION_CROP)
+        case Edition():
+            crop_values = EDITION_CROP
+
+        case Tarot():
+            crop_values = CONSUMABLE_CROP
+
+        case Spectral():
+            crop_values = CONSUMABLE_CROP
+
+        case Planet():
+            crop_values = CONSUMABLE_CROP
+
+    return card_crop(w, h, crop_values)
 
 
 def joker_feature_info(
@@ -266,21 +279,6 @@ def joker_feature_info(
                 NEGATIVE_JOKER_EDITION_ID if joker.negative else joker.edition,
                 card_crop(w, h, JOKER_EDITION_CROP),
             )
-
-
-def consumable_feature_info(
-    consumable_image: Image.Image, consumable: Consumable
-) -> tuple[int, CropBox]:
-    w, h = consumable_image.size
-    name = None
-    if consumable in list(Tarot):
-        name = Consumables.TAROT
-    elif consumable in list(Planet):
-        name = Consumables.PLANET
-    else:
-        name = Consumables.SPECTRAL
-
-    return name, card_crop(w, h, CONSUMABLE_CROP)
 
 
 def generate_location_training_data(
@@ -332,297 +330,119 @@ def generate_location_training_data(
             with progress_lock:
                 progress.update(1)
 
-    with tqdm(total=size) as progress:
-        with ThreadPoolExecutor(max_workers=worker_amount) as executor:
-            list(executor.map(lambda chunk: process_hands(chunk, progress), chunks))
+    with (
+        tqdm(total=size) as progress,
+        ThreadPoolExecutor(max_workers=worker_amount) as executor,
+    ):
+        list(executor.map(lambda chunk: process_hands(chunk, progress), chunks))
 
 
-def render_feature_sample(
-    sample_index: int,
-    cutoff: float,
-    render_function: Callable[..., tuple[str, str, RenderedHand]],
-    special_data: list[Any] | None,
-) -> tuple[str, str, RenderedHand]:
-    """Render one scene, optionally using prebuilt data for that sample."""
-    if special_data is None:
-        return render_function(sample_index, cutoff)
-
-    return render_function(sample_index, cutoff, special_data[sample_index])
-
-
-def crop_annotated_item(image: Image.Image, box: list[float]) -> Image.Image:
-    """Crop one complete card, Joker, or consumable from a rendered scene."""
-    return image.crop(yolo_box_to_crop(box, image))
-
-
-def extract_feature_image(
-    train_type: Any,
-    item_image: Image.Image,
-    item_data: Any,
-    feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]]
-    | Callable[[Image.Image, Any], tuple[Any, CropBox]]
-    | None,
-) -> tuple[Any, Image.Image]:
-    """Return the class label and optional smaller feature crop for one item."""
-    if feature_function is None:
-        return item_data, item_image
-
-    if inspect.signature(feature_function) == 2:
-        feature, crop_box = feature_function(item_image, item_data)
-    else:
-        feature, crop_box = feature_function(train_type, item_image, item_data)
-
-    return feature, item_image.crop(crop_box)
-
-
-def save_feature_image(
-    image: Image.Image,
+def generate_feature_data(
     start_path: str,
-    split: str,
-    feature: Any,
-    sample_name: str,
-    item_index: int,
-) -> None:
-    """Save a prepared feature image into its train/val class folder."""
-    feature_label = str(int(feature))
-    filename = f"{threading.get_ident()}_{sample_name}_{item_index}_{feature_label}.png"
-    image.save(os.path.join(start_path, split, feature_label, filename))
-
-
-def process_rendered_features(
-    train_type: Any,
-    start_path: str,
-    sample_name: str,
-    split: str,
-    rendered_data: RenderedHand,
-    feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]]
-    | Callable[[Image.Image, Any], tuple[Any, CropBox]]
-    | None,
-    skip_function: Callable[[Any], bool] | None,
-) -> None:
-    """Crop, optionally refine, and save every annotated item in one scene."""
-    for item_index, annotation in enumerate(rendered_data.annotations):
-        item_data = annotation.card
-        if skip_function is not None and skip_function(item_data):
-            continue
-
-        item_image = crop_annotated_item(rendered_data.image, annotation.box)
-        feature, feature_image = extract_feature_image(
-            train_type, item_image, item_data, feature_function
-        )
-        save_feature_image(
-            feature_image,
-            start_path,
-            split,
-            feature,
-            sample_name,
-            item_index,
-        )
-
-
-def _generate_feature_dataset(
-    train_type: Any,
     amount: int,
-    start_path: str,
-    features: list[Any],
-    render_function: Callable[..., tuple[str, str, RenderedHand]],
-    feature_function: Callable[[Any, Image.Image, Any], tuple[Any, CropBox]]
-    | Callable[[Image.Image, Any], tuple[Any, CropBox]]
-    | None = None,
-    skip_function: Callable[[Any], bool] | None = None,
-    special_data: list[Any] | None = None,
-) -> None:
-    """Build folders, then render, crop, optionally refine, and save each scene."""
-    amount = amount if special_data is None else len(special_data)
-    cutoff = amount * CUTOFF
+    schedule: list[tuple[str, RenderedHand]],
+    features: list[Feature],
+):
     build_folders(start_path, features)
-
-    if amount <= 0:
-        return
-
-    cpu_count = CPU_COUNT if CPU_COUNT is not None else 1
-    worker_amount = min(max(1, cpu_count // 2), amount)
-    # worker_amount = 1
+    worker_amount = CPU_COUNT - 1
     chunks = split_work(amount, worker_amount)
 
     progress_lock = threading.Lock()
 
-    def process_items(item_indices: range, progress: tqdm) -> None:
-        for sample_index in item_indices:
-            name, split, rendered_data = render_feature_sample(
-                sample_index, cutoff, render_function, special_data
-            )
-            process_rendered_features(
-                train_type,
-                start_path,
-                name,
-                split,
-                rendered_data,
-                feature_function,
-                skip_function,
-            )
+    def process_items(item_indices: range, progress: tqdm, feature: Feature) -> None:
+        for index in item_indices:
+            file_location, render_data = schedule[index]
+            image = render_data.image
+            for count, card_annotation in enumerate(render_data.annotations):
+                item, box = card_annotation.card, card_annotation.box
+                item_image = image.crop(yolo_box_to_crop(box, image))
+                feature_image = item_image.crop(feature_crop(feature, item_image))
+                final_path = os.path.join(
+                    start_path, file_location, str(item.value), f"{index}_{count}.png"
+                )
+                feature_image.save(final_path)
 
             with progress_lock:
                 progress.update(1)
 
-    with tqdm(total=amount) as progress:
-        with ThreadPoolExecutor(max_workers=worker_amount) as executor:
-            list(executor.map(lambda chunk: process_items(chunk, progress), chunks))
+    feature = features[-1]
 
-
-def generate_feature_data(
-    train_type: CardFeatureTrainingType | JokerFeatureTrainingType | Consumables,
-    amount: int = 5000,
-) -> None:
-    """Generate the requested card, Joker, or consumable feature dataset."""
-    if isinstance(train_type, CardFeatureTrainingType):
-
-        def should_skip_card(card: Card) -> bool:
-            return (
-                card.enhancement == Enhancement.STONE
-                and train_type != CardFeatureTrainingType.ENHANCEMENT
-            )
-
-        _generate_feature_dataset(
-            train_type=train_type,
-            amount=amount,
-            start_path=(
-                f"{ROOT_DIR}/training_data/{FOLDER_TRAINING_NAMES[train_type]}_data"
-            ),
-            features=list(CARD_FEATURE_ENUMS[train_type]),
-            render_function=lambda item_index, cutoff: generate_rendered_hand(
-                item_index, cutoff, True
-            ),
-            feature_function=card_feature_info,
-            skip_function=should_skip_card,
-        )
-        return
-
-    if isinstance(train_type, JokerFeatureTrainingType):
-        schedule = (
-            build_balanced_joker_type_schedule(amount)
-            if train_type == JokerFeatureTrainingType.JOKER_TYPE
-            else None
-        )
-        render_function = (
-            generate_targeted_rendered_jokers
-            if schedule is not None
-            else generate_rendered_jokers
+    with (
+        tqdm(total=amount) as progress,
+        ThreadPoolExecutor(max_workers=worker_amount) as executor,
+    ):
+        list(
+            executor.map(lambda chunk: process_items(chunk, progress, feature), chunks)
         )
 
-        _generate_feature_dataset(
-            train_type=train_type,
-            amount=amount,
-            start_path=f"{ROOT_DIR}/training_data/{train_type.name.lower()}_data",
-            features=list(JOKER_FEATURE_ENUMS[train_type]),
-            render_function=render_function,
-            feature_function=joker_feature_info,
-            special_data=schedule,
-        )
-        return
 
-    if isinstance(train_type, Consumables):
-        schedule = build_balanced_consumable_schedule(train_type, amount)
-        _generate_feature_dataset(
-            train_type=train_type,
-            amount=amount,
-            start_path=os.path.join(
-                ROOT_DIR, "training_data", f"{train_type.name.lower()}_data"
-            ),
-            features=list(CONSUMABLE_FEATURE_ENUMS[train_type]),
-            render_function=generate_rendered_consumables,
-            feature_function=consumable_feature_info,
-            special_data=schedule,
-        )
-        return
-
-
-def generate_all_feature_data() -> None:
-    for training_type in CardFeatureTrainingType:
-        generate_feature_data(training_type)
-
-
-def generate_all_joker_feature_data() -> None:
-    for training_type in JokerFeatureTrainingType:
-        joker_amount = (
-            5000 if training_type == JokerFeatureTrainingType.JOKER_EDITION else 150
-        )
-        generate_feature_data(training_type, joker_amount)
-
-
-def generate_all_consumable_feature_data(consumable_amount: int = 5000) -> None:
-    for training_type in Consumables:
-        generate_feature_data(training_type, consumable_amount)
+def setup(
+    command: str,
+    start_path: str,
+    render_amount: tuple[int, int],
+    render_function: Callable[[int, str], RenderedHand],
+):
+    training_amount = 5_000
+    start_path = os.path.join(start_path, f"{command}_data")
+    features = list(FEATURES[command])
+    schedule = build_schedule(training_amount, render_amount, render_function, command)
+    generate_feature_data(start_path, training_amount, schedule, features)
 
 
 if __name__ == "__main__":
-    available_commands = {
-        "all_card_features": {"function": generate_all_feature_data},
-        "card_enhancement": {
-            "function": generate_feature_data,
-            "args": [CardFeatureTrainingType.ENHANCEMENT],
-        },
-        "card_edition": {
-            "function": generate_feature_data,
-            "args": [CardFeatureTrainingType.EDITION],
-        },
-        "card_rank": {
-            "function": generate_feature_data,
-            "args": [CardFeatureTrainingType.RANK],
-        },
-        "card_suit": {
-            "function": generate_feature_data,
-            "args": [CardFeatureTrainingType.SUIT],
-        },
-        "card_seal": {
-            "function": generate_feature_data,
-            "args": [CardFeatureTrainingType.SEAL],
-        },
-        "card_locations": {
-            "function": generate_location_training_data,
-            "args": [5000, "card_location", generate_rendered_hand],
-        },
-        "joker_locations": {
-            "function": generate_location_training_data,
-            "args": [5000, "joker_location", generate_rendered_hand],
-        },
-        "consumable_locations": {
-            "function": generate_location_training_data,
-            "args": [5000, "consumable_location", generate_rendered_consumables],
-        },
-        "all_joker_features": {"function": generate_all_joker_feature_data},
-        "joker_type": {
-            "function": generate_feature_data,
-            "args": [JokerFeatureTrainingType.JOKER_TYPE, 150],
-        },
-        "joker_edition": {
-            "function": generate_feature_data,
-            "args": [JokerFeatureTrainingType.JOKER_EDITION],
-        },
-        "all_consumables": {"function": generate_all_consumable_feature_data},
-        "tarot": {
-            "function": generate_feature_data,
-            "args": [Consumables.TAROT],
-        },
-        "planet": {
-            "function": generate_feature_data,
-            "args": [Consumables.PLANET],
-        },
-        "spectral": {
-            "function": generate_feature_data,
-            "args": [Consumables.SPECTRAL],
-        },
-    }
+    available_commands = [
+        "all_card_features",
+        "enhancement",
+        "edition",
+        "rank",
+        "suit",
+        "seal",
+        "card_locations",
+        "joker_locations",
+        "consumable_locations",
+        "all_joker_features",
+        "joker_type",
+        "joker_edition",
+        "all_consumables",
+        "tarot",
+        "planet",
+        "spectral",
+    ]
 
-    if len(sys.argv) < 2 or sys.argv[1] not in available_commands:
-        print("Sorry that command is invalid please add 1 of the following:")
-        for key in available_commands.keys():
-            print(key)
-
-        exit()
+    if len(sys.argv) < 2:
+        print("Please pass in 1 of these arguemnts")
+        for val in available_commands:
+            print(val)
+        sys.exit()
 
     command = sys.argv[1]
-    command_config = available_commands[command]
-    function = command_config["function"]
-    args = command_config.get("args", [])
-    function(*args)
+    if command not in available_commands:
+        print("Sorry that command is invalid please use 1 of the following:")
+        for val in available_commands:
+            print(val)
+        sys.exit()
+
+    start_path = os.path.join(ROOT_DIR, "training_data")
+    render_amount = (0, 0)
+    render_function = None
+
+    if command == "all_card_features":
+        render_amount = (6, 16)
+        for feature in ["enhancement", "edition", "rank", "suit", "seal"]:
+            setup(feature, start_path, render_amount, generate_hand)
+
+    elif command == "all_consumables":
+        render_amount = (1, 4)
+        for feature in ["tarot", "planet", "spectral"]:
+            setup(feature, start_path, render_amount, generate_consumables)
+
+    else:
+        if command in ["enhancement", "edition", "rank", "suit", "seal"]:
+            render_amount = (6, 16)
+            render_function = generate_hand
+
+        elif command in ["tarot", "planet", "spectral"]:
+            render_amount = (1, 4)
+            render_function = generate_consumables
+
+        setup(command, start_path, render_amount, render_function)

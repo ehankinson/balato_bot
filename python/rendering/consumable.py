@@ -4,7 +4,7 @@ from functools import lru_cache
 
 from PIL import Image
 
-from config.settings import CARD_HEIGHT, CARD_WIDTH, ROOT_DIR
+from config.settings import CARD_HEIGHT, CARD_WIDTH, CONSUMABLE_CROP, ROOT_DIR
 from core.enums import Consumables, Planet, Spectral, Tarot
 from core.models import CardAnnotation, RenderedHand
 from rendering.backgrounds import render_background
@@ -66,7 +66,8 @@ def render_consumable(consumable: Consumable) -> Image.Image:
 
 
 def render_consumables(
-    consumables: list[Consumable], training: bool = False
+    consumables: list[Consumable] | list[Tarot] | list[Planet] | list[Spectral],
+    training: bool = False,
 ) -> RenderedHand:
     """Render consumables on a background and annotate each complete card."""
     background = render_background(IMAGE_WIDTH, IMAGE_HEIGHT, training)
@@ -109,10 +110,16 @@ def render_consumables(
     return RenderedHand(image=background, annotations=annotations)
 
 
+def generate_consumables(amount_of_tarots: int, training_type: str):
+    consumable_type = Tarot if training_type == "tarot" else Planet if training_type == "planet" else Spectral
+    consumables = [random.choice(list(consumable_type)) for _ in range(amount_of_tarots)]
+    return render_consumables(consumables, True)
+
+
 if __name__ == "__main__":
     target = None
     values = []
-    for _ in range(random.randint(4, 4)):
+    for _ in range(4):
         var = random.choice([0, 1, 2])
         if var == 1:
             target = Tarot(random.choice(list(Tarot)))
@@ -123,15 +130,14 @@ if __name__ == "__main__":
 
         values.append(target)
 
-    img = render_consumables(values)
-    w, h = img.image.size
-    for i, info in enumerate(img.annotations):
-        print(info.box)
-        values = yolo_box_to_crop(info.box, img.image)
-        print(values)
-        individual_card = img.image.crop(values)
-        crop = card_crop(w, h, [0.0, 115.0, 0.25, 0.95])
-        individual_card = individual_card.crop(crop)
-        individual_card.save(f"card_{i}.png")
+    data = render_consumables(values)
+    img = data.image
+
+    for i, card in enumerate(data.annotations):
+        box = card.box
+        consu = img.crop(yolo_box_to_crop(box, img))
+        w, h = consu.size
+        crop = consu.crop(card_crop(w, h, CONSUMABLE_CROP))
+        crop.save(f"{i}.png")
         
-    img.image.save("img.png")
+    data.image.save("img.png")

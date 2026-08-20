@@ -737,7 +737,7 @@ class ShopState:
 
 @dataclass
 class CardAnnotation:
-    card: Card | Joker | Tarot | Planet | Spectral
+    card: Rank | Suit | Enhancement | Edition | Seal | Joker | Tarot | Planet | Spectral
     box: list[float]
 
 

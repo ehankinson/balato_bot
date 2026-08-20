@@ -4,7 +4,7 @@ from config.settings import (
     X_RATIO_GAP,
     Y_RATIO_GAP,
 )
-from core.models import CardAnnotation, Hand, RenderedHand
+from core.models import Card, CardAnnotation, Hand, RenderedHand
 
 # 1445x393 THIS IS THE DIMENSIONS OF the SS WE ARE TAKING FOR HAND SIZE
 from rendering.backgrounds import render_background
@@ -22,6 +22,7 @@ TOTAL_HAND_WIDTH_RATIO: float = 1372 / 1445
 TOTAL_HAND_WIDTH = TOTAL_HAND_WIDTH_RATIO * HAND_WIDTH
 
 
+
 def calculate_card_gap(card_amount: int, card_width: int) -> float:
     if card_amount <= 1:
         return 0.0
@@ -32,7 +33,9 @@ def calculate_card_gap(card_amount: int, card_width: int) -> float:
     return shift_per_card
 
 
-def render_hand(hand: Hand, training: bool = False) -> RenderedHand:
+def render_hand(
+    hand: Hand, training: bool = False, training_type: str = ""
+) -> RenderedHand:
     img = render_background(HAND_WIDTH, HAND_HEIGHT, training)
 
     card_amount = len(hand.cards)
@@ -55,7 +58,7 @@ def render_hand(hand: Hand, training: bool = False) -> RenderedHand:
 
         annotations.append(
             CardAnnotation(
-                card=card,
+                card=card.__getattribute__(training_type),
                 box=calculate_box_dimensions(
                     card_image, x_pos, y_pos, HAND_WIDTH, HAND_HEIGHT
                 ),
@@ -63,6 +66,11 @@ def render_hand(hand: Hand, training: bool = False) -> RenderedHand:
         )
 
     return RenderedHand(image=img, annotations=annotations)
+
+
+def generate_hand(amount_of_cards: int, training_type: str = ""):
+    hand = Hand([Card.random() for _ in range(amount_of_cards)])
+    return render_hand(hand, training=True, training_type=training_type)
 
 
 def main() -> None:
