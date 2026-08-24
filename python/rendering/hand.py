@@ -1,8 +1,9 @@
 from config.settings import (
+    HAND_CONTENT_WIDTH,
     HAND_HEIGHT,
     HAND_WIDTH,
-    X_RATIO_GAP,
-    Y_RATIO_GAP,
+    HAND_X_START_GAP,
+    HAND_Y_START_GAP,
 )
 from core.models import Card, CardAnnotation, Hand, RenderedHand
 
@@ -16,19 +17,12 @@ from rendering.layout import (
     y_jitter,
 )
 
-X_START_GAP = int(X_RATIO_GAP * HAND_WIDTH)
-Y_START_GAP = int(Y_RATIO_GAP * HAND_HEIGHT)
-TOTAL_HAND_WIDTH_RATIO: float = 1372 / 1445
-TOTAL_HAND_WIDTH = TOTAL_HAND_WIDTH_RATIO * HAND_WIDTH
-
-
-
 def calculate_card_gap(card_amount: int, card_width: int) -> float:
     if card_amount <= 1:
         return 0.0
 
     total_card_space = card_amount * card_width
-    shift_space = TOTAL_HAND_WIDTH - total_card_space
+    shift_space = HAND_CONTENT_WIDTH - total_card_space
     shift_per_card = shift_space / (card_amount - 1)
     return shift_per_card
 
@@ -50,8 +44,10 @@ def render_hand(
         if i == 0:
             card_gap = calculate_card_gap(card_amount, card_image.width)
 
-        x_pos = int(X_START_GAP + i * (card_image.width + card_gap))
-        y_pos = round(Y_START_GAP - calculate_card_y_lift(i, card_amount) + y_jitter())
+        x_pos = int(HAND_X_START_GAP + i * (card_image.width + card_gap))
+        y_pos = round(
+            HAND_Y_START_GAP - calculate_card_y_lift(i, card_amount) + y_jitter()
+        )
 
         card_image = card_image.rotate(angle, expand=True)
         img.paste(card_image, (x_pos, y_pos), card_image)

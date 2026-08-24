@@ -9,6 +9,11 @@ def _random_phase():
     return random.uniform(0.0, 10.0)
 
 
+def _random_foil_phases() -> tuple[float, float]:
+    """Return a visible foil state near the reference Balatro highlight."""
+    return random.uniform(7.8, 8.2), random.uniform(-0.25, 0.25)
+
+
 def _rgb_to_hsl(rgb):
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     low = np.minimum(r, np.minimum(g, b))
@@ -254,10 +259,21 @@ def hologram_effect(img: Image.Image) -> Image.Image:
 
 def foil_effect(
     img: Image.Image,
+    foil_r: float | None = None,
+    foil_g: float | None = None,
+    strength: float = 1.0,
 ) -> Image.Image:
-    brightness_boost = 0.03
-    foil_r = _random_phase()
-    foil_g = _random_phase()
+    """Apply Balatro's foil interference pattern over the original artwork.
+
+    Explicit phase values make the effect deterministic for previews and tests.
+    Normal rendering leaves them unset so each generated card gets a variation.
+    """
+    if foil_r is None and foil_g is None:
+        foil_r, foil_g = _random_foil_phases()
+    else:
+        foil_r = _random_phase() if foil_r is None else foil_r
+        foil_g = _random_phase() if foil_g is None else foil_g
+    strength = float(np.clip(strength, 0.0, 1.0))
 
     tex = np.asarray(img).astype(np.float32) / 255.0
 
@@ -270,9 +286,11 @@ def foil_effect(
     uvx = xx / max(w - 1, 1)
     uvy = yy / max(h - 1, 1)
 
+    # The original shader works directly in normalized texture coordinates.
+    # Deliberately do not aspect-correct these values: that apparent distortion
+    # is what creates Balatro's tall elliptical interference rings.
     adjusted_x = uvx - 0.5
     adjusted_y = uvy - 0.5
-    adjusted_x = adjusted_x * (h / w)
 
     length_90 = np.sqrt((90.0 * adjusted_x) ** 2 + (90.0 * adjusted_y) ** 2)
     length_113 = np.sqrt((113.1121 * adjusted_x) ** 2 + (113.1121 * adjusted_y) ** 2)
@@ -333,27 +351,25 @@ def foil_effect(
         0.0,
     )
 
-    rings = 0.5 + 0.5 * np.cos(length_90 * 2.8 + foil_r * 4.0)
-    fine_lines = np.clip((rings - 0.78) / 0.22, 0.0, 1.0)
-    center_beam = np.exp(-((uvx - 0.5) ** 2) / 0.0018) * 0.58
+    # Faithful channel response from Balatro's foil shader. It removes red and
+    # green in quiet regions, then drives all channels—especially blue—at the
+    # interference peaks.
+    foil_rgb = rgb.copy()
+    foil_rgb[..., 0] = rgb[..., 0] - delta + delta * maxfac * 0.3
+    foil_rgb[..., 1] = rgb[..., 1] - delta + delta * maxfac * 0.3
+    foil_rgb[..., 2] = rgb[..., 2] + delta * maxfac * 1.9
+    foil_rgb = np.clip(foil_rgb, 0.0, 1.0)
 
+    shader_alpha = np.minimum(
+        alpha,
+        0.3 * alpha + 0.9 * np.minimum(0.5, maxfac * 0.1),
+    )
+    layer_alpha = (shader_alpha * strength)[..., None]
+
+    # Treat the shader result as a foil laminate over the source. Keeping the
+    # original pixels underneath preserves the colorful Joker artwork.
     out = tex.copy()
-    base_tint = np.array([0.38, 0.5, 1.0], dtype=np.float32)
-    light_face_mask = np.clip((high - 0.45) / 0.55, 0.0, 1.0)
-    dark_art_mask = 1.0 - np.clip((high - 0.15) / 0.45, 0.0, 1.0)
-    color_mask = np.clip((high - low - 0.08) / 0.38, 0.0, 1.0)
-    base_mix = 0.24 + 0.42 * light_face_mask
-    highlight = np.minimum(fine_lines * 0.46 + center_beam + maxfac * 0.04, 0.82)
-    shadow = dark_art_mask * 0.08
-    opaque = alpha[..., None]
-
-    base_mix *= 1.0 - 0.55 * color_mask
-    highlight *= 1.0 - 0.45 * color_mask
-
-    out[..., :3] = rgb * (1.0 - base_mix[..., None]) + base_tint * base_mix[..., None]
-    out[..., :3] += (1.0 - out[..., :3]) * highlight[..., None]
-    out[..., :3] -= shadow[..., None] * delta[..., None] * opaque
-    out[..., :3] += brightness_boost * delta[..., None] * opaque
+    out[..., :3] = rgb * (1.0 - layer_alpha) + foil_rgb * layer_alpha
     out[..., 3] = alpha
 
     out = np.clip(out, 0.0, 1.0)

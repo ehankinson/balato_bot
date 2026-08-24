@@ -1,23 +1,23 @@
 import random
 
-from config.settings import BOX_ID
+from config.settings import (
+    BOX_ID,
+    LAYOUT_ANGLE,
+    LAYOUT_ANGLE_JITTER,
+    LAYOUT_MAX_Y_LIFT,
+    LAYOUT_Y_JITTER,
+)
 from PIL import Image
 
-ANGLE = 5.6
-Y_JITTER = 5
-MAX_Y_LIFT = 18
-ANGLE_JITTER = 0.5
-
-
 def calculate_angle(card_index: int, card_amount: int, custom_angle: float | None = None) -> float:
-    angle = custom_angle if custom_angle is not None else ANGLE
+    angle = custom_angle if custom_angle is not None else LAYOUT_ANGLE
     mid = (card_amount - 1) / 2
     if mid == 0:
         return 0.0
 
     offset_from_center = card_index - mid
     normalized_offset = offset_from_center / mid
-    jitter = random.uniform(-ANGLE_JITTER, ANGLE_JITTER)
+    jitter = random.uniform(-LAYOUT_ANGLE_JITTER, LAYOUT_ANGLE_JITTER)
     return -normalized_offset * angle + jitter
 
 
@@ -28,7 +28,7 @@ def calculate_card_y_lift(card_index: int, card_amount: int) -> float:
 
     distance_from_center = abs(card_index - mid)
     normalized_center_lift = 1 - (distance_from_center / mid)
-    return normalized_center_lift * MAX_Y_LIFT
+    return normalized_center_lift * LAYOUT_MAX_Y_LIFT
 
 
 def calculate_box_dimensions(
@@ -47,4 +47,4 @@ def calculate_box_dimensions(
 
 
 def y_jitter() -> float:
-    return random.uniform(-Y_JITTER, Y_JITTER)
+    return random.uniform(-LAYOUT_Y_JITTER, LAYOUT_Y_JITTER)

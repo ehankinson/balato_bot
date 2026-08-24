@@ -80,9 +80,9 @@ def generate_copy_combos(
 
     if len(copy_jokers) == 1:
         copy_joker = copy_jokers[0]
-        function = COPY_FUNCTION[copy_joker.background_image]
+        function = COPY_FUNCTION[copy_joker.joker_name]
         return function(edit_jokers)
-    elif len(set([joker.background_image for joker in copy_jokers])) == 2:
+    elif len(set([joker.joker_name for joker in copy_jokers])) == 2:
         return generate_duo_copy_permutations(edit_jokers)
 
     return final_list

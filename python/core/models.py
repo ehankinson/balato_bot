@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass, field
 
 from PIL import Image
+from typing_extensions import override
 
 from config.settings import JOKER_CONFIG
 from core.class_indices import JOKER_TYPE_CLASSES
@@ -9,6 +10,7 @@ from core.enums import (
     Edition,
     Enhancement,
     HandAction,
+    JokerEdition,
     JokersName,
     JokerTriggers,
     Planet,
@@ -263,11 +265,11 @@ class Deck:
         for card in hand:
             if card in self.removed_cards:
                 continue
-    
+
             suit, rank, score = card.suit, card.rank, card.score
             suit_rank_id = suit << 4 | card.rank
             self.cards[card] -= 1
-            
+
             self.suits[suit].cards.remove(card)
             self.suits[suit].score -= score
 
@@ -323,7 +325,6 @@ class Deck:
             self.add_card(self.discards.pop())
 
         self._shuffle()
-        
 
 
 @dataclass(slots=True)
@@ -351,51 +352,57 @@ class JokerReq:
 
 @dataclass(slots=True)
 class Joker:
-    background_image: JokersName
+    joker_name: JokersName
     face_image: JokersName | None
-    negative: bool
-    edition: Edition
+    joker_edition: JokerEdition
     req: JokerReq
     copyable: bool
     joker_id: int = field(init=False, default=0)
 
     def _build_id(self):
-        val = self.background_image | 0b11111111
-        val = (val << 1) | self.negative
-        val = (val << 4) | (self.edition & 0b111)
+        val = self.joker_name | 0b11111111
+        val = (val << 5) | (self.joker_edition & 0b111)
         self.joker_id = val
 
     def _add_face(self):
-        if self.background_image in BACKGROUND_JOKERS:
-            self.face_image = JokersName(int(self.background_image) + 10)
+        if self.joker_name in BACKGROUND_JOKERS:
+            if self.joker_name == JokersName.HOLOGRAM_BACKGROUND:
+                self.face_image = JokersName.HOLOGRAM_REAL_FACE
+            else:
+                self.face_image = JokersName(self.joker_name.value + 10)
 
     def __post_init__(self):
         self._add_face()
         self._build_id()
 
+    @override
     def __repr__(self):
-        base = self.background_image.name.lower()
-        if self.negative:
-            base = f"negative {base}"
-        elif self.edition != Edition.NONE:
-            base = f"{self.edition.name.lower()} {base}"
+        base = self.joker_name.name.lower()
+        if self.joker_edition != JokerEdition.NONE:
+            base = f"{self.joker_edition.name.lower()} {base}"
 
         return base
 
+    @override
     def __hash__(self) -> int:
         return self.joker_id
 
     @classmethod
     def random(cls):
+        good_values = [val for val in list(JokersName) if "REAL_FACE" not in val.name]
+        joker = random.choice(good_values)
+        joker_face = None
+        str_name = joker.name.lower()
+        if "BACKGROUND" in str_name:
+            if "HOLOGRAM" in str_name:
+                joker_face = JokersName.HOLOGRAM_REAL_FACE
+
+            joker_face = JokersName(joker.value + 10)
+
         return Joker(
-            background_image=random.choice(list(JokersName)),
-            face_image=None,
-            negative=random.choice([True, False]),
-            edition=Edition(
-                random.choice(
-                    [edition.value for edition in Edition if edition.value >= 0]
-                )
-            ),
+            joker_name=joker,
+            face_image=joker_face,
+            joker_edition=random.choice(list(JokerEdition)),
             req=JokerReq(),
             copyable=False,
         )
@@ -426,10 +433,9 @@ class Joker:
                 )
 
             return JokerScoring(
-                background_image=joker_name,
+                joker_name=joker_name,
                 face_image=None,
-                negative=False,
-                edition=Edition.NONE,
+                joker_edition=Edition.NONE,
                 req=JokerReq(),
                 copyable=joker_data.get("copyable", False),
                 trigger=JokerTriggers(scoring_data.get("trigger")),
@@ -445,10 +451,9 @@ class Joker:
             retrigger_data = joker_data["retrigger"]
 
             return JokerRetrigger(
-                background_image=joker_name,
+                joker_name=joker_name,
                 face_image=None,
-                negative=False,
-                edition=Edition.NONE,
+                joker_edition=Edition.NONE,
                 req=JokerReq(),
                 copyable=joker_data.get("copyable", False),
                 trigger=JokerTriggers(retrigger_data.get("trigger")),
@@ -460,10 +465,9 @@ class Joker:
             copy_data = joker_data["copy"]
 
             return JokerCopy(
-                background_image=joker_name,
+                joker_name=joker_name,
                 face_image=None,
-                negative=False,
-                edition=Edition.NONE,
+                joker_edition=Edition.NONE,
                 req=JokerReq(),
                 copyable=joker_data.get("copyable", False),
                 position=copy_data.get("position"),
@@ -473,10 +477,9 @@ class Joker:
             modifier_data = joker_data["game_modifier"]
 
             return JokerGameModifier(
-                background_image=joker_name,
+                joker_name=joker_name,
                 face_image=None,
-                negative=False,
-                edition=Edition.NONE,
+                joker_edition=Edition.NONE,
                 req=JokerReq(),
                 copyable=joker_data.get("copyable", False),
                 discards=modifier_data.get("discards", 0),
@@ -506,10 +509,9 @@ class Joker:
             rank = Rank(rank_data) if isinstance(rank_data, int) else rank_data
 
             return JokerUpdate(
-                background_image=joker_name,
+                joker_name=joker_name,
                 face_image=None,
-                negative=False,
-                edition=Edition.NONE,
+                joker_edition=Edition.NONE,
                 req=JokerReq(),
                 copyable=joker_data["copyable"],
                 trigger=JokerTriggers(modifier_data["trigger"]),
@@ -521,10 +523,9 @@ class Joker:
             modifier_data = joker_data["econ"]
 
             return JokerEcon(
-                background_image=joker_name,
+                joker_name=joker_name,
                 face_image=None,
-                negative=False,
-                edition=Edition.NONE,
+                joker_edition=Edition.NONE,
                 req=JokerReq(),
                 copyable=joker_data["copyable"],
                 trigger=JokerTriggers(modifier_data.get("trigger")),
@@ -658,7 +659,14 @@ class GameState:
     def __post_init__(self):
         self.played_hands = [0] * len(PokerHand)
 
-    def execute_hand_action(self, mode: HandAction, selected_cards: list[Card], hand: list[Card], deck: Deck, draw: bool=True) -> bool:
+    def execute_hand_action(
+        self,
+        mode: HandAction,
+        selected_cards: list[Card],
+        hand: list[Card],
+        deck: Deck,
+        draw: bool = True,
+    ) -> bool:
         from calculation.score import calculate_scoring_hand
 
         has_won = False
@@ -675,7 +683,7 @@ class GameState:
         deck.add_to_discard_pile(selected_cards)
         if draw:
             hand.extend(deck.draw(self.hand_size - len(hand)))
-        
+
         return has_won
 
     def reset(self) -> None:
@@ -694,7 +702,7 @@ class ShopState:
     chaos_free_reroll_used: bool = False
 
     def has_joker(self, jokers: list[Joker], joker_name: JokersName) -> bool:
-        return any(joker.background_image == joker_name for joker in jokers)
+        return any(joker.joker_name == joker_name for joker in jokers)
 
     def has_free_chaos_reroll(self, jokers: list[Joker]) -> bool:
         return (

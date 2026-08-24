@@ -1,10 +1,8 @@
 from PIL import Image
 
 from config.settings import (
-    HAND_HEIGHT,
-    HAND_HEIGHT_RATION,
-    HAND_WIDTH,
-    HAND_WIDTH_RATIO,
+    RENDERED_CARD_HEIGHT,
+    RENDERED_CARD_WIDTH,
 )
 
 
@@ -27,9 +25,9 @@ def crop_image(image: Image.Image, x_pos: int, y_pos: int, width: int, height: i
 
 
 def resize_card(img: Image.Image) -> Image.Image:
-    new_width = int(round(HAND_WIDTH * HAND_WIDTH_RATIO, 0))
-    new_height = int(round(HAND_HEIGHT * HAND_HEIGHT_RATION, 0))
-    return img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+    return img.resize(
+        (RENDERED_CARD_WIDTH, RENDERED_CARD_HEIGHT), Image.Resampling.LANCZOS
+    )
 
 
 def yolo_box_to_crop(box: list[float], image: Image.Image) -> tuple[int, int, int, int]:
@@ -49,4 +47,3 @@ def yolo_box_to_crop(box: list[float], image: Image.Image) -> tuple[int, int, in
     bottom = max(top + 1, min(bottom, image_height))
 
     return left, top, right, bottom
-

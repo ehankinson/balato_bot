@@ -4,7 +4,14 @@ from functools import lru_cache
 
 from PIL import Image
 
-from config.settings import CARD_HEIGHT, CARD_WIDTH, CONSUMABLE_CROP, ROOT_DIR
+from config.settings import (
+    CARD_HEIGHT,
+    CARD_WIDTH,
+    CONSUMABLE_CANVAS_HEIGHT,
+    CONSUMABLE_CANVAS_WIDTH,
+    CONSUMABLE_CROP,
+    ROOT_DIR,
+)
 from core.enums import Consumables, Planet, Spectral, Tarot
 from core.models import CardAnnotation, RenderedHand
 from rendering.backgrounds import render_background
@@ -21,10 +28,6 @@ CONSUMABLES = Image.open(os.path.join(ROOT_DIR, "game_images", "Tarots.png")).co
 CONSUMABLES_LOCATIONS: dict[int, dict[int, dict[str, int]]] = load_yaml(
     os.path.join(ROOT_DIR, "yaml", "consumable_locations.yaml")
 )
-
-IMAGE_WIDTH = 535
-IMAGE_HEIGHT = 310
-
 
 def crop_consumable(
     location: dict[int, dict[int, dict[str, int]]],
@@ -70,21 +73,25 @@ def render_consumables(
     training: bool = False,
 ) -> RenderedHand:
     """Render consumables on a background and annotate each complete card."""
-    background = render_background(IMAGE_WIDTH, IMAGE_HEIGHT, training)
+    background = render_background(
+        CONSUMABLE_CANVAS_WIDTH, CONSUMABLE_CANVAS_HEIGHT, training
+    )
     annotations: list[CardAnnotation] = []
 
     if not consumables:
         return RenderedHand(image=background, annotations=annotations)
 
     card_width, card_height = render_consumable(consumables[0]).size
-    remaining_width = IMAGE_WIDTH - card_width * len(consumables)
+    remaining_width = CONSUMABLE_CANVAS_WIDTH - card_width * len(consumables)
     if remaining_width >= 0:
         x_gap = remaining_width / (len(consumables) + 1)
         x_start = x_gap
         x_step = card_width + x_gap
     else:
         x_start = 0
-        x_step = (IMAGE_WIDTH - card_width) / max(1, len(consumables) - 1)
+        x_step = (CONSUMABLE_CANVAS_WIDTH - card_width) / max(
+            1, len(consumables) - 1
+        )
 
     card_amount = len(consumables)
 
@@ -93,7 +100,7 @@ def render_consumables(
         angle = calculate_angle(index, card_amount, 1.75)
 
         x_pos = round(x_start + x_step * index)
-        y_pos = round((IMAGE_HEIGHT - card_height) / 2 + y_jitter())
+        y_pos = round((CONSUMABLE_CANVAS_HEIGHT - card_height) / 2 + y_jitter())
 
         consumable_image = consumable_image.rotate(angle, expand=True)
 
@@ -102,7 +109,11 @@ def render_consumables(
             CardAnnotation(
                 card=consumable,
                 box=calculate_box_dimensions(
-                    consumable_image, x_pos, y_pos, IMAGE_WIDTH, IMAGE_HEIGHT
+                    consumable_image,
+                    x_pos,
+                    y_pos,
+                    CONSUMABLE_CANVAS_WIDTH,
+                    CONSUMABLE_CANVAS_HEIGHT,
                 ),
             )
         )

@@ -59,6 +59,14 @@ class Edition(IntEnum):
     POLYCHROME = 2
 
 
+class JokerEdition(IntEnum):
+    NONE = 0
+    FOIL = 1
+    HOLOGRAPHIC = 2
+    POLYCHROME = 3
+    NEGATIVE = 4
+
+
 class Consumables(IntEnum):
     TAROT = 0
     PLANET = 1

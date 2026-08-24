@@ -9,7 +9,7 @@ def calculate_joker_update(
 ) -> None:
     for joker in jokers:
         if isinstance(joker, JokerUpdate) and joker.trigger == trigger:
-            if joker.background_image == JokersName.MIDAS_MASK:
+            if joker.joker_name == JokersName.MIDAS_MASK:
                 for card in hand_scoring.scored_played:
                     if card.is_facecard:
                         card.remove_enhancement()

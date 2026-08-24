@@ -251,7 +251,7 @@ def filter_cards(
     ]
 
     important_cards = []
-    if any(joker.background_image == JokersName.SHOOT_THE_MOON for joker in jokers):
+    if any(joker.joker_name == JokersName.SHOOT_THE_MOON for joker in jokers):
         queen_cards = [
             card
             for card in cards_not_played
@@ -259,7 +259,7 @@ def filter_cards(
         ]
         important_cards.extend(queen_cards)
 
-    if any(joker.background_image == JokersName.BARON for joker in jokers):
+    if any(joker.joker_name == JokersName.BARON for joker in jokers):
         king_cards = [
             card
             for card in cards_not_played
@@ -427,7 +427,7 @@ def add_splash(hand_cache: list[HandScoring], jokers: list[Joker]) -> None:
         )
 
         free_space = 5 - len(hand_scoring.scored_played)
-        if any(joker.background_image == JokersName.HANGING_CHAD for joker in jokers):
+        if any(joker.joker_name == JokersName.HANGING_CHAD for joker in jokers):
             for combo in combinations(unplayed_cards, free_space):
                 copy_scoring = HandScoring(
                     hand_stats=copy(hand_scoring.hand_stats),
@@ -532,17 +532,17 @@ def generate_scoring_hand_combinations(
             )
         )
 
-    if any(joker.background_image == JokersName.SPLASH for joker in jokers):
+    if any(joker.joker_name == JokersName.SPLASH for joker in jokers):
         add_splash(hand_cache, jokers)
 
     # Since blackboard only activates when Spades and Clubs are held in hand,
     # its benifial to add dead cards when playing (i.e. playing extra hearts and diamonds even if they don't increase score)
-    if any(joker.background_image == JokersName.BLACKBOARD for joker in jokers):
+    if any(joker.joker_name == JokersName.BLACKBOARD for joker in jokers):
         help_blackboard(hand_cache, jokers)
 
     # For raised fist, we will do this after blackboard since 3x mult is better 99% of the time
     # then a max of +22
-    if any(joker.background_image == JokersName.RAISED_FIST for joker in jokers):
+    if any(joker.joker_name == JokersName.RAISED_FIST for joker in jokers):
         help_raised_fist(hand_cache)
 
     # checking if we have stone cards, since that is always a plus
@@ -553,7 +553,7 @@ def generate_scoring_hand_combinations(
 
     # When we have a HangingChad it is sometimes (there is math to figure out the best starting card but will do that later)
     # So for now we will just take the end and make sure every card has a chance to start :p
-    if any(joker.background_image == JokersName.HANGING_CHAD for joker in jokers):
+    if any(joker.joker_name == JokersName.HANGING_CHAD for joker in jokers):
         add_chad(hand_cache)
 
     return hand_cache

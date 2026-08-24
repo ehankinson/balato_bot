@@ -13,7 +13,7 @@ from config.settings import (
     EDITION_CROP,
     ENHANCEMENT_CROP,
     JOKER_EDITION_CROP,
-    JOKER_TYPE_CROP,
+    JOKER_NAME_CROP,
     RANK_CROP,
     ROOT_DIR,
     SEAL_CROP,
@@ -23,6 +23,7 @@ from core.class_indices import NEGATIVE_JOKER_EDITION_ID
 from core.enums import (
     Edition,
     Enhancement,
+    JokerEdition,
     JokerFeatureTrainingType,
     JokersName,
     Planet,
@@ -39,7 +40,7 @@ from rendering.consumable import (
     render_consumables,
 )
 from rendering.hand import generate_hand, render_hand
-from rendering.joker import render_jokers
+from rendering.joker import generate_jokers, render_jokers
 from utils.files import build_folder, rebuild_folder
 from utils.images import card_crop, yolo_box_to_crop
 
@@ -56,6 +57,8 @@ FEATURES = {
     "tarot": Tarot,
     "planet": Planet,
     "spectral": Spectral,
+    "joker_name": JokersName,
+    "joker_edition": JokerEdition,
 }
 
 JOKER_FEATURE_ENUMS = {
@@ -63,7 +66,18 @@ JOKER_FEATURE_ENUMS = {
     JokerFeatureTrainingType.JOKER_EDITION: list(Edition) + [NEGATIVE_JOKER_EDITION_ID],
 }
 
-type Feature = Rank | Suit | Enhancement | Edition | Seal | Tarot | Planet | Spectral
+type Feature = (
+    Rank
+    | Suit
+    | Enhancement
+    | Edition
+    | Seal
+    | Tarot
+    | Planet
+    | Spectral
+    | JokersName
+    | JokerEdition
+)
 
 
 def random_full_card_amount() -> int:
@@ -135,12 +149,12 @@ def generate_rendered_consumables(
 def generate_random_joker(joker_name: JokersName | None = None) -> Joker:
     """Build a visually randomized Joker, optionally with a required identity."""
     return Joker(
-        background_image=(
+        joker_name=(
             joker_name if joker_name is not None else random.choice(RANDOM_JOKERS)
         ),
         face_image=None,
         negative=random.choice([True, False]),
-        edition=random.choice(list(Edition)),
+        joker_edition=random.choice(list(Edition)),
         req=JokerReq(),
         copyable=False,
     )
@@ -262,6 +276,12 @@ def feature_crop(feature: Feature, img: Image.Image) -> tuple[int, int, int, int
         case Planet():
             crop_values = CONSUMABLE_CROP
 
+        case JokersName():
+            crop_values = JOKER_NAME_CROP
+
+        case JokerEdition():
+            crop_values = JOKER_NAME_CROP
+
     return card_crop(w, h, crop_values)
 
 
@@ -272,11 +292,11 @@ def joker_feature_info(
 
     match train_type:
         case JokerFeatureTrainingType.JOKER_TYPE:
-            return joker.background_image, card_crop(w, h, JOKER_TYPE_CROP)
+            return joker.joker_name, card_crop(w, h, JOKER_NAME_CROP)
 
         case JokerFeatureTrainingType.JOKER_EDITION:
             return (
-                NEGATIVE_JOKER_EDITION_ID if joker.negative else joker.edition,
+                NEGATIVE_JOKER_EDITION_ID if joker.negative else joker.joker_edition,
                 card_crop(w, h, JOKER_EDITION_CROP),
             )
 
@@ -377,12 +397,12 @@ def generate_feature_data(
 
 
 def setup(
+    training_amount: int,
     command: str,
     start_path: str,
     render_amount: tuple[int, int],
     render_function: Callable[[int, str], RenderedHand],
 ):
-    training_amount = 5_000
     start_path = os.path.join(start_path, f"{command}_data")
     features = list(FEATURES[command])
     schedule = build_schedule(training_amount, render_amount, render_function, command)
@@ -401,7 +421,7 @@ if __name__ == "__main__":
         "joker_locations",
         "consumable_locations",
         "all_joker_features",
-        "joker_type",
+        "joker_name",
         "joker_edition",
         "all_consumables",
         "tarot",
@@ -422,6 +442,7 @@ if __name__ == "__main__":
             print(val)
         sys.exit()
 
+    training_amount = 5_000
     start_path = os.path.join(ROOT_DIR, "training_data")
     render_amount = (0, 0)
     render_function = None
@@ -429,12 +450,18 @@ if __name__ == "__main__":
     if command == "all_card_features":
         render_amount = (6, 16)
         for feature in ["enhancement", "edition", "rank", "suit", "seal"]:
-            setup(feature, start_path, render_amount, generate_hand)
+            setup(training_amount, feature, start_path, render_amount, generate_hand)
 
     elif command == "all_consumables":
         render_amount = (1, 4)
         for feature in ["tarot", "planet", "spectral"]:
-            setup(feature, start_path, render_amount, generate_consumables)
+            setup(
+                training_amount,
+                feature,
+                start_path,
+                render_amount,
+                generate_consumables,
+            )
 
     else:
         if command in ["enhancement", "edition", "rank", "suit", "seal"]:
@@ -445,4 +472,10 @@ if __name__ == "__main__":
             render_amount = (1, 4)
             render_function = generate_consumables
 
-        setup(command, start_path, render_amount, render_function)
+        elif command in ["joker_name", "joker_edition"]:
+            training_amount = 50_000 if command == "joker_name" else 5_000
+            render_amount = (1, 9)
+            render_function = generate_jokers
+
+        assert render_function is not None
+        setup(training_amount, command, start_path, render_amount, render_function)

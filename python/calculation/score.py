@@ -229,7 +229,7 @@ def calculate_score(
             card_cache = joker_cache[card.card_id] = {}
 
         for joker in on_play_jokers:
-            joker_key = joker.background_image
+            joker_key = joker.joker_name
             score = card_cache.get(joker_key)
 
             if joker_key in NO_CACHE_JOKERS:
@@ -258,7 +258,7 @@ def calculate_score(
 
     for joker in after_hand_jokers:
         j_chips, j_add_mult, j_x_mult = 0, 0, 1
-        if joker.background_image == JokersName.LUCKY_CAT:
+        if joker.joker_name == JokersName.LUCKY_CAT:
             j_x_mult = 0.25 * lucky_triggers * 2
         else:
             j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(
