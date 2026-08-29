@@ -1,4 +1,4 @@
-from core.enums import Enhancement, JokersName, JokerTriggers
+from core.enums import Enhancement, JokerName, JokerTriggers
 from core.models import HandScoring, JokerScoring, JokerUpdate
 
 
@@ -9,7 +9,7 @@ def calculate_joker_update(
 ) -> None:
     for joker in jokers:
         if isinstance(joker, JokerUpdate) and joker.trigger == trigger:
-            if joker.joker_name == JokersName.MIDAS_MASK:
+            if joker.joker_name == JokerName.MIDAS_MASK:
                 for card in hand_scoring.scored_played:
                     if card.is_facecard:
                         card.remove_enhancement()

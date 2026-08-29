@@ -1,4 +1,4 @@
-from core.enums import JokersName
+from core.enums import JokerName
 from core.models import Joker, JokerCopy, JokerRetrigger, JokerScoring
 
 
@@ -45,8 +45,8 @@ def generate_duo_copy_permutations(jokers: list[Joker]) -> list[list[Joker]]:
 
 
 COPY_FUNCTION = {
-    JokersName.BLUEPRINT: generate_blueprint_permutations,
-    JokersName.BRAINSTORM: generate_brainstorm_permutations,
+    JokerName.BLUEPRINT: generate_blueprint_permutations,
+    JokerName.BRAINSTORM: generate_brainstorm_permutations,
 }
 
 

@@ -10,7 +10,7 @@ from calculation.poker_eval import find_best_hand_type
 from calculation.poker_generation import generate_scoring_hand_combinations
 from core.enums import (
     Enhancement,
-    JokersName,
+    JokerName,
     JokerTriggers,
     PokerHand,
 )
@@ -31,7 +31,7 @@ from core.models import (
 JOKER_CACHE: dict[int, dict[int, tuple[int, int, float]]] = {}
 ADD = 0
 MULT = 1
-NO_CACHE_JOKERS = {JokersName.PHOTOGRAPH}
+NO_CACHE_JOKERS = {JokerName.PHOTOGRAPH}
 
 
 def build_joker_plan(jokers: list[Joker]) -> JokerPlan:
@@ -258,7 +258,7 @@ def calculate_score(
 
     for joker in after_hand_jokers:
         j_chips, j_add_mult, j_x_mult = 0, 0, 1
-        if joker.joker_name == JokersName.LUCKY_CAT:
+        if joker.joker_name == JokerName.LUCKY_CAT:
             j_x_mult = 0.25 * lucky_triggers * 2
         else:
             j_chips, j_add_mult, j_x_mult = calculate_joker_scoring(

@@ -10,9 +10,10 @@ from config.settings import (
     JOKER_CANVAS_WIDTH,
     JOKER_CONTENT_WIDTH,
     JOKER_X_PADDING,
+    LAYOUT_MAX_Y_LIFT,
     ROOT_DIR,
 )
-from core.enums import JokerEdition, JokersName
+from core.enums import JokerEdition, JokerFaces, JokerName
 from core.models import CardAnnotation, Joker, RenderedHand
 from core.type_aliases import Feature
 from rendering.backgrounds import render_background
@@ -46,11 +47,11 @@ def crop_joker(location: dict[str, int]) -> Image.Image:
 @lru_cache(maxsize=None)
 def render_joker_cached(
     background_image: int,
-    face_image: int | None,
+    face_image: int,
     edition: int,
 ) -> Image.Image:
     img = crop_joker(JOKER_LOCATIONS[background_image])
-    if face_image is not None:
+    if face_image != JokerFaces.NONE:
         face = crop_joker(JOKER_LOCATIONS[face_image])
         img.paste(face, (0, 0), face)
 
@@ -76,7 +77,7 @@ def render_joker_cached(
 def render_joker(joker: Joker) -> Image.Image:
     return render_joker_cached(
         int(joker.joker_name),
-        int(joker.face_image) if joker.face_image is not None else None,
+        int(joker.face_image),
         int(joker.joker_edition),
     ).copy()
 
@@ -120,8 +121,11 @@ def render_jokers(
             card_gap = joker_gap(joker_count, image_width)
 
         x_pos = JOKER_X_PADDING + calculate_x_pos(card_gap, image_width, joker_count, i)
-        y_pos = round(calculate_card_y_lift(i, joker_count) + y_jitter())
-
+        y_pos = round(
+            LAYOUT_MAX_Y_LIFT
+            - calculate_card_y_lift(i, joker_count)
+            + y_jitter()
+        )
         joker_image = joker_image.rotate(angle, expand=True)
         background.paste(joker_image, (x_pos, y_pos), joker_image)
         attribute = getattr(joker, training_type)
@@ -143,18 +147,20 @@ def render_jokers(
 
 def generate_jokers(amount: int, feature: Feature | None = None):
     training_type = None
-    jokers = [Joker.random() for _ in range(amount)]
+    jokers: list[Joker] = []
     if feature is not None:
-        edit_joker = jokers[0]
-        if isinstance(feature, JokersName):
-            edit_joker.joker_name = feature
+        if isinstance(feature, JokerName):
+            jokers.append(Joker.build(feature))
             training_type = "joker_name"
         elif isinstance(feature, JokerEdition):
-            edit_joker.joker_edition = feature
+            joker = Joker.random()
+            joker.joker_edition = feature
+            jokers.append(joker)
             training_type = "joker_edition"
         else:
             raise TypeError(f"The type: {type(feature)} can not be edited for jokers")
 
+    jokers.extend([Joker.random() for _ in range(amount - 1)])
     return render_jokers(jokers, True, training_type)
 
 
@@ -162,7 +168,7 @@ if __name__ == "__main__":
     import random
 
     joker_amount = random.randint(1, 9)
-    data = generate_jokers(joker_amount, "joker_name")
+    data = generate_jokers(joker_amount, JokerName.TRIBOULET_BACKGROUND)
     data.image.save("tmp.png")
     #
     # joker = Joker.build(JokersName.CANIO_BACKGROUND)

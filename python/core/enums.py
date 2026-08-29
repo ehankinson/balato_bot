@@ -171,7 +171,7 @@ class JokerTriggers(IntEnum):
     BEFORE_PLAYED_CARDS = 3
 
 
-class JokersName(IntEnum):
+class JokerName(IntEnum):
     JOKER = 0
     CHAOS_THE_CLOWN = 1
     JOLLY_JOKER = 2
@@ -261,12 +261,6 @@ class JokersName(IntEnum):
     PERKEO_BACKGROUND = 87
     CERTIFICATE = 88
     BOOTSTRAPS = 89
-    HOLOGRAM_REAL_FACE = 92
-    CANIO_REAL_FACE = 93
-    TRIBOULET_REAL_FACE = 94
-    YORICK_REAL_FACE = 95
-    CHICOT_REAL_FACE = 96
-    PERKEO_REAL_FACE = 97
     EGG = 100
     BURGLAR = 101
     BLACKBOARD = 102
@@ -327,3 +321,13 @@ class JokersName(IntEnum):
     ANCIENT_JOKER = 157
     WALKIE_TALKIE = 158
     CASTLE = 159
+
+
+class JokerFaces(IntEnum):
+    NONE = 0
+    HOLOGRAM_REAL_FACE = 92
+    CANIO_REAL_FACE = 93
+    TRIBOULET_REAL_FACE = 94
+    YORICK_REAL_FACE = 95
+    CHICOT_REAL_FACE = 96
+    PERKEO_REAL_FACE = 97

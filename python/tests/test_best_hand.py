@@ -8,7 +8,7 @@ from _test_util import build_card
 
 from best_hand import build_joker_plan, get_best_scoring_hand
 from config.poker_hands import HAND_STATS
-from core.enums import Edition, Enhancement, JokersName, PokerHand, Rank, Seal, Suit
+from core.enums import Edition, Enhancement, JokerName, PokerHand, Rank, Seal, Suit
 from core.hand_stats import HandStats
 from core.models import (
     BestHand,
@@ -55,7 +55,7 @@ def build_test_game_state(jokers: list[Joker], cards: list[Card]) -> GameState:
 
 
 def build_joker(
-    joker_name: JokersName,
+    joker_name: JokerName,
     *,
     req_rank: Rank,
     req_suit: Suit,
@@ -576,9 +576,9 @@ def test_0011_photograph_hanging_chad_vs_polychrome_lucky_king():
         build_card(Rank.THREE, Suit.DIAMONDS),
     ]
     jokers = [
-        Joker.build(JokersName.PHOTOGRAPH),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.OOPS_ALL_6S),
+        Joker.build(JokerName.PHOTOGRAPH),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.OOPS_ALL_6S),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -630,9 +630,9 @@ def test_0012_glass_queen_vs_lucky_polychrome_king_as_first_card():
         build_card(Rank.JACK, Suit.HEARTS, Enhancement.GOLD),
     ]
     jokers = [
-        Joker.build(JokersName.PHOTOGRAPH),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.SOCK_AND_BUSKIN),
+        Joker.build(JokerName.PHOTOGRAPH),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.SOCK_AND_BUSKIN),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -681,9 +681,9 @@ def test_0013_baron_mime_wants_kings_held_not_played():
         build_card(Rank.THREE, Suit.CLUBS),
     ]
     jokers = [
-        Joker.build(JokersName.BARON),
-        Joker.build(JokersName.MIME),
-        Joker.build(JokersName.RAISED_FIST),
+        Joker.build(JokerName.BARON),
+        Joker.build(JokerName.MIME),
+        Joker.build(JokerName.RAISED_FIST),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -735,9 +735,9 @@ def test_0014_full_house_available_but_held_baron_kings_may_dominate():
         build_card(Rank.FIVE, Suit.DIAMONDS),
     ]
     jokers = [
-        Joker.build(JokersName.BARON),
-        Joker.build(JokersName.MIME),
-        Joker.build(JokersName.THE_TRIO),
+        Joker.build(JokerName.BARON),
+        Joker.build(JokerName.MIME),
+        Joker.build(JokerName.THE_TRIO),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -788,9 +788,9 @@ def test_0015_mime_steel_red_seal_ace_vs_baron_king():
         build_card(Rank.TWO, Suit.DIAMONDS),
     ]
     jokers = [
-        Joker.build(JokersName.MIME),
-        Joker.build(JokersName.BARON),
-        Joker.build(JokersName.RAISED_FIST),
+        Joker.build(JokerName.MIME),
+        Joker.build(JokerName.BARON),
+        Joker.build(JokerName.RAISED_FIST),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -843,11 +843,11 @@ def test_0016_pareidolia_photograph_midas_vampire():
         build_card(Rank.TEN, Suit.CLUBS),
     ]
     jokers = [
-        Joker.build(JokersName.PAREIDOLIA),
-        Joker.build(JokersName.PHOTOGRAPH),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.MIDAS_MASK),
-        Joker.build(JokersName.VAMPIRE),
+        Joker.build(JokerName.PAREIDOLIA),
+        Joker.build(JokerName.PHOTOGRAPH),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.MIDAS_MASK),
+        Joker.build(JokerName.VAMPIRE),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -897,9 +897,9 @@ def test_0017_wild_polychrome_jack_creates_flush_and_retrigger_bait():
         build_card(Rank.TWO, Suit.CLUBS),
     ]
     jokers = [
-        Joker.build(JokersName.BLOODSTONE),
-        Joker.build(JokersName.PHOTOGRAPH),
-        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokerName.BLOODSTONE),
+        Joker.build(JokerName.PHOTOGRAPH),
+        Joker.build(JokerName.HANGING_CHAD),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -954,10 +954,10 @@ def test_0018_bloodstone_ev_vs_photograph_order():
         build_card(Rank.TWO, Suit.CLUBS),
     ]
     jokers = [
-        Joker.build(JokersName.BLOODSTONE),
-        Joker.build(JokersName.PHOTOGRAPH),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.SOCK_AND_BUSKIN),
+        Joker.build(JokerName.BLOODSTONE),
+        Joker.build(JokerName.PHOTOGRAPH),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.SOCK_AND_BUSKIN),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1011,10 +1011,10 @@ def test_0019_oops_lucky_cat_multiple_lucky_candidates():
         build_card(Rank.TWO, Suit.SPADES),
     ]
     jokers = [
-        Joker.build(JokersName.LUCKY_CAT),
-        Joker.build(JokersName.OOPS_ALL_6S),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.PHOTOGRAPH),
+        Joker.build(JokerName.LUCKY_CAT),
+        Joker.build(JokerName.OOPS_ALL_6S),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.PHOTOGRAPH),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1065,9 +1065,9 @@ def test_0020_splash_makes_junk_enhanced_cards_score():
         build_card(Rank.TWO, Suit.SPADES, Enhancement.BONUS),
     ]
     jokers = [
-        Joker.build(JokersName.SPLASH),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.OOPS_ALL_6S),
+        Joker.build(JokerName.SPLASH),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.OOPS_ALL_6S),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1116,9 +1116,9 @@ def test_0021_splash_photograph_first_card_scores_outside_main_pair():
         build_card(Rank.JACK, Suit.CLUBS, Enhancement.GOLD),
     ]
     jokers = [
-        Joker.build(JokersName.SPLASH),
-        Joker.build(JokersName.PHOTOGRAPH),
-        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokerName.SPLASH),
+        Joker.build(JokerName.PHOTOGRAPH),
+        Joker.build(JokerName.HANGING_CHAD),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1169,9 +1169,9 @@ def test_0022_sock_and_buskin_red_seal_face_card_pile():
         build_card(Rank.TWO, Suit.DIAMONDS),
     ]
     jokers = [
-        Joker.build(JokersName.SOCK_AND_BUSKIN),
-        Joker.build(JokersName.PHOTOGRAPH),
-        Joker.build(JokersName.HANGING_CHAD),
+        Joker.build(JokerName.SOCK_AND_BUSKIN),
+        Joker.build(JokerName.PHOTOGRAPH),
+        Joker.build(JokerName.HANGING_CHAD),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1225,9 +1225,9 @@ def test_0023_hack_retriggers_low_enhanced_cards():
         build_card(Rank.ACE, Suit.CLUBS),
     ]
     jokers = [
-        Joker.build(JokersName.HACK),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.OOPS_ALL_6S),
+        Joker.build(JokerName.HACK),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.OOPS_ALL_6S),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1283,10 +1283,10 @@ def test_0024_hack_fibonacci_lucky_ev():
         build_card(Rank.QUEEN, Suit.CLUBS),
     ]
     jokers = [
-        Joker.build(JokersName.HACK),
-        Joker.build(JokersName.FIBONACCI),
-        Joker.build(JokersName.LUCKY_CAT),
-        Joker.build(JokersName.OOPS_ALL_6S),
+        Joker.build(JokerName.HACK),
+        Joker.build(JokerName.FIBONACCI),
+        Joker.build(JokerName.LUCKY_CAT),
+        Joker.build(JokerName.OOPS_ALL_6S),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1340,9 +1340,9 @@ def test_0025_idol_picks_one_exact_red_seal_card():
         build_card(Rank.TWO, Suit.SPADES),
     ]
     jokers = [
-        build_joker(JokersName.THE_IDOL, req_rank=Rank.QUEEN, req_suit=Suit.HEARTS),
-        Joker.build(JokersName.SOCK_AND_BUSKIN),
-        Joker.build(JokersName.HANGING_CHAD),
+        build_joker(JokerName.THE_IDOL, req_rank=Rank.QUEEN, req_suit=Suit.HEARTS),
+        Joker.build(JokerName.SOCK_AND_BUSKIN),
+        Joker.build(JokerName.HANGING_CHAD),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1396,9 +1396,9 @@ def test_0026_reserved_parking_held_face_cards():
         build_card(Rank.TWO, Suit.HEARTS),
     ]
     jokers = [
-        Joker.build(JokersName.RESERVED_PARKING),
-        Joker.build(JokersName.MIME),
-        Joker.build(JokersName.THE_TRIO),
+        Joker.build(JokerName.RESERVED_PARKING),
+        Joker.build(JokerName.MIME),
+        Joker.build(JokerName.THE_TRIO),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1450,9 +1450,9 @@ def test_0027_raised_fist_lowest_held_card_and_steel_kings():
         build_card(Rank.ACE, Suit.DIAMONDS),
     ]
     jokers = [
-        Joker.build(JokersName.RAISED_FIST),
-        Joker.build(JokersName.BARON),
-        Joker.build(JokersName.MIME),
+        Joker.build(JokerName.RAISED_FIST),
+        Joker.build(JokerName.BARON),
+        Joker.build(JokerName.MIME),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1503,10 +1503,10 @@ def test_0028_business_card_face_card_economy_with_hanging_chad():
         build_card(Rank.ACE, Suit.HEARTS, Enhancement.STEEL),
     ]
     jokers = [
-        Joker.build(JokersName.BUSINESS_CARD),
-        Joker.build(JokersName.SOCK_AND_BUSKIN),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.PHOTOGRAPH),
+        Joker.build(JokerName.BUSINESS_CARD),
+        Joker.build(JokerName.SOCK_AND_BUSKIN),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.PHOTOGRAPH),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1555,9 +1555,9 @@ def test_0029_ancient_joker_suit_target_with_red_seal_glass_card():
         build_card(Rank.TWO, Suit.CLUBS),
     ]
     jokers = [
-        build_joker(JokersName.ANCIENT_JOKER, req_suit=Suit.SPADES),
-        Joker.build(JokersName.PHOTOGRAPH),
-        Joker.build(JokersName.HANGING_CHAD),
+        build_joker(JokerName.ANCIENT_JOKER, req_suit=Suit.SPADES),
+        Joker.build(JokerName.PHOTOGRAPH),
+        Joker.build(JokerName.HANGING_CHAD),
     ]
 
     game_state = build_test_game_state(jokers, cards)
@@ -1608,11 +1608,11 @@ def test_0030_full_scoring_chaos_splash_lucky_glass_held_steel():
         build_card(Rank.TWO, Suit.SPADES, Enhancement.LUCKY),
     ]
     jokers = [
-        Joker.build(JokersName.SPLASH),
-        Joker.build(JokersName.HANGING_CHAD),
-        Joker.build(JokersName.MIME),
-        Joker.build(JokersName.BARON),
-        Joker.build(JokersName.OOPS_ALL_6S),
+        Joker.build(JokerName.SPLASH),
+        Joker.build(JokerName.HANGING_CHAD),
+        Joker.build(JokerName.MIME),
+        Joker.build(JokerName.BARON),
+        Joker.build(JokerName.OOPS_ALL_6S),
     ]
 
     game_state = build_test_game_state(jokers, cards)

@@ -18,13 +18,11 @@ from config.settings import (
     SEAL_CROP,
     SUIT_CROP,
 )
-from core.class_indices import NEGATIVE_JOKER_EDITION_ID
 from core.enums import (
     Edition,
     Enhancement,
     JokerEdition,
-    JokerFeatureTrainingType,
-    JokersName,
+    JokerName,
     Planet,
     Rank,
     Seal,
@@ -32,7 +30,7 @@ from core.enums import (
     Suit,
     Tarot,
 )
-from core.models import RANDOM_JOKERS, RenderedHand
+from core.models import RenderedHand
 from core.type_aliases import Feature
 from rendering.consumable import (
     generate_consumables,
@@ -56,13 +54,8 @@ FEATURES: dict[str, type[Feature]] = {
     "tarot": Tarot,
     "planet": Planet,
     "spectral": Spectral,
-    "joker_name": JokersName,
+    "joker_name": JokerName,
     "joker_edition": JokerEdition,
-}
-
-JOKER_FEATURE_ENUMS = {
-    JokerFeatureTrainingType.JOKER_TYPE: RANDOM_JOKERS,
-    JokerFeatureTrainingType.JOKER_EDITION: list(Edition) + [NEGATIVE_JOKER_EDITION_ID],
 }
 
 
@@ -138,7 +131,7 @@ def feature_crop(feature: Feature, img: Image.Image) -> tuple[int, int, int, int
         case Planet():
             crop_values = CONSUMABLE_CROP
 
-        case JokersName():
+        case JokerName():
             crop_values = JOKER_NAME_CROP
 
         case JokerEdition():
@@ -212,7 +205,7 @@ def generate_feature_data(
 ):
     build_folders(start_path, features)
     # worker_amount = max(1, CPU_COUNT - 1)
-    worker_amount = 4
+    worker_amount = 1
     chunks = split_work(amount, worker_amount)
     progress_lock = threading.Lock()
 

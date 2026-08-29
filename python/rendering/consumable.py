@@ -124,20 +124,20 @@ def render_consumables(
 def generate_consumables(amount_of_tarots: int, feature: Feature):
     consumables: list[Consumable] = []
     if isinstance(feature, Tarot):
-        consumables.append(random.choice(list(Tarot)))
+        consumables.append(feature)
         consumable_type = Tarot
     elif isinstance(feature, Spectral):
-        consumables.append(random.choice(list(Spectral)))
+        consumables.append(feature)
         consumable_type = Spectral
     elif isinstance(feature, Planet):
-        consumables.append(random.choice(list(Planet)))
+        consumables.append(feature)
         consumable_type = Planet
     else:
         raise TypeError(f"The type: {type(feature)} can not be edited for jokers")
 
-    consumables = [
-        random.choice(list(consumable_type)) for _ in range(amount_of_tarots - 1)
-    ]
+    consumables.extend(
+        [random.choice(list(consumable_type)) for _ in range(amount_of_tarots - 1)]
+    )
     return render_consumables(consumables, True)
 
 

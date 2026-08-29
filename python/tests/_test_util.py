@@ -2,7 +2,7 @@ from typing import Iterable
 
 from calculation.joker_retrigger import calculate_joker_retrigger
 from calculation.joker_scoring import calculate_joker_scoring
-from core.enums import Edition, Enhancement, JokersName, Rank, Seal, Suit
+from core.enums import Edition, Enhancement, JokerName, Rank, Seal, Suit
 from core.models import (
     Card,
     Joker,
@@ -23,14 +23,14 @@ def build_card(
     return Card(rank, suit, enhancement, seal, edition)
 
 
-def build_jokers(joker_names: Iterable[JokersName]) -> list[Joker]:
+def build_jokers(joker_names: Iterable[JokerName]) -> list[Joker]:
     return [Joker.build(joker_name) for joker_name in joker_names]
 
 
-def buildable_jokers_of_type(joker_type: type[Joker]) -> set[JokersName]:
+def buildable_jokers_of_type(joker_type: type[Joker]) -> set[JokerName]:
     buildable_jokers = set()
 
-    for joker_name in JokersName:
+    for joker_name in JokerName:
         try:
             joker = Joker.build(joker_name)
         except Exception:
@@ -43,7 +43,7 @@ def buildable_jokers_of_type(joker_type: type[Joker]) -> set[JokersName]:
 
 
 def scoring_joker(
-    joker_name: JokersName,
+    joker_name: JokerName,
     *,
     req_rank: Rank,
     req_suit: Suit,
@@ -55,7 +55,7 @@ def scoring_joker(
 
 
 def score_joker(
-    joker_name: JokersName,
+    joker_name: JokerName,
     *,
     card: Card | None = None,
     scoring_played: list[Card] | None = None,

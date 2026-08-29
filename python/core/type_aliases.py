@@ -2,7 +2,7 @@ from core.enums import (
     Edition,
     Enhancement,
     JokerEdition,
-    JokersName,
+    JokerName,
     Planet,
     Rank,
     Seal,
@@ -20,7 +20,7 @@ type Feature = (
     | Tarot
     | Planet
     | Spectral
-    | JokersName
+    | JokerName
     | JokerEdition
 )
 
@@ -33,6 +33,6 @@ FEATURE_TYPES = (
     Tarot,
     Planet,
     Spectral,
-    JokersName,
+    JokerName,
     JokerEdition,
 )

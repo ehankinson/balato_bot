@@ -1,25 +1,22 @@
 import random
 from dataclasses import dataclass, field
+from typing import override
 
 from PIL import Image
-from typing_extensions import override
 
 from config.settings import JOKER_CONFIG
-from core.class_indices import JOKER_TYPE_CLASSES
 from core.enums import (
     Edition,
     Enhancement,
     HandAction,
     JokerEdition,
-    JokersName,
+    JokerFaces,
+    JokerName,
     JokerTriggers,
-    Planet,
     PokerHand,
     Rank,
     Seal,
-    Spectral,
     Suit,
-    Tarot,
 )
 from core.hand_stats import HandStats
 from core.scoring import (
@@ -36,15 +33,13 @@ CONFIG = load_json(JOKER_CONFIG)
 CARD_STRINGS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 
 BACKGROUND_JOKERS = {
-    JokersName.CANIO_BACKGROUND,
-    JokersName.CHICOT_BACKGROUND,
-    JokersName.PERKEO_BACKGROUND,
-    JokersName.YORICK_BACKGROUND,
-    JokersName.HOLOGRAM_BACKGROUND,
-    JokersName.TRIBOULET_BACKGROUND,
+    JokerName.CANIO_BACKGROUND,
+    JokerName.CHICOT_BACKGROUND,
+    JokerName.PERKEO_BACKGROUND,
+    JokerName.YORICK_BACKGROUND,
+    JokerName.HOLOGRAM_BACKGROUND,
+    JokerName.TRIBOULET_BACKGROUND,
 }
-
-RANDOM_JOKERS = list(JOKER_TYPE_CLASSES)
 
 
 @dataclass(slots=True)
@@ -353,12 +348,12 @@ class JokerReq:
 
 @dataclass(slots=True)
 class Joker:
-    joker_name: JokersName
-    face_image: JokersName | None
+    joker_name: JokerName
     joker_edition: JokerEdition
     req: JokerReq
     copyable: bool
     joker_id: int = field(init=False, default=0)
+    face_image: JokerFaces = field(init=False, default=JokerFaces.NONE)
 
     def _build_id(self):
         val = self.joker_name | 0b11111111
@@ -367,10 +362,10 @@ class Joker:
 
     def _add_face(self):
         if self.joker_name in BACKGROUND_JOKERS:
-            if self.joker_name == JokersName.HOLOGRAM_BACKGROUND:
-                self.face_image = JokersName.HOLOGRAM_REAL_FACE
+            if self.joker_name == JokerName.HOLOGRAM_BACKGROUND:
+                self.face_image = JokerFaces.HOLOGRAM_REAL_FACE
             else:
-                self.face_image = JokersName(self.joker_name.value + 10)
+                self.face_image = JokerFaces(self.joker_name + 10)
 
     def __post_init__(self):
         self._add_face()
@@ -390,26 +385,17 @@ class Joker:
 
     @classmethod
     def random(cls):
-        good_values = [val for val in list(JokersName) if "REAL_FACE" not in val.name]
-        joker = random.choice(good_values)
-        joker_face = None
-        str_name = joker.name.lower()
-        if "BACKGROUND" in str_name:
-            if "HOLOGRAM" in str_name:
-                joker_face = JokersName.HOLOGRAM_REAL_FACE
-
-            joker_face = JokersName(joker.value + 10)
+        random_joker = random.choice(list(JokerName))
 
         return Joker(
-            joker_name=joker,
-            face_image=joker_face,
+            joker_name=random_joker,
             joker_edition=random.choice(list(JokerEdition)),
             req=JokerReq(),
             copyable=False,
         )
 
     @classmethod
-    def build(cls, joker_name: JokersName):
+    def build(cls, joker_name: JokerName):
         joker_key = (
             joker_name.name.lower()
             if "BACKGROUND" not in joker_name.name
@@ -426,7 +412,7 @@ class Joker:
                 update = JokerScoringUpdate(
                     count=update_data.get("count", ""),
                     effect=update_data.get("effect", ""),
-                    trigger=JokerTriggers(update_data.get("trigger")),
+                    trigger=JokerTriggers(update_data.get("trigger", 0)),
                     condition=update_data.get("trigger", {}),
                     each=update_data.get("each", -1),
                     value=update_data.get("value", -1),
@@ -435,11 +421,10 @@ class Joker:
 
             return JokerScoring(
                 joker_name=joker_name,
-                face_image=None,
-                joker_edition=Edition.NONE,
+                joker_edition=JokerEdition.NONE,
                 req=JokerReq(),
                 copyable=joker_data.get("copyable", False),
-                trigger=JokerTriggers(scoring_data.get("trigger")),
+                trigger=JokerTriggers(scoring_data.get("trigger", 0)),
                 prob=scoring_data.get("prob", 1),
                 chips=scoring_data.get("chips"),
                 add_mult=scoring_data.get("add_mult"),
@@ -453,11 +438,10 @@ class Joker:
 
             return JokerRetrigger(
                 joker_name=joker_name,
-                face_image=None,
-                joker_edition=Edition.NONE,
+                joker_edition=JokerEdition.NONE,
                 req=JokerReq(),
                 copyable=joker_data.get("copyable", False),
-                trigger=JokerTriggers(retrigger_data.get("trigger")),
+                trigger=JokerTriggers(retrigger_data.get("trigger", 0)),
                 times=retrigger_data.get("times"),
                 condition=retrigger_data.get("condition", ""),
             )
@@ -467,8 +451,7 @@ class Joker:
 
             return JokerCopy(
                 joker_name=joker_name,
-                face_image=None,
-                joker_edition=Edition.NONE,
+                joker_edition=JokerEdition.NONE,
                 req=JokerReq(),
                 copyable=joker_data.get("copyable", False),
                 position=copy_data.get("position"),
@@ -479,8 +462,7 @@ class Joker:
 
             return JokerGameModifier(
                 joker_name=joker_name,
-                face_image=None,
-                joker_edition=Edition.NONE,
+                joker_edition=JokerEdition.NONE,
                 req=JokerReq(),
                 copyable=joker_data.get("copyable", False),
                 discards=modifier_data.get("discards", 0),
@@ -511,11 +493,10 @@ class Joker:
 
             return JokerUpdate(
                 joker_name=joker_name,
-                face_image=None,
-                joker_edition=Edition.NONE,
+                joker_edition=JokerEdition.NONE,
                 req=JokerReq(),
                 copyable=joker_data["copyable"],
-                trigger=JokerTriggers(modifier_data["trigger"]),
+                trigger=JokerTriggers(modifier_data.get("trigger", 0)),
                 rank=rank,
                 enhacnement=Enhancement(modifier_data.get("enhancement", None)),
             )
@@ -525,11 +506,10 @@ class Joker:
 
             return JokerEcon(
                 joker_name=joker_name,
-                face_image=None,
-                joker_edition=Edition.NONE,
+                joker_edition=JokerEdition.NONE,
                 req=JokerReq(),
                 copyable=joker_data["copyable"],
-                trigger=JokerTriggers(modifier_data.get("trigger")),
+                trigger=JokerTriggers(modifier_data.get("trigger", 0)),
                 money=modifier_data.get("money"),
                 condition=modifier_data.get("condition", None),
             )
@@ -702,12 +682,12 @@ class ShopState:
     rerolls_used: int = 0
     chaos_free_reroll_used: bool = False
 
-    def has_joker(self, jokers: list[Joker], joker_name: JokersName) -> bool:
+    def has_joker(self, jokers: list[Joker], joker_name: JokerName) -> bool:
         return any(joker.joker_name == joker_name for joker in jokers)
 
     def has_free_chaos_reroll(self, jokers: list[Joker]) -> bool:
         return (
-            self.has_joker(jokers, JokersName.CHAOS_THE_CLOWN)
+            self.has_joker(jokers, JokerName.CHAOS_THE_CLOWN)
             and not self.chaos_free_reroll_used
         )
 
@@ -726,7 +706,7 @@ class ShopState:
         return cost
 
     def item_cost(self, jokers: list[Joker], item_type: str, base_cost: int) -> int:
-        if self.has_joker(jokers, JokersName.ASTRONOMER) and item_type in {
+        if self.has_joker(jokers, JokerName.ASTRONOMER) and item_type in {
             "planet_card",
             "celestial_pack",
         }:
@@ -735,7 +715,7 @@ class ShopState:
         return base_cost
 
     def minimum_money(self, jokers: list[Joker]) -> int:
-        if self.has_joker(jokers, JokersName.CREDIT_CARD):
+        if self.has_joker(jokers, JokerName.CREDIT_CARD):
             return -20
 
         return 0
