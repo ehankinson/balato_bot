@@ -14,6 +14,7 @@ from config.settings import (
 )
 from core.enums import Consumables, Planet, Spectral, Tarot
 from core.models import CardAnnotation, RenderedHand
+from core.type_aliases import Feature
 from rendering.backgrounds import render_background
 from rendering.card import ENHANCEMENT_LOCATIONS, ENHANCEMENTS
 from rendering.layout import calculate_angle, calculate_box_dimensions, y_jitter
@@ -28,6 +29,7 @@ CONSUMABLES = Image.open(os.path.join(ROOT_DIR, "game_images", "Tarots.png")).co
 CONSUMABLES_LOCATIONS: dict[int, dict[int, dict[str, int]]] = load_yaml(
     os.path.join(ROOT_DIR, "yaml", "consumable_locations.yaml")
 )
+
 
 def crop_consumable(
     location: dict[int, dict[int, dict[str, int]]],
@@ -69,7 +71,7 @@ def render_consumable(consumable: Consumable) -> Image.Image:
 
 
 def render_consumables(
-    consumables: list[Consumable] | list[Tarot] | list[Planet] | list[Spectral],
+    consumables: list[Consumable],
     training: bool = False,
 ) -> RenderedHand:
     """Render consumables on a background and annotate each complete card."""
@@ -89,9 +91,7 @@ def render_consumables(
         x_step = card_width + x_gap
     else:
         x_start = 0
-        x_step = (CONSUMABLE_CANVAS_WIDTH - card_width) / max(
-            1, len(consumables) - 1
-        )
+        x_step = (CONSUMABLE_CANVAS_WIDTH - card_width) / max(1, len(consumables) - 1)
 
     card_amount = len(consumables)
 
@@ -121,9 +121,23 @@ def render_consumables(
     return RenderedHand(image=background, annotations=annotations)
 
 
-def generate_consumables(amount_of_tarots: int, training_type: str):
-    consumable_type = Tarot if training_type == "tarot" else Planet if training_type == "planet" else Spectral
-    consumables = [random.choice(list(consumable_type)) for _ in range(amount_of_tarots)]
+def generate_consumables(amount_of_tarots: int, feature: Feature):
+    consumables: list[Consumable] = []
+    if isinstance(feature, Tarot):
+        consumables.append(random.choice(list(Tarot)))
+        consumable_type = Tarot
+    elif isinstance(feature, Spectral):
+        consumables.append(random.choice(list(Spectral)))
+        consumable_type = Spectral
+    elif isinstance(feature, Planet):
+        consumables.append(random.choice(list(Planet)))
+        consumable_type = Planet
+    else:
+        raise TypeError(f"The type: {type(feature)} can not be edited for jokers")
+
+    consumables = [
+        random.choice(list(consumable_type)) for _ in range(amount_of_tarots - 1)
+    ]
     return render_consumables(consumables, True)
 
 
@@ -150,5 +164,5 @@ if __name__ == "__main__":
         w, h = consu.size
         crop = consu.crop(card_crop(w, h, CONSUMABLE_CROP))
         crop.save(f"{i}.png")
-        
+
     data.image.save("img.png")

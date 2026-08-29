@@ -46,7 +46,7 @@
     "request": "launch",
     "program": "$ZED_WORKTREE_ROOT/python/data_generator.py",
     "cwd": "$ZED_WORKTREE_ROOT/python",
-    "args": ["rank"],
+    "args": ["joker_edition"],
     "env": {
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
     }

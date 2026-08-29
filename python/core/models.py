@@ -28,6 +28,7 @@ from core.scoring import (
     SEAL_SCORING,
     get_initial_card_chips,
 )
+from core.type_aliases import Feature
 from utils.files import load_json
 
 CONFIG = load_json(JOKER_CONFIG)
@@ -745,7 +746,7 @@ class ShopState:
 
 @dataclass
 class CardAnnotation:
-    card: Rank | Suit | Enhancement | Edition | Seal | Joker | Tarot | Planet | Spectral
+    card: Feature
     box: list[float]
 
 
