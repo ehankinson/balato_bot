@@ -1,11 +1,11 @@
 from core.models import GameState
 
 
-SCORE_PROGRESS_WEIGHT = 0.25
-HAND_PLAY_COST = 0.2
-WIN_REWARD = 10.0
-LOSS_REWARD = -20.0
-UNUSED_HAND_REWARD = 0.5
+SCORE_PROGRESS_WEIGHT = 0.45
+HAND_PLAY_COST = 0.25
+WIN_REWARD = 15.0
+LOSS_REWARD = -30.0
+UNUSED_HAND_REWARD = 1.5
 
 
 def calculate_score_progress_reward(

@@ -113,7 +113,7 @@ class TrainingConfig:
         )
 
         config = cls(
-            iterations=int(os.getenv("BALATRO_ITERATIONS", "2000")),
+            iterations=int(os.getenv("BALATRO_ITERATIONS", "20000")),
             episodes_per_update=int(os.getenv("BALATRO_EPISODES_PER_UPDATE", "1024")),
             ppo_epochs=int(os.getenv("BALATRO_PPO_EPOCHS", "4")),
             minibatch_size=int(os.getenv("BALATRO_MINIBATCH_SIZE", "512")),
