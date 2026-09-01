@@ -1,0 +1,9 @@
+path: training_data/location_data
+
+train: images/train
+val: images/val
+
+names:
+  0: card
+  1: joker
+  2: consumable

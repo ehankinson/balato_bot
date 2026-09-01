@@ -73,15 +73,20 @@ def render_consumable(consumable: Consumable) -> Image.Image:
 def render_consumables(
     consumables: list[Consumable],
     training: bool = False,
+    background: Image.Image | None = None,
 ) -> RenderedHand:
     """Render consumables on a background and annotate each complete card."""
-    background = render_background(
-        CONSUMABLE_CANVAS_WIDTH, CONSUMABLE_CANVAS_HEIGHT, training
+    canvas = (
+        background
+        if background is not None
+        else render_background(
+            CONSUMABLE_CANVAS_WIDTH, CONSUMABLE_CANVAS_HEIGHT, training
+        )
     )
     annotations: list[CardAnnotation] = []
 
     if not consumables:
-        return RenderedHand(image=background, annotations=annotations)
+        return RenderedHand(image=canvas, annotations=annotations)
 
     card_width, card_height = render_consumable(consumables[0]).size
     remaining_width = CONSUMABLE_CANVAS_WIDTH - card_width * len(consumables)
@@ -104,7 +109,7 @@ def render_consumables(
 
         consumable_image = consumable_image.rotate(angle, expand=True)
 
-        background.paste(consumable_image, (x_pos, y_pos), consumable_image)
+        canvas.paste(consumable_image, (x_pos, y_pos), consumable_image)
         annotations.append(
             CardAnnotation(
                 card=consumable,
@@ -118,7 +123,7 @@ def render_consumables(
             )
         )
 
-    return RenderedHand(image=background, annotations=annotations)
+    return RenderedHand(image=canvas, annotations=annotations)
 
 
 def generate_consumables(amount_of_tarots: int, feature: Feature):

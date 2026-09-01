@@ -4,7 +4,7 @@ import threading
 from config.settings import BACKGROUND_PALETTES, BACKGROUND_POOL_SIZE
 from PIL import Image, ImageDraw, ImageFilter
 
-BACKGROUND_POOL: list[Image.Image] | None = None
+BACKGROUND_POOLS: dict[tuple[int, int], list[Image.Image]] = {}
 BACKGROUND_POOL_LOCK = threading.Lock()
 
 
@@ -83,16 +83,16 @@ def render_background_texture(width: int, height: int) -> Image.Image:
 
 
 def get_background_pool(width: int, height: int, size: int) -> list[Image.Image]:
-    global BACKGROUND_POOL
+    pool_key = (width, height)
 
-    if BACKGROUND_POOL is None:
+    if pool_key not in BACKGROUND_POOLS:
         with BACKGROUND_POOL_LOCK:
-            if BACKGROUND_POOL is None:
-                BACKGROUND_POOL = [
+            if pool_key not in BACKGROUND_POOLS:
+                BACKGROUND_POOLS[pool_key] = [
                     render_background_texture(width, height) for _ in range(size)
                 ]
 
-    return BACKGROUND_POOL
+    return BACKGROUND_POOLS[pool_key]
 
 
 def render_background(width: int, height: int, training: bool = False) -> Image.Image:

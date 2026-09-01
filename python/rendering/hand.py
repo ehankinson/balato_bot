@@ -35,9 +35,16 @@ def calculate_card_gap(card_amount: int, card_width: int) -> float:
 
 
 def render_hand(
-    hand: Hand, training: bool = False, training_type: str | None = None
+    hand: Hand,
+    training: bool = False,
+    training_type: str | None = None,
+    background=None,
 ) -> RenderedHand:
-    img = render_background(HAND_WIDTH, HAND_HEIGHT, training)
+    img = (
+        background
+        if background is not None
+        else render_background(HAND_WIDTH, HAND_HEIGHT, training)
+    )
 
     card_amount = len(hand.cards)
     card_gap: float = 0.0

@@ -103,9 +103,16 @@ def calculate_x_pos(
 
 
 def render_jokers(
-    jokers: list[Joker], training: bool = False, training_type: str | None = None
+    jokers: list[Joker],
+    training: bool = False,
+    training_type: str | None = None,
+    background: Image.Image | None = None,
 ):
-    background = render_background(JOKER_CANVAS_WIDTH, JOKER_CANVAS_HEIGHT, training)
+    canvas = (
+        background
+        if background is not None
+        else render_background(JOKER_CANVAS_WIDTH, JOKER_CANVAS_HEIGHT, training)
+    )
     card_gap: float = 0.0
     joker_count = len(jokers)
     annotations: list[CardAnnotation] = []
@@ -127,7 +134,7 @@ def render_jokers(
             + y_jitter()
         )
         joker_image = joker_image.rotate(angle, expand=True)
-        background.paste(joker_image, (x_pos, y_pos), joker_image)
+        canvas.paste(joker_image, (x_pos, y_pos), joker_image)
         attribute = getattr(joker, training_type)
         annotations.append(
             CardAnnotation(
@@ -142,7 +149,7 @@ def render_jokers(
             )
         )
 
-    return RenderedHand(image=background, annotations=annotations)
+    return RenderedHand(image=canvas, annotations=annotations)
 
 
 def generate_jokers(amount: int, feature: Feature | None = None):

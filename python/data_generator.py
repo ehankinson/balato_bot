@@ -9,9 +9,15 @@ from PIL import Image
 from tqdm import tqdm
 
 from config.settings import (
+    CONSUMABLE_CANVAS_HEIGHT,
+    CONSUMABLE_CANVAS_WIDTH,
     CONSUMABLE_CROP,
     EDITION_CROP,
     ENHANCEMENT_CROP,
+    HAND_HEIGHT,
+    HAND_WIDTH,
+    JOKER_CANVAS_HEIGHT,
+    JOKER_CANVAS_WIDTH,
     JOKER_NAME_CROP,
     RANK_CROP,
     ROOT_DIR,
@@ -30,19 +36,60 @@ from core.enums import (
     Suit,
     Tarot,
 )
-from core.models import RenderedHand
+from core.models import Card, CardAnnotation, Hand, Joker, RenderedHand
 from core.type_aliases import Feature
+from rendering.backgrounds import render_background
 from rendering.consumable import (
     generate_consumables,
+    render_consumables,
 )
-from rendering.hand import generate_hand
-from rendering.joker import generate_jokers
+from rendering.hand import generate_hand, render_hand
+from rendering.joker import generate_jokers, render_jokers
 from utils.files import build_folder, rebuild_folder
 from utils.images import card_crop, yolo_box_to_crop
 
 CUTOFF = 0.9  # split between training and val
-CPU_COUNT = int(os.cpu_count() if os.cpu_count() is not None else 1)
+WORKER_AMOUNT = 8
 CropBox = tuple[int | float, int | float, int | float, int | float]
+
+
+def build_random_consumables(amount: int) -> list[Feature]:
+    feature_type = random.choice([Tarot, Planet, Spectral])
+    return [random.choice(list(feature_type)) for _ in range(amount)]
+
+
+LOCATION_RENDERERS: dict[
+    str,
+    tuple[
+        int,
+        tuple[int, int],
+        tuple[int, int],
+        Callable[[int], object],
+        Callable[..., RenderedHand],
+    ],
+] = {
+    "card": (
+        0,
+        (6, 16),
+        (HAND_WIDTH, HAND_HEIGHT),
+        lambda amount: Hand([Card.random() for _ in range(amount)]),
+        render_hand,
+    ),
+    "joker": (
+        1,
+        (1, 9),
+        (JOKER_CANVAS_WIDTH, JOKER_CANVAS_HEIGHT),
+        lambda amount: [Joker.random() for _ in range(amount)],
+        render_jokers,
+    ),
+    "consumable": (
+        2,
+        (1, 4),
+        (CONSUMABLE_CANVAS_WIDTH, CONSUMABLE_CANVAS_HEIGHT),
+        build_random_consumables,
+        render_consumables,
+    ),
+}
 
 
 FEATURES: dict[str, type[Feature]] = {
@@ -58,12 +105,52 @@ FEATURES: dict[str, type[Feature]] = {
     "joker_edition": JokerEdition,
 }
 
+FEATURE_GROUPS: dict[
+    str, tuple[tuple[int, int], Callable[[int, Feature], RenderedHand], list[str]]
+] = {
+    "card_features": (
+        (6, 16),
+        generate_hand,
+        ["enhancement", "edition", "rank", "suit", "seal"],
+    ),
+    "consumables": ((1, 4), generate_consumables, ["tarot", "planet", "spectral"]),
+    "jokers": ((1, 9), generate_jokers, ["joker_name", "joker_edition"]),
+}
 
-def split_work(total_amount: int, worker_amount: int) -> list[range]:
-    chunk_size, extra = divmod(total_amount, worker_amount)
+FEATURE_COMMANDS: dict[
+    str, tuple[tuple[int, int], Callable[[int, Feature], RenderedHand], list[str]]
+] = {
+    feature: (render_amount, render_function, [feature])
+    for render_amount, render_function, group_features in FEATURE_GROUPS.values()
+    for feature in group_features
+} | {
+    f"all_{group}": (render_amount, render_function, group_features)
+    for group, (
+        render_amount,
+        render_function,
+        group_features,
+    ) in FEATURE_GROUPS.items()
+}
+
+FEATURE_CROPS = {
+    Rank: RANK_CROP,
+    Suit: SUIT_CROP,
+    Enhancement: ENHANCEMENT_CROP,
+    Seal: SEAL_CROP,
+    Edition: EDITION_CROP,
+    Tarot: CONSUMABLE_CROP,
+    Spectral: CONSUMABLE_CROP,
+    Planet: CONSUMABLE_CROP,
+    JokerName: JOKER_NAME_CROP,
+    JokerEdition: JOKER_NAME_CROP,
+}
+
+
+def split_work(total_amount: int) -> list[range]:
+    chunk_size, extra = divmod(total_amount, WORKER_AMOUNT)
     chunks: list[range] = []
     start = 0
-    for worker_index in range(worker_amount):
+    for worker_index in range(WORKER_AMOUNT):
         end = start + chunk_size + (1 if worker_index < extra else 0)
         chunks.append(range(start, end))
         start = end
@@ -105,95 +192,100 @@ def build_schedule(
 
 def feature_crop(feature: Feature, img: Image.Image) -> tuple[int, int, int, int]:
     w, h = img.size
-    crop_values = []
-    match feature:
-        case Rank():
-            crop_values = RANK_CROP
-
-        case Suit():
-            crop_values = SUIT_CROP
-
-        case Enhancement():
-            crop_values = ENHANCEMENT_CROP
-
-        case Seal():
-            crop_values = SEAL_CROP
-
-        case Edition():
-            crop_values = EDITION_CROP
-
-        case Tarot():
-            crop_values = CONSUMABLE_CROP
-
-        case Spectral():
-            crop_values = CONSUMABLE_CROP
-
-        case Planet():
-            crop_values = CONSUMABLE_CROP
-
-        case JokerName():
-            crop_values = JOKER_NAME_CROP
-
-        case JokerEdition():
-            crop_values = JOKER_NAME_CROP
-
+    crop_values = FEATURE_CROPS[type(feature)]
     return card_crop(w, h, crop_values)
 
 
-def generate_location_training_data(
-    size: int,
-    data_type: str,
-    function: Callable[..., tuple[str, str, RenderedHand]],
-    is_feature: bool = False,
-) -> None:
-    cutoff = size * CUTOFF
-
-    start_path = os.path.join(ROOT_DIR, "training_data", data_type)
+def generate_location_training_data(size: int) -> None:
+    start_path = os.path.join(ROOT_DIR, "training_data", "location_data")
     rebuild_folder(start_path)
     image_root = f"{start_path}/images"
-    build_folder(image_root)
     label_root = f"{start_path}/labels"
+    build_folder(image_root)
     build_folder(label_root)
 
     for split in ("train", "val"):
-        image_path = f"{image_root}/{split}"
-        build_folder(image_path)
+        build_folder(f"{image_root}/{split}")
+        build_folder(f"{label_root}/{split}")
 
-        label_path = f"{label_root}/{split}"
-        build_folder(label_path)
+    cutoff = size * CUTOFF
 
-    if size <= 0:
-        return
+    work: list[tuple[str, int]] = [
+        (render_type, index)
+        for render_type in LOCATION_RENDERERS
+        for index in range(size)
+    ]
+    random.shuffle(work)
 
-    cpu_threads = CPU_COUNT if CPU_COUNT is not None else 2
-    worker_amount = min(cpu_threads - 1, size)
-    chunks = split_work(size, worker_amount)
+    def remap_box(
+        box: list[float],
+        class_id: int,
+        offset_x: int,
+        offset_y: int,
+        small_w: int,
+        small_h: int,
+    ) -> list[float]:
+        _, center_x, center_y, box_w, box_h = box
+        return [
+            class_id,
+            round((offset_x + center_x * small_w) / HAND_WIDTH, 6),
+            round((offset_y + center_y * small_h) / HAND_HEIGHT, 6),
+            round(box_w * small_w / HAND_WIDTH, 6),
+            round(box_h * small_h / HAND_HEIGHT, 6),
+        ]
+
+    def render_on_main_canvas(render_type: str) -> RenderedHand:
+        class_id, (low, high), (small_w, small_h), build_items, render_function = (
+            LOCATION_RENDERERS[render_type]
+        )
+        items = build_items(random.randint(low, high))
+
+        background = render_background(HAND_WIDTH, HAND_HEIGHT, True)
+        offset_x = (HAND_WIDTH - small_w) // 2
+        offset_y = (HAND_HEIGHT - small_h) // 2
+        small_background = background.crop(
+            (offset_x, offset_y, offset_x + small_w, offset_y + small_h)
+        )
+
+        rendered = render_function(items, True, background=small_background)
+        background.paste(rendered.image, (offset_x, offset_y))
+
+        annotations = [
+            CardAnnotation(
+                card=data.card,
+                box=remap_box(data.box, class_id, offset_x, offset_y, small_w, small_h),
+            )
+            for data in rendered.annotations
+        ]
+        return RenderedHand(image=background, annotations=annotations)
+
     progress_lock = threading.Lock()
-    args = [0, cutoff, is_feature] if is_feature else [0, cutoff]
 
-    def process_hands(hand_indices: range, progress: tqdm) -> None:
-        for hand_index in hand_indices:
-            args[0] = hand_index
-            name, split, hand_render = function(*args)
+    def process_locations(work_chunk: range, progress: tqdm) -> None:
+        for work_index in work_chunk:
+            render_type, index = work[work_index]
+            split = "train" if index < cutoff else "val"
+            name = f"{render_type}_{index}"
 
-            img_path = f"{image_root}/{split}/{name}.png"
+            hand_render = render_on_main_canvas(render_type)
+
+            hand_render.image.save(f"{image_root}/{split}/{name}.png")
+
             label_path = f"{label_root}/{split}/{name}.txt"
-
-            hand_render.image.save(img_path)
-
             with open(label_path, "w", encoding="utf-8") as t:
                 for data in hand_render.annotations:
-                    line = " ".join([str(val) for val in data.box])
+                    line = " ".join(str(val) for val in data.box)
                     t.write(line + "\n")
 
             with progress_lock:
                 progress.update(1)
 
     with (
-        tqdm(total=size) as progress,
-        ThreadPoolExecutor(max_workers=worker_amount) as executor,
+        tqdm(total=len(work)) as progress,
+        ThreadPoolExecutor(max_workers=WORKER_AMOUNT) as executor,
     ):
-        list(executor.map(lambda chunk: process_hands(chunk, progress), chunks))
+        chunks = split_work(len(work))
+        list(executor.map(lambda chunk: process_locations(chunk, progress), chunks))
 
 
 def generate_feature_data(
@@ -204,9 +296,7 @@ def generate_feature_data(
     schedule: list[tuple[Feature, int, str]],
 ):
     build_folders(start_path, features)
-    # worker_amount = max(1, CPU_COUNT - 1)
-    worker_amount = 1
-    chunks = split_work(amount, worker_amount)
+    chunks = split_work(amount)
     progress_lock = threading.Lock()
 
     def process_items(item_indices: range, progress: tqdm) -> None:
@@ -228,7 +318,7 @@ def generate_feature_data(
 
     with (
         tqdm(total=amount) as progress,
-        ThreadPoolExecutor(max_workers=worker_amount) as executor,
+        ThreadPoolExecutor(max_workers=WORKER_AMOUNT) as executor,
     ):
         list(executor.map(lambda chunk: process_items(chunk, progress), chunks))
 
@@ -249,24 +339,7 @@ def setup(
 
 
 if __name__ == "__main__":
-    available_commands = [
-        "all_card_features",
-        "all_consumables",
-        "all_jokers",
-        "enhancement",
-        "edition",
-        "rank",
-        "suit",
-        "seal",
-        "card_locations",
-        "joker_locations",
-        "consumable_locations",
-        "joker_name",
-        "joker_edition",
-        "tarot",
-        "planet",
-        "spectral",
-    ]
+    available_commands = list(FEATURE_COMMANDS) + ["locations"]
 
     if len(sys.argv) < 2:
         print("Please pass in 1 of these arguemnts")
@@ -283,42 +356,11 @@ if __name__ == "__main__":
 
     training_amount = 5_000
     start_path = os.path.join(ROOT_DIR, "training_data")
-    render_amount = (0, 0)
-    render_function = None
 
-    if command == "all_card_features":
-        render_amount = (6, 16)
-        for feature in ["enhancement", "edition", "rank", "suit", "seal"]:
-            setup(training_amount, feature, start_path, render_amount, generate_hand)
+    if command == "locations":
+        generate_location_training_data(training_amount)
+        sys.exit()
 
-    elif command == "all_consumables":
-        render_amount = (1, 4)
-        for feature in ["tarot", "planet", "spectral"]:
-            setup(
-                training_amount,
-                feature,
-                start_path,
-                render_amount,
-                generate_consumables,
-            )
-
-    elif command == "all_jokers":
-        render_amount = (1, 9)
-        for feature in ["joker_name", "joker_edition"]:
-            setup(training_amount, feature, start_path, render_amount, generate_jokers)
-
-    else:
-        if command in ["enhancement", "edition", "rank", "suit", "seal"]:
-            render_amount = (6, 16)
-            render_function = generate_hand
-
-        elif command in ["tarot", "planet", "spectral"]:
-            render_amount = (1, 4)
-            render_function = generate_consumables
-
-        elif command in ["joker_name", "joker_edition"]:
-            render_amount = (1, 9)
-            render_function = generate_jokers
-
-        assert render_function is not None
-        setup(training_amount, command, start_path, render_amount, render_function)
+    render_amount, render_function, features = FEATURE_COMMANDS[command]
+    for feature in features:
+        setup(training_amount, feature, start_path, render_amount, render_function)

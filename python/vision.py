@@ -5,7 +5,7 @@ from PIL import Image
 
 from calculation.poker_discards import generate_discard_table
 from calculation.score import get_best_scoring_hand
-from config.model_registry import CARD_BOX_MODEL
+from config.model_registry import LOCATION_MODEL
 from config.settings import (
     EDITION_CROP,
     ENHANCEMENT_CROP,
@@ -28,8 +28,9 @@ BLIND_MODEL = BlindModel(BLIND_MODEL_CHECKPOINT["input_size"], BLIND_MODEL_CHECK
 BLIND_MODEL.load_state_dict(BLIND_MODEL_CHECKPOINT["state_dict"])
 BLIND_MODEL.eval()
 
-def get_card_locations(img: Image.Image):
-    results = CARD_BOX_MODEL(img)
+def get_card_locations(img: Image.Image, save_path: str | None = None):
+    results = LOCATION_MODEL(img)
+
     for result in results:
         boxes = result.boxes
 
@@ -41,6 +42,11 @@ def get_card_locations(img: Image.Image):
             print("box:", xyxy)
             print("confidence:", confidence)
             print("class:", class_id)
+
+        if save_path is not None:
+            plotted = Image.fromarray(result.plot()[..., ::-1])
+            plotted.save(save_path)
+            print(f"Saved annotations to {save_path}")
 
 
 def get_card_information(card_images: list[Image.Image]) -> list[Card]:
@@ -83,11 +89,15 @@ def get_played_hand(
     img: Image.Image, deck: Deck, game_state: GameState
 ) -> tuple[list[CardData], HandAction, list[Card]]:
     card_locations = []
-    results = CARD_BOX_MODEL(img, verbose=False)
+    results = LOCATION_MODEL(img, verbose=False)
 
     for res in results:
         for box in res.boxes:
+            print(box.conf)
             if float(box.conf) < 0.9:
+                continue
+
+            if int(box.cls) != 0:
                 continue
 
             location = [float(val) for val in box.xyxy[0]]
@@ -96,7 +106,7 @@ def get_played_hand(
     card_locations.sort(key=lambda x: x[0])
 
     card_images = []
-    for location in card_locations:
+    for i, location in enumerate(card_locations):
         card_image = img.crop(location)
         card_images.append(card_image)
 
@@ -128,5 +138,12 @@ def get_played_hand(
 
 
 if __name__ == "__main__":
-    img = Image.open("/home/hank/projects/balatro_bot/hand_0.png").convert("RGB")
-    get_played_hand(img)
+    img = Image.open("/home/hank/projects/balatro_bot/python/tmp.png").convert("RGB")
+    print(img.size)
+    get_card_locations(img, save_path="tmp_annotated.png")
+    deck = Deck()
+    game_state = GameState(score_to_beat=300)
+    _, _, hand = get_played_hand(img, deck, game_state)
+
+    for card in hand:
+        print(card)
