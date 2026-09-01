@@ -2,8 +2,7 @@ import time
 
 import mss
 import pyautogui
-import pyscreenshot
-from PIL import Image
+from PIL import Image, ImageGrab
 
 from config.settings import (
     CASH_OUT_X,
@@ -41,7 +40,7 @@ def primary_monitor_bbox() -> tuple[int, int, int, int]:
 
 
 def screenshot_primary(filename: str | None = None) -> Image.Image:
-    image = pyscreenshot.grab(bbox=primary_monitor_bbox()).convert("RGB")
+    image = ImageGrab.grab(bbox=primary_monitor_bbox()).convert("RGB")
     if filename is not None:
         image.save(filename)
 
@@ -80,8 +79,12 @@ def play_blind(deck: Deck, game_state: GameState) -> None:
     hand = []
     while game_state.hands > 0:
         hand_img = get_hand()
-
+        hand_img.save("tmp.png")
         selected_data, mode, hand = get_played_hand(hand_img, deck, game_state)
+        for card in hand:
+            print(card)
+        time.sleep(2)
+
         selected_cards = [data.card for data in selected_data]
         play_hand(selected_data, mode)
         has_won = game_state.execute_hand_action(

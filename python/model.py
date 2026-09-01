@@ -45,8 +45,11 @@ def load_model(name: str):
 
 
 def run_model(name: str, images: list[Image.Image]) -> list[int]:
+    device = "cuda"
+
     if name not in MODEL_QUEUE:
         model, checkpoint = load_model(name)
+        model.to(device)
         MODEL_QUEUE[name] = {"model": model, "checkpoint": checkpoint}
 
     model = MODEL_QUEUE[name]["model"]
@@ -58,8 +61,6 @@ def run_model(name: str, images: list[Image.Image]) -> list[int]:
         transforms.Resize((height, width)),
         transforms.ToTensor(),
     ])
-
-    device = "cuda"
 
     x = torch.stack([transform(img) for img in images]).to(device)
 
