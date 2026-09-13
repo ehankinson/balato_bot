@@ -15,7 +15,11 @@ from simulation.blind_env import ActionMasks
 from simulation.blind_trainer import BlindModel
 from simulation.decoder import build_mask, model_decoder_batch
 from simulation.encoder import encode_game_state
-from simulation.reward import calculate_score_progress_reward, calculate_terminal_reward
+from simulation.reward import (
+    calculate_hand_value_reward,
+    calculate_score_progress_reward,
+    calculate_terminal_reward,
+)
 
 
 @dataclass(slots=True)
@@ -288,6 +292,9 @@ def _apply_shared_actions(
                 score_before,
                 slot.game_state,
             )
+            buffers.rewards[round_index, episode] += calculate_hand_value_reward(
+                hand_stats.name
+            )
 
         is_terminal = has_won or slot.game_state.hands == 0 or slot.steps >= max_steps
         if is_terminal:
@@ -312,6 +319,14 @@ def _apply_shared_actions(
     return any(slot.active for slot in slots)
 
 
+def _expect(connection: Connection, *commands: str) -> tuple[str, object]:
+    """Receive the next message, asserting it is one of the expected commands."""
+    command, payload = connection.recv()
+    if command not in commands:
+        raise RuntimeError(f"unexpected actor command: {command}")
+    return command, payload
+
+
 def rollout_actor(
     connection: Connection,
     buffers: SharedRolloutBuffers,
@@ -325,11 +340,9 @@ def rollout_actor(
     torch.set_num_threads(1)
     try:
         while True:
-            command, payload = connection.recv()
+            command, payload = _expect(connection, "start", "close")
             if command == "close":
                 return
-            if command != "start":
-                raise RuntimeError(f"unexpected actor command: {command}")
 
             slots = _create_game_slots(
                 episode_count,
@@ -347,11 +360,11 @@ def rollout_actor(
                 )
                 connection.send(("observations_ready", active_count))
 
-                command, _action_payload = connection.recv()
+                command, _action_payload = _expect(
+                    connection, "actions_ready", "close"
+                )
                 if command == "close":
                     return
-                if command != "actions_ready":
-                    raise RuntimeError(f"unexpected actor command: {command}")
 
                 still_active = _apply_shared_actions(
                     slots,
@@ -413,6 +426,63 @@ class RolloutPool:
             self.connections.append(parent_connection)
             self.processes.append(process)
 
+    def _await_observations(self, active_workers: list[int]) -> None:
+        for worker in active_workers:
+            _expect(self.connections[worker], "observations_ready")
+
+    def _run_inference(
+        self,
+        round_index: int,
+        model: BlindModel,
+        device: torch.device,
+    ) -> float:
+        """Batch every live episode into one GPU call, write actions back."""
+        inference_started = perf_counter()
+        active_mask = self.buffers.valid[round_index]
+        observations = self.buffers.observations[round_index, active_mask].to(
+            device
+        )
+        masks = ActionMasks(
+            mode=self.buffers.mode_masks[round_index, active_mask].to(device),
+            count=self.buffers.count_masks[round_index, active_mask].to(device),
+            card=self.buffers.card_masks[round_index, active_mask].to(device),
+        )
+        model.eval()
+        with torch.inference_mode():
+            outputs = model(observations)
+            (
+                modes,
+                counts,
+                cards,
+                card_valid,
+                log_probs,
+                _entropies,
+            ) = model_decoder_batch(outputs, masks, stochastic=True)
+            values = outputs["value"]
+
+        self.buffers.modes[round_index, active_mask] = modes.cpu()
+        self.buffers.counts[round_index, active_mask] = counts.cpu()
+        self.buffers.cards[round_index, active_mask] = cards.cpu()
+        self.buffers.card_valid[round_index, active_mask] = card_valid.cpu()
+        self.buffers.old_log_probs[round_index, active_mask] = log_probs.cpu()
+        self.buffers.old_values[round_index, active_mask] = values.cpu()
+
+        elapsed = perf_counter() - inference_started
+        return elapsed if self.profile else 0.0
+
+    def _dispatch_actions(self, active_workers: list[int]) -> list[int]:
+        """Send actions to workers, then collect which workers still have
+        live games and return them as the next round's active set."""
+        for worker in active_workers:
+            self.connections[worker].send(("actions_ready", None))
+
+        still_active: list[int] = []
+        for worker in active_workers:
+            _, payload = _expect(self.connections[worker], "results_ready")
+            if payload:
+                still_active.append(worker)
+        return still_active
+
     def collect(
         self,
         model: BlindModel,
@@ -429,55 +499,9 @@ class RolloutPool:
         inference_seconds = 0.0
         round_index = 0
         while active_workers:
-            for worker in active_workers:
-                command, _active_count = self.connections[worker].recv()
-                if command != "observations_ready":
-                    raise RuntimeError(f"unexpected actor response: {command}")
-
-            inference_started = perf_counter()
-            active_mask = self.buffers.valid[round_index]
-            observations = self.buffers.observations[round_index, active_mask].to(
-                device
-            )
-            masks = ActionMasks(
-                mode=self.buffers.mode_masks[round_index, active_mask].to(device),
-                count=self.buffers.count_masks[round_index, active_mask].to(device),
-                card=self.buffers.card_masks[round_index, active_mask].to(device),
-            )
-            model.eval()
-            with torch.inference_mode():
-                outputs = model(observations)
-                (
-                    modes,
-                    counts,
-                    cards,
-                    card_valid,
-                    log_probs,
-                    _entropies,
-                ) = model_decoder_batch(outputs, masks, stochastic=True)
-                values = outputs["value"]
-
-            self.buffers.modes[round_index, active_mask] = modes.cpu()
-            self.buffers.counts[round_index, active_mask] = counts.cpu()
-            self.buffers.cards[round_index, active_mask] = cards.cpu()
-            self.buffers.card_valid[round_index, active_mask] = card_valid.cpu()
-            self.buffers.old_log_probs[round_index, active_mask] = log_probs.cpu()
-            self.buffers.old_values[round_index, active_mask] = values.cpu()
-            if self.profile:
-                inference_seconds += perf_counter() - inference_started
-
-            for worker in active_workers:
-                self.connections[worker].send(("actions_ready", None))
-
-            next_active_workers = []
-            for worker in active_workers:
-                command, still_active = self.connections[worker].recv()
-                if command != "results_ready":
-                    raise RuntimeError(f"unexpected actor response: {command}")
-                if still_active:
-                    next_active_workers.append(worker)
-
-            active_workers = next_active_workers
+            self._await_observations(active_workers)
+            inference_seconds += self._run_inference(round_index, model, device)
+            active_workers = self._dispatch_actions(active_workers)
             inference_batches += 1
             round_index += 1
 

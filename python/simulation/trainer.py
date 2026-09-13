@@ -63,9 +63,10 @@ def _load_resume_checkpoint(
     print(
         f"resumed {config.resume_checkpoint} after "
         f"{state.iterations_completed} completed iterations "
-        f"(optimizer={str(config.resume_optimizer).lower()})"
+        f"(optimizer={str(config.resume_optimizer).lower()}), "
+        "restarting the iteration count at zero"
     )
-    return state.iterations_completed, state.evaluation
+    return 0, state.evaluation
 
 
 def train(config: TrainingConfig) -> None:
