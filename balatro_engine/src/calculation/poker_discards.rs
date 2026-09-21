@@ -1,7 +1,6 @@
 use crate::core::enums::PokerHand;
 use itertools::Itertools;
 use std::sync::LazyLock;
-use use_combinatorics::combinations;
 
 const MAX_CARDS: usize = 64;
 const MAX_DRAW: usize = 5;
