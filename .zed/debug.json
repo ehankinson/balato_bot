@@ -46,7 +46,7 @@
     "request": "launch",
     "program": "$ZED_WORKTREE_ROOT/python/data_generator.py",
     "cwd": "$ZED_WORKTREE_ROOT/python",
-    "args": ["joker_edition"],
+    "args": ["joker_name"],
     "env": {
       "PYTHONPATH": "$ZED_WORKTREE_ROOT/python"
     }

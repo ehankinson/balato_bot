@@ -12,4 +12,14 @@ impl Hand {
     pub fn add_card(&mut self, card: Card) {
         self.cards.push(card);
     }
+
+    pub fn select_cards(&self, positions: Vec<u8>) -> Vec<Card> {
+        let mut cards = Vec::new();
+        for position in positions {
+            
+            
+        }
+
+        cards
+    }
 }
