@@ -1,3 +1,5 @@
+use crate::core::enums::{Stakes};
+
 pub const ANTE_SCORES: [[[u64; 3]; 8]; 3] = [
     // Easy: White / Red
     [
@@ -35,3 +37,15 @@ pub const ANTE_SCORES: [[[u64; 3]; 8]; 3] = [
         [200_000, 300_000, 400_000],
     ],
 ];
+
+pub fn endless_ante(stake: &Stakes, ante: u8) -> f64 {
+    let difficulty = match stake {
+        Stakes::White | Stakes::Red => 100_000,
+        Stakes::Green | Stakes::Black | Stakes::Blue => 200_000,
+        _ => 400_000,
+    } as f64;
+
+    let d = (ante - 8) as f64;
+
+    difficulty * (1.6 + (0.75 * d).powf(1.0 + 0.2 * d)).powf(d)
+}

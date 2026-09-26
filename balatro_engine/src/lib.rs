@@ -1,5 +1,6 @@
 mod calculation;
 mod core;
+mod consts;
 
 use pyo3::prelude::*;
 
