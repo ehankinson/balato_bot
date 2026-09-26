@@ -13,11 +13,12 @@ impl Hand {
         self.cards.push(card);
     }
 
-    pub fn select_cards(&self, positions: Vec<u8>) -> Vec<Card> {
+    pub fn select_cards(mut self, mut positions: Vec<u8>) -> Vec<Card> {
         let mut cards = Vec::new();
+        positions.sort_unstable_by(|a, b| b.cmp(a));
+        
         for position in positions {
-            
-            
+            cards.push(self.cards.remove(position as usize));
         }
 
         cards

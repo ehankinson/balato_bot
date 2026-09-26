@@ -89,6 +89,17 @@ pub(crate) enum Decks {
     Erratic = 15,
 }
 
+pub(crate) enum Stakes {
+    White = 1,
+    Red = 2,
+    Green = 3,
+    Black = 4,
+    Blue = 5,
+    Purple = 6,
+    Orange = 7,
+    Gold = 8
+}
+
 impl PokerHand {
     pub(crate) const DISCARD_HANDS: [PokerHand; 11] = [
         PokerHand::Pair,
