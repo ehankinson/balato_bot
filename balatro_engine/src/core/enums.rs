@@ -1,3 +1,5 @@
+use crate::core::joker::{JokerEcon, JokerGameState, JokerGenerate, JokerRetrigger, JokerScoring};
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[repr(u8)]
 pub(crate) enum PokerHand {
@@ -295,7 +297,7 @@ pub(crate) enum JokerKind {
     Order = 134,
     Tribe = 135,
     Stuntman = 136,
-    InvisibleJoker = 137,
+    Invisible = 137,
     Brainstorm = 138,
     Satellite = 139,
     ShootTheMoon = 140,
@@ -312,11 +314,11 @@ pub(crate) enum JokerKind {
 }
 
 pub(crate) enum JokerData {
-    Scoring(JokerScoringData),
-    Econ(JokerEconData),
-    GameState(JokerGameStateData),
-    Copy(JokerCopyData),
-    Retrigger(JokerRetriggerData),
+    Scoring(JokerScoring),
+    Econ(JokerEcon),
+    GameState(JokerGameState),
+    Retrigger(JokerRetrigger),
+    Generate(JokerGenerate)
 }
 
 pub(crate) enum JokerEdition {
@@ -325,6 +327,67 @@ pub(crate) enum JokerEdition {
     Holographic = 2,
     Polychrome = 3,
     Negative = 4,
+}
+
+pub(crate) enum JokerTrigger {
+    OnPlayedCard = 1,
+    AfterHand = 2,
+    OnHeldCards= 3,
+    BeforePlayedCards = 4,
+    None = 5,
+    StartOfBlind = 6,
+    EndOfBlind = 7,
+}
+
+pub(crate) enum RetriggerTarget {
+    FaceCards = 1,
+    LowCards = 2,
+    FianlHand = 3,
+    FirstCard = 4,
+    PlayedCards = 5,
+    HeldCards = 6
+}
+
+pub(crate) enum CopyType {
+    Right = 1,
+    LeftMost = 2
+}
+
+pub(crate) enum JokerStructure {
+    Normal(JokerData),
+    Copy(CopyType)
+}
+
+pub(crate) enum JokerRarity {
+    Common = 0,
+    Uncommon = 1,
+    Rare = 2,
+    Legendary = 3
+}
+
+pub(crate) enum GenerateType {
+    None = 0,
+    StoneCard = 1,
+    Tarot = 2,
+    Spectral = 3,
+    SealCard = 4,
+    FirstPlayedCard = 5,
+    Joker = 6,
+    Gold = 7,
+    PlanetLevel = 8,
+    NegativeConsumable = 9,
+}
+
+pub(crate) enum GameStateModifications {
+    AllFaces = 0,
+    PlayAllCards = 1,
+    AllowStraightGaps = 2,
+    DisableBossBlind = 3,
+    PreventDeath = 4,
+    DoubleSuit = 5,
+    DuplicateJokers = 6,
+    DoubleProbability = 7,
+    FreePlanetCards = 8
 }
 
 impl PokerHand {
