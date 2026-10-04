@@ -1,6 +1,14 @@
 use crate::core::enums::{
-    CopyType, Enhancement, GameStateModifications, GenerateType, JokerData, JokerEdition, JokerKind, JokerRarity, JokerStructure, JokerTrigger, PokerHand, Rank, RetriggerTarget, Suit,
+    Enhancement, PokerHand, Rank, Suit,
 };
+use crate::core::joker_types::{
+    CopyType, GameStateModifications, GenerateType, JokerEdition, JokerKind, JokerRarity,
+    JokerTrigger, RetriggerTarget,
+};
+
+#[path = "joker_events.rs"]
+mod events;
+pub use events::{Jokers, TriggerEvent};
 
 pub struct Joker {
     kind: JokerKind,
@@ -10,10 +18,24 @@ pub struct Joker {
     rarity: JokerRarity,
     price: u8,
     debuffed: bool,
+    update_mask: u32,
+}
+
+pub(crate) enum JokerData {
+    Scoring(JokerScoring),
+    Econ(JokerEcon),
+    GameState(JokerGameState),
+    Retrigger(JokerRetrigger),
+    Generate(JokerGenerate),
+}
+
+pub(crate) enum JokerStructure {
+    Normal(JokerData),
+    Copy(CopyType),
 }
 
 impl Joker {
-    fn create_joker(joker_kind: JokerKind) -> Joker {
+    pub(crate) fn create_joker(joker_kind: JokerKind) -> Joker {
         let (price, rarity, trigger, structure) = match joker_kind {
             JokerKind::Joker => {
                 let data = JokerScoring {
@@ -273,7 +295,7 @@ impl Joker {
                 (
                     5,
                     JokerRarity::Uncommon,
-                    JokerTrigger::OnHeldCards,
+                    JokerTrigger::OnHeldCard,
                     JokerStructure::Normal(JokerData::Retrigger(data)),
                 )
             }
@@ -333,6 +355,7 @@ impl Joker {
             JokerKind::Marble => {
                 let data = JokerGenerate {
                     amount: 1,
+                    generate_type: GenerateType::StoneCard,
                     ..JokerGenerate::default()
                 };
 
@@ -387,7 +410,7 @@ impl Joker {
             JokerKind::Dusk => {
                 let data = JokerRetrigger {
                     retrigger: 1,
-                    target: RetriggerTarget::FianlHand,
+                    target: RetriggerTarget::FinalHand,
                 };
 
                 (
@@ -514,7 +537,6 @@ impl Joker {
             JokerKind::GrosMichel => {
                 let data = JokerScoring {
                     add_mult: 15,
-                    probability: 1.0 / 6.0,
                     ..JokerScoring::default()
                 };
 
@@ -833,7 +855,6 @@ impl Joker {
             JokerKind::Cavendish => {
                 let data = JokerScoring {
                     x_mult: 3.0,
-                    probability: 1.0 / 1000.0,
                     ..JokerScoring::default()
                 };
 
@@ -1111,7 +1132,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Common,
-                    JokerTrigger::OnHeldCards,
+                    JokerTrigger::OnHeldCard,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -1124,7 +1145,7 @@ impl Joker {
                 (
                     4,
                     JokerRarity::Common,
-                    JokerTrigger::AfterHand,
+                    JokerTrigger::OnDiscard,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -1339,7 +1360,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Uncommon,
-                    JokerTrigger::AfterHand,
+                    JokerTrigger::OnDiscard,
                     JokerStructure::Normal(JokerData::Scoring(data)),
                 )
             }
@@ -1635,14 +1656,12 @@ impl Joker {
                     JokerStructure::Normal(JokerData::Scoring(data)),
                 )
             }
-            JokerKind::Blueprint => {
-                (
-                    10,
-                    JokerRarity::Rare,
-                    JokerTrigger::None,
-                    JokerStructure::Copy(CopyType::Right),
-                )
-            }
+            JokerKind::Blueprint => (
+                10,
+                JokerRarity::Rare,
+                JokerTrigger::None,
+                JokerStructure::Copy(CopyType::Right),
+            ),
             JokerKind::Wee => {
                 let data = JokerScoring {
                     ..JokerScoring::default()
@@ -1669,7 +1688,7 @@ impl Joker {
                     JokerStructure::Normal(JokerData::GameState(data)),
                 )
             }
-            JokerKind::OppsAll6s => {
+            JokerKind::OopsAll6s => {
                 let data = JokerGameState {
                     game_state_modification: Some(GameStateModifications::DoubleProbability),
                     ..JokerGameState::default()
@@ -1833,14 +1852,12 @@ impl Joker {
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
-            JokerKind::Brainstorm => {
-                (
-                    10,
-                    JokerRarity::Rare,
-                    JokerTrigger::None,
-                    JokerStructure::Copy(CopyType::LeftMost),
-                )
-            }
+            JokerKind::Brainstorm => (
+                10,
+                JokerRarity::Rare,
+                JokerTrigger::None,
+                JokerStructure::Copy(CopyType::LeftMost),
+            ),
             JokerKind::Satellite => {
                 let data = JokerEcon {
                     ..JokerEcon::default()
@@ -1863,7 +1880,7 @@ impl Joker {
                 (
                     5,
                     JokerRarity::Common,
-                    JokerTrigger::OnHeldCards,
+                    JokerTrigger::OnHeldCard,
                     JokerStructure::Normal(JokerData::Scoring(data)),
                 )
             }
@@ -1921,7 +1938,7 @@ impl Joker {
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
-            JokerKind::Bpootstraps => {
+            JokerKind::Bootstraps => {
                 let data = JokerScoring {
                     ..JokerScoring::default()
                 };
@@ -2000,6 +2017,8 @@ impl Joker {
             }
         };
 
+        let update_mask = Self::update_mask(joker_kind);
+
         Joker {
             kind: joker_kind,
             structure,
@@ -2008,6 +2027,7 @@ impl Joker {
             rarity,
             price,
             debuffed: false,
+            update_mask,
         }
     }
 }
@@ -2047,7 +2067,7 @@ pub struct JokerEcon {
     rank: Option<Vec<Rank>>,
     suit: Option<Suit>,
     poker_hand: Option<PokerHand>,
-    enhancment: Option<Enhancement>
+    enhancment: Option<Enhancement>,
 }
 
 impl JokerEcon {
@@ -2085,7 +2105,7 @@ impl JokerGameState {
             min_money: 0,
             straight_flush_size: 5,
             probability: 1.0,
-            game_state_modification: None
+            game_state_modification: None,
         }
     }
 }
@@ -2100,7 +2120,7 @@ pub struct JokerGenerate {
     amount: u8,
     generate_type: GenerateType,
     rank: Option<Rank>,
-    poker_hand: Option<PokerHand>
+    poker_hand: Option<PokerHand>,
 }
 
 impl JokerGenerate {
@@ -2110,7 +2130,11 @@ impl JokerGenerate {
             amount: 0,
             generate_type: GenerateType::None,
             rank: None,
-            poker_hand: None
+            poker_hand: None,
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/joker.rs"]
+mod tests;

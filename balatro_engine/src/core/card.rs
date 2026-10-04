@@ -46,4 +46,12 @@ impl Card {
             | ((*seal) as u16) << 2)
             | (*edition as u16)
     }
+
+    pub(crate) fn rank(&self) -> Rank {
+        self.rank
+    }
+
+    pub(crate) fn suit(&self) -> Suit {
+        self.suit
+    }
 }

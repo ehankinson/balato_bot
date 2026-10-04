@@ -1,4 +1,4 @@
-use super::poker_discards::generate_discard_table;
+use crate::calculation::poker_discards::generate_discard_table;
 use crate::core::enums::PokerHand;
 use std::hint::black_box;
 use std::time::{Duration, Instant};
