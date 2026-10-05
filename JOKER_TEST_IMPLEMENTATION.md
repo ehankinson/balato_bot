@@ -14,7 +14,7 @@ This is the behavioral test checklist for all 150 Joker kinds. Each Joker gets a
 ## Current implementation batches
 
 - `joker_triggers.rs`: basic scoring conditions and dynamic scoring.
-- `joker_retriggers.rs`: Sock and Buskin and Hanging Chad.
+- `joker_retriggers.rs`: Mime, Sock and Buskin, and Hanging Chad.
 - `joker_economy.rs`: Mail-In Rebate, Golden Ticket, and Matador.
 - `joker_updates.rs`: lifecycle and state updates already implemented in the engine.
 - `joker_scoring.rs`: simple scoring-condition coverage added in the first batch.
@@ -43,7 +43,7 @@ The remaining rows are the backlog. A `blocked` row should move to `planned` onl
 | 16 | Half Joker | Three or fewer played cards scores +20 Mult. | Four cards does not score; zero cards stays safe. | scoring / implemented |
 | 17 | Stencil | Empty Joker slots increase XMult. | Full capacity has the minimum bonus; negative edition slot rules need coverage. | scoring / implemented |
 | 18 | Four Fingers | Four-card Straight/Flush is accepted. | Three-card hand is rejected. | game rules / blocked |
-| 19 | Mime | Held-card abilities retrigger. | Played cards are not treated as held cards. | retrigger / planned |
+| 19 | Mime | Held-card abilities retrigger. | Played cards are not treated as held cards. | retrigger / implemented |
 | 20 | Credit Card | Debt/negative money is allowed. | Spending remains bounded by the configured credit limit. | game rules / blocked |
 | 21 | Ceremonial Dagger | At blind selection, destroy the right Joker and gain its sell value as Mult. | Empty/rightmost-only lineup and self-targeting must be safe. | update / implemented |
 | 22 | Banner | Each remaining discard adds Chips. | Zero discards and exhausted discards. | scoring / implemented |
@@ -51,7 +51,7 @@ The remaining rows are the backlog. A `blocked` row should move to `planned` onl
 | 24 | Marble Joker | At blind selection, add a Stone card. | Full deck/hand capacity and repeated selection. | update / blocked |
 | 25 | Loyalty Card | Every sixth hand gets XMult. | Fifth and seventh hands do not trigger early/again. | scoring / blocked |
 | 26 | 8 Ball | Played 8 has a chance to create a Planet card. | Non-8 and failed probability path. | trigger / blocked |
-| 27 | Misprint | Score with a random Mult in its range. | Range endpoints and deterministic seeded RNG. | scoring / planned |
+| 27 | Misprint | Score with a random Mult in its range. | Range endpoints and deterministic seeded RNG. | scoring / implemented |
 | 28 | Dusk | Final hand of the round retriggers played cards. | Non-final hand does not retrigger. | retrigger / blocked |
 | 29 | Raised Fist | Lowest held card scores twice its rank as Mult. | Ties and an empty hand. | scoring / blocked |
 | 30 | Chaos the Clown | First shop reroll is free. | Later rerolls still cost money. | update / blocked |
@@ -141,7 +141,7 @@ The remaining rows are the backlog. A `blocked` row should move to `planned` onl
 | 114 | Throwback | Skipped blinds increase XMult. | Non-skip events do not increase it. | update / planned |
 | 115 | Hanging Chad | Retriggers first played card twice. | Second card and empty played cards. | retrigger / implemented |
 | 116 | Rough Gem | Diamond cards earn money. | Non-Diamond card earns nothing. | trigger / planned |
-| 117 | Bloodstone | Hearts have a chance to give XMult. | Non-Heart and failed probability. | scoring / planned |
+| 117 | Bloodstone | Hearts have a chance to give XMult. | Non-Heart and failed probability. | scoring / implemented |
 | 118 | Arrowhead | Spades give Chips. | Non-Spade does not score. | scoring / planned |
 | 119 | Onyx Agate | Clubs give Mult. | Non-Club does not score. | scoring / planned |
 | 120 | Glass Joker | Glass-card destruction gives XMult. | Non-Glass destruction and debuffed state. | update / implemented |

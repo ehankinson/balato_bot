@@ -1109,6 +1109,9 @@ fn add_scoring_effect(
             effect.add_mult = 0;
             effect.x_mult = 1.0;
         }
+        JokerKind::Bloodstone if !chance(game_state, data.probability) => {
+            effect.x_mult = 1.0;
+        }
         _ => {}
     }
 }

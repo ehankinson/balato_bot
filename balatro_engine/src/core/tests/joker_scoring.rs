@@ -6,13 +6,7 @@ use crate::core::game::GameState;
 use crate::core::joker_types::JokerKind;
 
 fn card(rank: Rank, suit: Suit) -> Card {
-    Card::new(
-        rank,
-        suit,
-        Enhancement::None,
-        Edition::None,
-        Seal::None,
-    )
+    Card::new(rank, suit, Enhancement::None, Edition::None, Seal::None)
 }
 
 fn played_effect(kind: JokerKind, card: &Card, hand_type: Option<PokerHand>) -> JokerEffect {
@@ -149,11 +143,17 @@ fn rank_based_jokers_reject_adjacent_non_matching_ranks() {
     assert_eq!(played_effect(JokerKind::Fibonacci, &ace, None).add_mult, 8);
     assert_eq!(played_effect(JokerKind::Fibonacci, &two, None).add_mult, 8);
     assert_eq!(played_effect(JokerKind::Fibonacci, &odd, None).add_mult, 0);
-    assert_eq!(played_effect(JokerKind::EvenSteven, &even, None).add_mult, 4);
+    assert_eq!(
+        played_effect(JokerKind::EvenSteven, &even, None).add_mult,
+        4
+    );
     assert_eq!(played_effect(JokerKind::OddTodd, &odd, None).chips, 31);
     assert_eq!(played_effect(JokerKind::Scholar, &ace, None).add_mult, 4);
     assert_eq!(played_effect(JokerKind::Scholar, &ace, None).chips, 20);
-    assert_eq!(played_effect(JokerKind::Scholar, &two, None), JokerEffect::default());
+    assert_eq!(
+        played_effect(JokerKind::Scholar, &two, None),
+        JokerEffect::default()
+    );
 }
 
 #[test]
@@ -162,11 +162,23 @@ fn face_and_queen_king_jokers_have_negative_cases() {
     let queen = card(Rank::Queen, Suit::Hearts);
     let number = card(Rank::Seven, Suit::Hearts);
 
-    assert_eq!(played_effect(JokerKind::SmileyFace, &king, None).add_mult, 5);
-    assert_eq!(played_effect(JokerKind::SmileyFace, &number, None).add_mult, 0);
+    assert_eq!(
+        played_effect(JokerKind::SmileyFace, &king, None).add_mult,
+        5
+    );
+    assert_eq!(
+        played_effect(JokerKind::SmileyFace, &number, None).add_mult,
+        0
+    );
     assert_eq!(played_effect(JokerKind::Triboulet, &king, None).x_mult, 2.0);
-    assert_eq!(played_effect(JokerKind::Triboulet, &queen, None).x_mult, 2.0);
-    assert_eq!(played_effect(JokerKind::Triboulet, &number, None).x_mult, 1.0);
+    assert_eq!(
+        played_effect(JokerKind::Triboulet, &queen, None).x_mult,
+        2.0
+    );
+    assert_eq!(
+        played_effect(JokerKind::Triboulet, &number, None).x_mult,
+        1.0
+    );
 }
 
 #[test]
@@ -232,30 +244,19 @@ fn special_scoring_jokers_respect_state_boundaries() {
     let mut banner_state = GameState::new(104);
     banner_state.discards_remaining = 2;
     assert_eq!(
-        hand_effect_with_state(
-            JokerKind::Banner,
-            &played,
-            &[],
-            None,
-            &mut banner_state,
-            1,
-        )
-        .chips,
+        hand_effect_with_state(JokerKind::Banner, &played, &[], None, &mut banner_state, 1,).chips,
         60
+    );
+    banner_state.discards_remaining = 0;
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Banner, &played, &[], None, &mut banner_state, 1,).chips,
+        0
     );
 
     let mut money_state = GameState::new(105);
     money_state.money = 10;
     assert_eq!(
-        hand_effect_with_state(
-            JokerKind::Bull,
-            &played,
-            &[],
-            None,
-            &mut money_state,
-            1,
-        )
-        .chips,
+        hand_effect_with_state(JokerKind::Bull, &played, &[], None, &mut money_state, 1,).chips,
         20
     );
     assert_eq!(
@@ -284,6 +285,11 @@ fn deck_and_lineup_scoring_jokers_use_current_counts() {
     );
 
     state.starting_deck_size = 52;
+    state.deck_size = 52;
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut state, 1).add_mult,
+        0
+    );
     state.deck_size = 50;
     assert_eq!(
         hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut state, 1).add_mult,
@@ -349,10 +355,7 @@ fn flower_pot_and_seeing_double_require_their_full_hand_conditions() {
         card(Rank::Two, Suit::Clubs),
         card(Rank::Three, Suit::Hearts),
     ];
-    let all_clubs = [
-        card(Rank::Two, Suit::Clubs),
-        card(Rank::Three, Suit::Clubs),
-    ];
+    let all_clubs = [card(Rank::Two, Suit::Clubs), card(Rank::Three, Suit::Clubs)];
     assert_eq!(
         hand_effect(JokerKind::SeeingDouble, &club_and_heart, &[], None).x_mult,
         2.0
@@ -503,5 +506,338 @@ fn state_scaled_and_held_rank_jokers_use_exact_thresholds() {
         )
         .x_mult,
         1.5
+    );
+}
+
+#[test]
+fn direct_rank_and_suit_scoring_jokers_have_matching_and_negative_cases() {
+    let ten = card(Rank::Ten, Suit::Hearts);
+    let four = card(Rank::Four, Suit::Clubs);
+    let five = card(Rank::Five, Suit::Clubs);
+    let six = card(Rank::Six, Suit::Clubs);
+    let face = card(Rank::Queen, Suit::Hearts);
+    let number = card(Rank::Seven, Suit::Hearts);
+
+    let walkie_talkie = played_effect(JokerKind::WalkieTalkie, &ten, None);
+    assert_eq!(walkie_talkie.chips, 10);
+    assert_eq!(walkie_talkie.add_mult, 4);
+    assert_eq!(
+        played_effect(JokerKind::WalkieTalkie, &six, None),
+        JokerEffect::default()
+    );
+
+    assert_eq!(
+        played_effect(
+            JokerKind::RoughGem,
+            &card(Rank::Seven, Suit::Diamonds),
+            None
+        )
+        .money,
+        1
+    );
+    assert_eq!(played_effect(JokerKind::RoughGem, &number, None).money, 0);
+    assert_eq!(
+        played_effect(JokerKind::Arrowhead, &card(Rank::Seven, Suit::Spades), None).chips,
+        50
+    );
+    assert_eq!(played_effect(JokerKind::Arrowhead, &number, None).chips, 0);
+    assert_eq!(played_effect(JokerKind::OnyxAgate, &four, None).add_mult, 7);
+    assert_eq!(played_effect(JokerKind::OnyxAgate, &face, None).add_mult, 0);
+
+    assert_eq!(
+        played_effect(JokerKind::Photograph, &face, None).x_mult,
+        2.0
+    );
+    assert_eq!(
+        played_effect(JokerKind::Photograph, &number, None).x_mult,
+        1.0
+    );
+    let mut photograph = Jokers::new();
+    photograph.add(Joker::create_joker(JokerKind::Photograph));
+    let face_pair = [
+        card(Rank::Queen, Suit::Hearts),
+        card(Rank::Jack, Suit::Spades),
+    ];
+    let mut photograph_state = GameState::new(112);
+    assert_eq!(
+        photograph
+            .trigger(
+                TriggerEvent::PlayedCard {
+                    card: &face_pair[1],
+                    played_cards: &face_pair,
+                    held_cards: &[],
+                    card_index: 1,
+                    hand_type: None,
+                    hands_remaining: 4,
+                },
+                &mut photograph_state,
+            )
+            .x_mult,
+        1.0
+    );
+
+    assert_eq!(played_effect(JokerKind::Fibonacci, &five, None).add_mult, 8);
+    assert_eq!(played_effect(JokerKind::Fibonacci, &six, None).add_mult, 0);
+    assert_eq!(
+        played_effect(JokerKind::EvenSteven, &four, None).add_mult,
+        4
+    );
+    assert_eq!(
+        played_effect(JokerKind::EvenSteven, &five, None).add_mult,
+        0
+    );
+}
+
+#[test]
+fn dynamic_scoring_jokers_use_zero_and_nonzero_state_boundaries() {
+    let played = [card(Rank::Seven, Suit::Spades)];
+    let mut state = GameState::new(109);
+
+    state.empty_joker_slots = 0;
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Stencil, &played, &[], None, &mut state, 1).x_mult,
+        1.0
+    );
+    state.empty_joker_slots = 2;
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Stencil, &played, &[], None, &mut state, 1).x_mult,
+        3.0
+    );
+
+    state.deck_size = 0;
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut state, 1).chips,
+        0
+    );
+    state.deck_size = 1;
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut state, 1).chips,
+        0
+    );
+
+    state.starting_deck_size = 52;
+    state.deck_size = 51;
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut state, 1).add_mult,
+        4
+    );
+    state.money = -10;
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Bull, &played, &[], None, &mut state, 1).chips,
+        0
+    );
+}
+
+#[test]
+fn living_mult_jokers_score_only_on_their_scoring_event() {
+    let played = [card(Rank::Seven, Suit::Spades)];
+
+    assert_eq!(
+        hand_effect(
+            JokerKind::GrosMichel,
+            &played,
+            &[],
+            Some(PokerHand::HighCard)
+        )
+        .add_mult,
+        15
+    );
+    assert_eq!(
+        hand_effect(
+            JokerKind::Cavendish,
+            &played,
+            &[],
+            Some(PokerHand::HighCard)
+        )
+        .x_mult,
+        3.0
+    );
+    assert_eq!(
+        played_effect(JokerKind::GrosMichel, &played[0], None),
+        JokerEffect::default()
+    );
+}
+
+#[test]
+fn initialized_target_jokers_match_both_parts_of_their_target() {
+    let mut idol = Jokers::new();
+    idol.add(Joker::create_joker(JokerKind::Idol));
+    let mut idol_state = GameState::new(110);
+    idol.initialize(&mut idol_state);
+    let (idol_rank, idol_suit) = match &idol.jokers[0].structure {
+        JokerStructure::Normal(JokerData::Scoring(data)) => {
+            (data.rank.as_ref().unwrap()[0], data.suit.unwrap())
+        }
+        _ => panic!("Idol did not contain scoring data"),
+    };
+    let matching = card(idol_rank, idol_suit);
+    let wrong_suit = card(
+        idol_rank,
+        if idol_suit == Suit::Hearts {
+            Suit::Spades
+        } else {
+            Suit::Hearts
+        },
+    );
+    assert_eq!(
+        idol.trigger(
+            TriggerEvent::PlayedCard {
+                card: &matching,
+                played_cards: std::slice::from_ref(&matching),
+                held_cards: &[],
+                card_index: 0,
+                hand_type: None,
+                hands_remaining: 4,
+            },
+            &mut idol_state,
+        )
+        .x_mult,
+        2.0
+    );
+    assert_eq!(
+        idol.trigger(
+            TriggerEvent::PlayedCard {
+                card: &wrong_suit,
+                played_cards: std::slice::from_ref(&wrong_suit),
+                held_cards: &[],
+                card_index: 0,
+                hand_type: None,
+                hands_remaining: 4,
+            },
+            &mut idol_state,
+        )
+        .x_mult,
+        1.0
+    );
+
+    let mut ancient = Jokers::new();
+    ancient.add(Joker::create_joker(JokerKind::Ancient));
+    let mut ancient_state = GameState::new(111);
+    ancient.initialize(&mut ancient_state);
+    let target_suit = match &ancient.jokers[0].structure {
+        JokerStructure::Normal(JokerData::Scoring(data)) => data.suit.unwrap(),
+        _ => panic!("Ancient Joker did not contain scoring data"),
+    };
+    let matching = card(Rank::Seven, target_suit);
+    assert_eq!(
+        ancient
+            .trigger(
+                TriggerEvent::PlayedCard {
+                    card: &matching,
+                    played_cards: std::slice::from_ref(&matching),
+                    held_cards: &[],
+                    card_index: 0,
+                    hand_type: None,
+                    hands_remaining: 4,
+                },
+                &mut ancient_state,
+            )
+            .x_mult,
+        1.5
+    );
+    let wrong_suit = card(
+        Rank::Seven,
+        if target_suit == Suit::Hearts {
+            Suit::Spades
+        } else {
+            Suit::Hearts
+        },
+    );
+    assert_eq!(
+        ancient
+            .trigger(
+                TriggerEvent::PlayedCard {
+                    card: &wrong_suit,
+                    played_cards: std::slice::from_ref(&wrong_suit),
+                    held_cards: &[],
+                    card_index: 0,
+                    hand_type: None,
+                    hands_remaining: 4,
+                },
+                &mut ancient_state,
+            )
+            .x_mult,
+        1.0
+    );
+}
+
+#[test]
+fn misprint_uses_a_seeded_value_within_its_current_range() {
+    let played = [card(Rank::Seven, Suit::Spades)];
+    let mut saw_low = false;
+    let mut saw_high = false;
+
+    for seed in 0..64 {
+        let mut jokers = Jokers::new();
+        jokers.add(Joker::create_joker(JokerKind::Misprint));
+        let mut state = GameState::new(seed);
+        let effect = jokers.trigger(
+            TriggerEvent::AfterHand {
+                played_cards: &played,
+                held_cards: &[],
+                hand_type: Some(PokerHand::HighCard),
+                hands_remaining: 3,
+                discards_remaining: 4,
+                joker_count: 1,
+            },
+            &mut state,
+        );
+
+        assert!(matches!(effect.add_mult, 0 | 23));
+        saw_low |= effect.add_mult == 0;
+        saw_high |= effect.add_mult == 23;
+    }
+
+    assert!(saw_low && saw_high);
+}
+
+#[test]
+fn bloodstone_requires_a_heart_and_a_successful_probability_roll() {
+    let heart = card(Rank::Seven, Suit::Hearts);
+    let club = card(Rank::Seven, Suit::Clubs);
+    let mut saw_success = false;
+    let mut saw_failure = false;
+
+    for seed in 0..64 {
+        let mut jokers = Jokers::new();
+        jokers.add(Joker::create_joker(JokerKind::Bloodstone));
+        let mut state = GameState::new(seed);
+        let effect = jokers.trigger(
+            TriggerEvent::PlayedCard {
+                card: &heart,
+                played_cards: std::slice::from_ref(&heart),
+                held_cards: &[],
+                card_index: 0,
+                hand_type: None,
+                hands_remaining: 4,
+            },
+            &mut state,
+        );
+
+        assert!(matches!(effect.x_mult, 1.0 | 1.5));
+        saw_success |= effect.x_mult == 1.5;
+        saw_failure |= effect.x_mult == 1.0;
+    }
+
+    assert!(saw_success && saw_failure);
+
+    let mut jokers = Jokers::new();
+    jokers.add(Joker::create_joker(JokerKind::Bloodstone));
+    let mut state = GameState::new(112);
+    assert_eq!(
+        jokers
+            .trigger(
+                TriggerEvent::PlayedCard {
+                    card: &club,
+                    played_cards: std::slice::from_ref(&club),
+                    held_cards: &[],
+                    card_index: 0,
+                    hand_type: None,
+                    hands_remaining: 4,
+                },
+                &mut state,
+            )
+            .x_mult,
+        1.0
     );
 }

@@ -283,25 +283,18 @@ fn discard_and_hand_lifecycle_updates_use_exact_boundaries() {
     let seven = card(Rank::Seven, Enhancement::None);
     let discarded = [jack, seven];
     let effect = hit_the_road.update(
-        UpdateEvent::CardsDiscarded {
-            cards: &discarded,
-        },
+        UpdateEvent::CardsDiscarded { cards: &discarded },
         &mut state,
     );
     assert_eq!(effect.x_mult, 1.5);
     hit_the_road.update(UpdateEvent::RoundStarted, &mut state);
-    let effect = hit_the_road.update(
-        UpdateEvent::CardsDiscarded { cards: &[] },
-        &mut state,
-    );
+    let effect = hit_the_road.update(UpdateEvent::CardsDiscarded { cards: &[] }, &mut state);
     assert_eq!(effect.x_mult, 1.0);
 
     let mut ramen = Jokers::new();
     ramen.add(Joker::create_joker(JokerKind::Ramen));
     let effect = ramen.update(
-        UpdateEvent::CardsDiscarded {
-            cards: &discarded,
-        },
+        UpdateEvent::CardsDiscarded { cards: &discarded },
         &mut state,
     );
     assert_eq!(effect.x_mult, 1.98);
@@ -309,9 +302,7 @@ fn discard_and_hand_lifecycle_updates_use_exact_boundaries() {
         .map(|_| card(Rank::Seven, Enhancement::None))
         .collect();
     let effect = ramen.update(
-        UpdateEvent::CardsDiscarded {
-            cards: &many_cards,
-        },
+        UpdateEvent::CardsDiscarded { cards: &many_cards },
         &mut state,
     );
     assert_eq!(effect.x_mult, 1.0);
@@ -411,9 +402,506 @@ fn scoring_updates_apply_thresholds_and_clamps() {
     constellation.add(Joker::create_joker(JokerKind::Constellation));
     let effect = constellation.update(UpdateEvent::PlanetCardUsed, &mut state);
     assert_eq!(effect.x_mult, 1.1);
+    assert_eq!(
+        constellation.update(UpdateEvent::TarotCardUsed, &mut state),
+        JokerEffect::default()
+    );
 
     let mut fortune_teller = Jokers::new();
     fortune_teller.add(Joker::create_joker(JokerKind::FortuneTeller));
     let effect = fortune_teller.update(UpdateEvent::TarotCardUsed, &mut state);
     assert_eq!(effect.add_mult, 1);
+}
+
+#[test]
+fn shop_and_pack_updates_use_only_their_matching_event() {
+    let mut red_card = Jokers::new();
+    red_card.add(Joker::create_joker(JokerKind::RedCard));
+    let mut state = GameState::new(30);
+    assert_eq!(
+        red_card
+            .update(UpdateEvent::BoosterPackSkipped, &mut state)
+            .add_mult,
+        3
+    );
+    assert_eq!(
+        red_card
+            .update(UpdateEvent::BoosterPackOpened, &mut state)
+            .add_mult,
+        0
+    );
+
+    let mut hologram = Jokers::new();
+    hologram.add(Joker::create_joker(JokerKind::Hologram));
+    assert_eq!(
+        hologram
+            .update(UpdateEvent::DeckChanged { cards_added: 0 }, &mut state)
+            .x_mult,
+        1.0
+    );
+    assert_eq!(
+        hologram
+            .update(UpdateEvent::DeckChanged { cards_added: 1 }, &mut state)
+            .x_mult,
+        1.25
+    );
+
+    let mut lucky_cat = Jokers::new();
+    lucky_cat.add(Joker::create_joker(JokerKind::LuckyCat));
+    assert_eq!(
+        lucky_cat
+            .update(UpdateEvent::LuckyCardSucceeded, &mut state)
+            .x_mult,
+        1.25
+    );
+    assert_eq!(
+        lucky_cat
+            .update(UpdateEvent::TarotCardUsed, &mut state)
+            .x_mult,
+        1.0
+    );
+
+    let mut flash_card = Jokers::new();
+    flash_card.add(Joker::create_joker(JokerKind::FlashCard));
+    assert_eq!(
+        flash_card
+            .update(UpdateEvent::ShopRerolled, &mut state)
+            .add_mult,
+        2
+    );
+    assert_eq!(
+        flash_card
+            .update(UpdateEvent::ShopClosed, &mut state)
+            .add_mult,
+        0
+    );
+}
+
+#[test]
+fn round_lifecycle_updates_apply_their_boundaries_in_place() {
+    let mut turtle_bean = Jokers::new();
+    turtle_bean.add(Joker::create_joker(JokerKind::TurtleBean));
+    let mut state = GameState::new(31);
+    assert_eq!(
+        turtle_bean
+            .update(UpdateEvent::RoundCompleted, &mut state)
+            .hand_size,
+        -1
+    );
+    assert_eq!(
+        turtle_bean
+            .update(UpdateEvent::BlindSelected { is_boss: false }, &mut state)
+            .hand_size,
+        0
+    );
+
+    let mut campfire = Jokers::new();
+    campfire.add(Joker::create_joker(JokerKind::Campfire));
+    let played = card(Rank::Seven, Enhancement::None);
+    assert_eq!(
+        campfire
+            .update(UpdateEvent::AfterCardSold, &mut state)
+            .x_mult,
+        1.25
+    );
+    assert_eq!(
+        campfire
+            .trigger(
+                TriggerEvent::AfterHand {
+                    played_cards: std::slice::from_ref(&played),
+                    held_cards: &[],
+                    hand_type: Some(PokerHand::HighCard),
+                    hands_remaining: 3,
+                    discards_remaining: 4,
+                    joker_count: 1,
+                },
+                &mut state,
+            )
+            .x_mult,
+        1.25
+    );
+    campfire.update(UpdateEvent::BossBlindCompleted, &mut state);
+    assert_eq!(
+        campfire
+            .trigger(
+                TriggerEvent::AfterHand {
+                    played_cards: std::slice::from_ref(&played),
+                    held_cards: &[],
+                    hand_type: Some(PokerHand::HighCard),
+                    hands_remaining: 3,
+                    discards_remaining: 4,
+                    joker_count: 1,
+                },
+                &mut state,
+            )
+            .x_mult,
+        1.0
+    );
+
+    let mut popcorn = Jokers::new();
+    popcorn.add(Joker::create_joker(JokerKind::Popcorn));
+    assert_eq!(
+        popcorn
+            .update(UpdateEvent::RoundCompleted, &mut state)
+            .add_mult,
+        16
+    );
+    assert_eq!(
+        popcorn
+            .update(UpdateEvent::BlindSelected { is_boss: false }, &mut state)
+            .add_mult,
+        0
+    );
+}
+
+#[test]
+fn obelisk_and_spare_trousers_use_hand_boundaries() {
+    let mut obelisk = Jokers::new();
+    obelisk.add(Joker::create_joker(JokerKind::Obelisk));
+    let mut state = GameState::new(32);
+    state.most_played_hand = Some(PokerHand::Pair);
+    let played = card(Rank::Seven, Enhancement::None);
+    assert_eq!(
+        obelisk
+            .update(
+                UpdateEvent::HandCompleted {
+                    played_cards: std::slice::from_ref(&played),
+                    hand_type: Some(PokerHand::Flush),
+                    hands_remaining: 3,
+                },
+                &mut state,
+            )
+            .x_mult,
+        1.2
+    );
+    assert_eq!(
+        obelisk
+            .update(
+                UpdateEvent::HandCompleted {
+                    played_cards: std::slice::from_ref(&played),
+                    hand_type: Some(PokerHand::Pair),
+                    hands_remaining: 2,
+                },
+                &mut state,
+            )
+            .x_mult,
+        1.0
+    );
+
+    let mut spare_trousers = Jokers::new();
+    spare_trousers.add(Joker::create_joker(JokerKind::SpareTrousers));
+    assert_eq!(
+        spare_trousers
+            .update(
+                UpdateEvent::HandCompleted {
+                    played_cards: std::slice::from_ref(&played),
+                    hand_type: Some(PokerHand::TwoPair),
+                    hands_remaining: 3,
+                },
+                &mut state,
+            )
+            .add_mult,
+        2
+    );
+    assert_eq!(
+        spare_trousers
+            .update(
+                UpdateEvent::HandCompleted {
+                    played_cards: std::slice::from_ref(&played),
+                    hand_type: Some(PokerHand::Pair),
+                    hands_remaining: 2,
+                },
+                &mut state,
+            )
+            .add_mult,
+        0
+    );
+}
+
+#[test]
+fn castle_tracks_only_cards_matching_its_current_target_suit() {
+    let mut castle = Jokers::new();
+    castle.add(Joker::create_joker(JokerKind::Castle));
+    let mut state = GameState::new(33);
+    castle.update(UpdateEvent::RoundStarted, &mut state);
+    let target = state
+        .target_suit
+        .expect("Castle did not choose a target suit");
+    let other = if target == Suit::Hearts {
+        Suit::Spades
+    } else {
+        Suit::Hearts
+    };
+    let cards = [
+        Card::new(
+            Rank::Seven,
+            other,
+            Enhancement::None,
+            Edition::None,
+            Seal::None,
+        ),
+        Card::new(
+            Rank::Eight,
+            target,
+            Enhancement::None,
+            Edition::None,
+            Seal::None,
+        ),
+        Card::new(
+            Rank::Nine,
+            other,
+            Enhancement::None,
+            Edition::None,
+            Seal::None,
+        ),
+    ];
+    assert_eq!(
+        castle
+            .update(UpdateEvent::CardsDiscarded { cards: &cards }, &mut state)
+            .chips,
+        3
+    );
+    assert_eq!(
+        castle
+            .update(UpdateEvent::CardsDiscarded { cards: &[] }, &mut state)
+            .chips,
+        3
+    );
+}
+
+#[test]
+fn madness_and_death_updates_respect_boss_and_threshold_edges() {
+    let mut madness = Jokers::new();
+    madness.add(Joker::create_joker(JokerKind::Madness));
+    let mut state = GameState::new(34);
+    assert_eq!(
+        madness.update(UpdateEvent::BlindSelected { is_boss: true }, &mut state),
+        JokerEffect::default()
+    );
+    let effect = madness.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
+    assert_eq!(effect.x_mult, 1.5);
+    assert!(effect.remove_random_joker);
+    assert_eq!(madness.as_slice().len(), 1);
+
+    let mut bones = Jokers::new();
+    bones.add(Joker::create_joker(JokerKind::MrBones));
+    assert_eq!(
+        bones
+            .update(
+                UpdateEvent::AfterPlayerDeath {
+                    chips_scored: 24,
+                    required_chips: 100,
+                },
+                &mut state,
+            )
+            .prevent_death,
+        false
+    );
+    let effect = bones.update(
+        UpdateEvent::AfterPlayerDeath {
+            chips_scored: 25,
+            required_chips: 100,
+        },
+        &mut state,
+    );
+    assert!(effect.prevent_death);
+    assert!(bones.as_slice().is_empty());
+}
+
+#[test]
+fn debuffed_round_end_and_nonmatching_destroy_events_are_inactive() {
+    let mut golden = Jokers::new();
+    golden.add(Joker::create_joker(JokerKind::Golden));
+    golden.jokers[0].debuffed = true;
+    let mut state = GameState::new(35);
+    assert_eq!(
+        golden.update(UpdateEvent::RoundCompleted, &mut state),
+        JokerEffect::default()
+    );
+
+    let mut glass = Jokers::new();
+    glass.add(Joker::create_joker(JokerKind::Glass));
+    let plain = card(Rank::Seven, Enhancement::None);
+    assert_eq!(
+        glass
+            .update(UpdateEvent::CardDestroyed { card: &plain }, &mut state)
+            .x_mult,
+        1.0
+    );
+}
+
+#[test]
+fn lifecycle_edges_are_safe_for_singletons_floors_and_expiration() {
+    let mut dagger = Jokers::new();
+    dagger.add(Joker::create_joker(JokerKind::CeremonialDagger));
+    let mut state = GameState::new(36);
+    let effect = dagger.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
+    assert_eq!(effect.add_mult, 2);
+    assert!(effect.remove_rightmost_joker);
+    assert_eq!(dagger.as_slice().len(), 1);
+
+    let mut burglar = Jokers::new();
+    burglar.add(Joker::create_joker(JokerKind::Burglar));
+    state.discards_remaining = 1;
+    let effect = burglar.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
+    assert_eq!(effect.discards, -4);
+    assert_eq!(state.discards_remaining, 0);
+
+    let mut green = Jokers::new();
+    green.add(Joker::create_joker(JokerKind::Green));
+    assert_eq!(
+        green
+            .update(UpdateEvent::DiscardActionCompleted, &mut state)
+            .add_mult,
+        0
+    );
+
+    let mut ice_cream = Jokers::new();
+    ice_cream.add(Joker::create_joker(JokerKind::IceCream));
+    for _ in 0..20 {
+        ice_cream.update(
+            UpdateEvent::HandCompleted {
+                played_cards: &[],
+                hand_type: Some(PokerHand::HighCard),
+                hands_remaining: 1,
+            },
+            &mut state,
+        );
+    }
+    assert_eq!(
+        ice_cream
+            .update(
+                UpdateEvent::HandCompleted {
+                    played_cards: &[],
+                    hand_type: Some(PokerHand::HighCard),
+                    hands_remaining: 1,
+                },
+                &mut state
+            )
+            .chips,
+        0
+    );
+}
+
+#[test]
+fn probability_and_removal_lifecycle_events_are_seeded_and_bounded() {
+    let mut saw_gros_failure = false;
+    let mut saw_gros_survival = false;
+    let mut saw_cavendish_failure = false;
+    let mut saw_cavendish_survival = false;
+    let mut saw_hallucination = false;
+    let mut saw_hallucination_failure = false;
+
+    for seed in 0..20_000 {
+        let mut gros = Jokers::new();
+        gros.add(Joker::create_joker(JokerKind::GrosMichel));
+        let mut gros_state = GameState::new(seed);
+        if gros
+            .update(UpdateEvent::RoundCompleted, &mut gros_state)
+            .remove_self
+        {
+            saw_gros_failure = true;
+        } else {
+            saw_gros_survival = true;
+        }
+
+        let mut cavendish = Jokers::new();
+        cavendish.add(Joker::create_joker(JokerKind::Cavendish));
+        let mut cavendish_state = GameState::new(seed);
+        if cavendish
+            .update(UpdateEvent::RoundCompleted, &mut cavendish_state)
+            .remove_self
+        {
+            saw_cavendish_failure = true;
+        } else {
+            saw_cavendish_survival = true;
+        }
+
+        let mut hallucination = Jokers::new();
+        hallucination.add(Joker::create_joker(JokerKind::Hallucination));
+        let mut hallucination_state = GameState::new(seed);
+        if hallucination
+            .update(UpdateEvent::BoosterPackOpened, &mut hallucination_state)
+            .generated
+            > 0
+        {
+            saw_hallucination = true;
+        } else {
+            saw_hallucination_failure = true;
+        }
+    }
+
+    assert!(saw_gros_failure && saw_gros_survival);
+    assert!(saw_cavendish_failure && saw_cavendish_survival);
+    assert!(saw_hallucination && saw_hallucination_failure);
+
+    let mut hallucination = Jokers::new();
+    hallucination.add(Joker::create_joker(JokerKind::Hallucination));
+    let mut state = GameState::new(37);
+    assert_eq!(
+        hallucination.update(UpdateEvent::RoundCompleted, &mut state),
+        JokerEffect::default()
+    );
+}
+
+#[test]
+fn target_rotation_and_unrelated_update_events_do_not_cross_trigger() {
+    let mut ancient = Jokers::new();
+    ancient.add(Joker::create_joker(JokerKind::Ancient));
+    let mut state = GameState::new(38);
+    ancient.update(UpdateEvent::RoundStarted, &mut state);
+    let first_suit = match &ancient.jokers[0].structure {
+        JokerStructure::Normal(JokerData::Scoring(data)) => data.suit,
+        _ => panic!("Ancient Joker did not contain scoring data"),
+    };
+    assert!(first_suit.is_some());
+    assert_eq!(
+        ancient.update(UpdateEvent::PlanetCardUsed, &mut state),
+        JokerEffect::default()
+    );
+    ancient.update(UpdateEvent::RoundCompleted, &mut state);
+    let second_suit = match &ancient.jokers[0].structure {
+        JokerStructure::Normal(JokerData::Scoring(data)) => data.suit,
+        _ => panic!("Ancient Joker did not contain scoring data"),
+    };
+    assert!(second_suit.is_some());
+
+    let mut constellation = Jokers::new();
+    constellation.add(Joker::create_joker(JokerKind::Constellation));
+    assert_eq!(
+        constellation.update(UpdateEvent::TarotCardUsed, &mut state),
+        JokerEffect::default()
+    );
+}
+
+#[test]
+fn yorick_levels_only_after_reaching_the_discard_threshold() {
+    let mut yorick = Jokers::new();
+    yorick.add(Joker::create_joker(JokerKind::Yorick));
+    let mut state = GameState::new(39);
+    let discarded: Vec<Card> = (0..22)
+        .map(|_| card(Rank::Seven, Enhancement::None))
+        .collect();
+    assert_eq!(
+        yorick
+            .update(
+                UpdateEvent::CardsDiscarded { cards: &discarded },
+                &mut state,
+            )
+            .x_mult,
+        1.0
+    );
+    let one = [card(Rank::Seven, Enhancement::None)];
+    assert_eq!(
+        yorick
+            .update(UpdateEvent::CardsDiscarded { cards: &one }, &mut state)
+            .x_mult,
+        2.0
+    );
+    assert_eq!(
+        yorick
+            .update(UpdateEvent::CardsDiscarded { cards: &[] }, &mut state)
+            .x_mult,
+        1.0
+    );
 }

@@ -85,3 +85,34 @@ fn hanging_chad_retriggers_the_first_played_card_twice() {
     assert_eq!(first_effect.retriggers, 2);
     assert_eq!(second_effect.retriggers, 0);
 }
+
+#[test]
+fn mime_retriggers_held_cards_but_not_played_cards() {
+    let mut jokers = Jokers::new();
+    jokers.add(Joker::create_joker(JokerKind::Mime));
+    let held = card(Rank::King);
+    let mut game_state = GameState::new(7);
+
+    let held_effect = jokers.trigger(
+        TriggerEvent::HeldCard {
+            card: &held,
+            held_cards: std::slice::from_ref(&held),
+            card_index: 0,
+        },
+        &mut game_state,
+    );
+    let played_effect = jokers.trigger(
+        TriggerEvent::PlayedCard {
+            card: &held,
+            played_cards: std::slice::from_ref(&held),
+            held_cards: &[],
+            card_index: 0,
+            hand_type: None,
+            hands_remaining: 4,
+        },
+        &mut game_state,
+    );
+
+    assert_eq!(held_effect.retriggers, 1);
+    assert_eq!(played_effect, JokerEffect::default());
+}

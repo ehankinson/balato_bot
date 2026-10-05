@@ -158,6 +158,41 @@ pub(crate) enum SkipTag {
     Economy = 24,
 }
 
+pub(crate) enum Vouchers {
+    Overstock = 1,
+    OverstockPlus = 2,
+    ClearanceSale = 3,
+    Liquidation = 4,
+    Hone = 5,
+    GlowUp = 6,
+    RerollSurplus = 7,
+    RerollGlut = 8,
+    CrystalBall = 9,
+    OmenGlobe = 10,
+    Telescope = 11,
+    Observatory = 12,
+    Grabber = 13,
+    NachoTong = 14,
+    Wasteful = 15,
+    Recyclomancy = 16,
+    TarotMerchant = 17,
+    TarotTycoon = 18,
+    PlanetMerchant = 19,
+    PlanetTycoon = 20,
+    SeedMoney = 21,
+    MoneyTree = 22,
+    Blank = 23,
+    Anitmatter = 24,
+    MagicTrick = 25,
+    Illusion = 26,
+    Hieroglyph = 27,
+    Petroglpyh = 28,
+    DirectorsCut = 29,
+    Retcon = 30,
+    PaintBrush = 31,
+    Palette = 32
+}
+
 impl PokerHand {
     pub(crate) const DISCARD_HANDS: [PokerHand; 11] = [
         PokerHand::Pair,
