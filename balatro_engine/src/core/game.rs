@@ -5,6 +5,7 @@ use crate::core::deck::Deck;
 use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Suit, Tarot, Vouchers};
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
+use crate::core::shop::{ShopError, ShopState};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
@@ -201,13 +202,36 @@ impl GameState {
 /// The runtime object that will coordinate phase transitions.
 pub struct Game {
     pub(crate) state: GameState,
+    pub(crate) shop: Option<ShopState>,
 }
 
 impl Game {
     pub fn new(seed: u64) -> Game {
         Game {
             state: GameState::new(seed),
+            shop: None,
         }
+    }
+
+    pub(crate) fn enter_shop(&mut self, mut shop: ShopState) -> Result<(), ShopError> {
+        if self.shop.is_some() {
+            return Err(ShopError::ShopAlreadyActive);
+        }
+        shop.refresh_base_items(&mut self.state);
+        self.shop = Some(shop);
+        Ok(())
+    }
+
+    pub(crate) fn shop(&self) -> Option<&ShopState> {
+        self.shop.as_ref()
+    }
+
+    pub(crate) fn shop_mut(&mut self) -> Option<&mut ShopState> {
+        self.shop.as_mut()
+    }
+
+    pub(crate) fn leave_shop(&mut self) -> Option<ShopState> {
+        self.shop.take()
     }
 }
 
@@ -222,3 +246,7 @@ mod card_deck_tests;
 #[cfg(test)]
 #[path = "tests/consumable.rs"]
 mod consumable_tests;
+
+#[cfg(test)]
+#[path = "tests/shop.rs"]
+mod shop_tests;

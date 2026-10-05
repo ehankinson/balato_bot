@@ -57,6 +57,10 @@ impl Joker {
         self.sell_value
     }
 
+    pub(crate) fn price(&self) -> u16 {
+        self.price as u16
+    }
+
     pub(crate) fn set_edition(&mut self, edition: JokerEdition) {
         self.edition = edition;
     }
@@ -74,6 +78,16 @@ impl Joker {
             .filter(|kind| Joker::create_joker(*kind).rarity == rarity)
             .collect::<Vec<_>>();
         kinds.choose(rng).copied().map(Joker::create_joker)
+    }
+
+    pub(crate) fn random_shop_joker(rng: &mut StdRng) -> Joker {
+        let kinds = JokerKind::ALL
+            .iter()
+            .copied()
+            .filter(|kind| Joker::create_joker(*kind).rarity != JokerRarity::Legendary)
+            .collect::<Vec<_>>();
+        let kind = kinds.choose(rng).copied().unwrap_or(JokerKind::Joker);
+        Joker::create_joker(kind)
     }
 
     pub(crate) fn create_joker(joker_kind: JokerKind) -> Joker {

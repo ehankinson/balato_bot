@@ -6,3 +6,4 @@ pub(crate) mod game;
 pub(crate) mod hand;
 pub(crate) mod joker;
 pub(crate) mod joker_types;
+pub(crate) mod shop;

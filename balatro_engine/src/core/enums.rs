@@ -158,6 +158,7 @@ pub(crate) enum SkipTag {
     Economy = 24,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Vouchers {
     Overstock = 1,
     OverstockPlus = 2,
@@ -219,6 +220,33 @@ pub(crate) enum Tarot {
     World = 22,
 }
 
+impl Tarot {
+    pub(crate) const ALL: [Tarot; 22] = [
+        Tarot::Fool,
+        Tarot::Magician,
+        Tarot::HighPriestess,
+        Tarot::Emperor,
+        Tarot::Empress,
+        Tarot::Hierophant,
+        Tarot::Lovers,
+        Tarot::Chariot,
+        Tarot::Justice,
+        Tarot::Hermit,
+        Tarot::WheelOfFortune,
+        Tarot::Strength,
+        Tarot::HangedMan,
+        Tarot::Death,
+        Tarot::Temperance,
+        Tarot::Devil,
+        Tarot::Tower,
+        Tarot::Star,
+        Tarot::Moon,
+        Tarot::Sun,
+        Tarot::Judgement,
+        Tarot::World,
+    ];
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Spectral {
     Familiar = 1,
@@ -255,6 +283,23 @@ pub(crate) enum Planet {
     PlanetX = 10,
     Ceres = 11,
     Eris = 12,
+}
+
+impl Planet {
+    pub(crate) const ALL: [Planet; 12] = [
+        Planet::Pluto,
+        Planet::Mercury,
+        Planet::Uranus,
+        Planet::Venus,
+        Planet::Saturn,
+        Planet::Jupiter,
+        Planet::Earth,
+        Planet::Mars,
+        Planet::Neptune,
+        Planet::PlanetX,
+        Planet::Ceres,
+        Planet::Eris,
+    ];
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
