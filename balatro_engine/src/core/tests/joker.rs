@@ -59,7 +59,12 @@ fn mail_in_rebate_triggers_for_matching_discarded_cards() {
         ),
     ];
 
-    jokers.trigger(TriggerEvent::Discard(&discarded_cards), &mut game_state);
+    jokers.trigger(
+        TriggerEvent::Discard {
+            cards: &discarded_cards,
+        },
+        &mut game_state,
+    );
 
     assert_eq!(game_state.money, 15);
 }
@@ -85,7 +90,10 @@ fn idol_is_initialized_and_updates_with_the_game_rng() {
 fn every_configured_persistent_update_is_registered() {
     let expected = [
         (JokerKind::Glass, &[JokerUpdate::CardDestroyed][..]),
-        (JokerKind::CeremonialDagger, &[JokerUpdate::BlindSelected][..]),
+        (
+            JokerKind::CeremonialDagger,
+            &[JokerUpdate::BlindSelected][..],
+        ),
         (
             JokerKind::HitTheRoad,
             &[JokerUpdate::CardsDiscarded, JokerUpdate::RoundStarted][..],
@@ -95,11 +103,14 @@ fn every_configured_persistent_update_is_registered() {
         (JokerKind::Canio, &[JokerUpdate::CardDestroyed][..]),
         (JokerKind::Yorick, &[JokerUpdate::CardsDiscarded][..]),
         (JokerKind::Runner, &[JokerUpdate::HandCompleted][..]),
-        (JokerKind::IceCream, &[JokerUpdate::RoundCompleted][..]),
+        (JokerKind::IceCream, &[JokerUpdate::HandCompleted][..]),
         (JokerKind::Constellation, &[JokerUpdate::PlanetCardUsed][..]),
         (
             JokerKind::Green,
-            &[JokerUpdate::HandCompleted, JokerUpdate::DiscardActionCompleted][..],
+            &[
+                JokerUpdate::HandCompleted,
+                JokerUpdate::DiscardActionCompleted,
+            ][..],
         ),
         (JokerKind::RedCard, &[JokerUpdate::BoosterPackSkipped][..]),
         (JokerKind::Madness, &[JokerUpdate::BlindSelected][..]),

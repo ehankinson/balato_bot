@@ -54,4 +54,16 @@ impl Card {
     pub(crate) fn suit(&self) -> Suit {
         self.suit
     }
+
+    pub(crate) fn enhancement(&self) -> Enhancement {
+        self.enhancement
+    }
+
+    pub(crate) fn is_face_card(&self) -> bool {
+        self.rank.is_face_card()
+    }
+
+    pub(crate) fn is_low_card(&self) -> bool {
+        self.rank.is_low_card()
+    }
 }

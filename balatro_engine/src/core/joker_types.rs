@@ -169,32 +169,33 @@ pub(crate) enum JokerTrigger {
     OnHeldCard = 3,
     BeforePlayedCards = 4,
     None = 5,
-    StartOfBlind = 6,
-    EndOfBlind = 7,
     OnDiscard = 8,
+    OnBossBlindAbility = 9,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum RetriggerTarget {
     FaceCards = 1,
     LowCards = 2,
     FinalHand = 3,
     FirstCard = 4,
     PlayedCards = 5,
-    HeldCards = 6
+    HeldCards = 6,
 }
 
 pub(crate) enum CopyType {
     Right = 1,
-    LeftMost = 2
+    LeftMost = 2,
 }
 
 pub(crate) enum JokerRarity {
     Common = 0,
     Uncommon = 1,
     Rare = 2,
-    Legendary = 3
+    Legendary = 3,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum GenerateType {
     None = 0,
     StoneCard = 1,
@@ -206,6 +207,7 @@ pub(crate) enum GenerateType {
     Gold = 7,
     PlanetLevel = 8,
     NegativeConsumable = 9,
+    DoubleTag = 10,
 }
 
 pub(crate) enum GameStateModifications {
@@ -217,7 +219,7 @@ pub(crate) enum GameStateModifications {
     DoubleSuit = 5,
     DuplicateJokers = 6,
     DoubleProbability = 7,
-    FreePlanetCards = 8
+    FreePlanetCards = 8,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -233,7 +235,7 @@ pub(crate) enum JokerUpdate {
     BoosterPackSkipped = 8,
     BoosterPackOpened = 9,
     TarotCardUsed = 10,
-    CardSold = 11,
+    JokerSold = 11,
     CardsDiscarded = 12,
     AfterCardSold = 13,
     AfterPlayerDeath = 14,
@@ -244,6 +246,7 @@ pub(crate) enum JokerUpdate {
     LuckyCardSucceeded = 19,
     ShopRerolled = 20,
     BossBlindCompleted = 21,
+    ShopClosed = 22,
 }
 
 impl JokerUpdate {

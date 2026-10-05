@@ -40,7 +40,7 @@ pub(crate) enum Suit {
     Spades = 3,
 }
 
-#[derive(Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Enhancement {
     None = 0,
     Stone = 1,

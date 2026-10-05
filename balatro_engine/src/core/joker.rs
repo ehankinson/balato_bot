@@ -1,6 +1,4 @@
-use crate::core::enums::{
-    Enhancement, PokerHand, Rank, Suit,
-};
+use crate::core::enums::{Enhancement, PokerHand, Rank, Suit};
 use crate::core::joker_types::{
     CopyType, GameStateModifications, GenerateType, JokerEdition, JokerKind, JokerRarity,
     JokerTrigger, RetriggerTarget,
@@ -8,7 +6,7 @@ use crate::core::joker_types::{
 
 #[path = "joker_events.rs"]
 mod events;
-pub use events::{Jokers, TriggerEvent};
+pub use events::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
 
 pub struct Joker {
     kind: JokerKind,
@@ -17,8 +15,11 @@ pub struct Joker {
     trigger: JokerTrigger,
     rarity: JokerRarity,
     price: u8,
+    sell_value: u8,
     debuffed: bool,
     update_mask: u32,
+    rounds_completed: u8,
+    active_hands: u8,
 }
 
 pub(crate) enum JokerData {
@@ -362,7 +363,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Uncommon,
-                    JokerTrigger::BeforePlayedCards,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
@@ -663,7 +664,7 @@ impl Joker {
                 (
                     4,
                     JokerRarity::Common,
-                    JokerTrigger::EndOfBlind,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -676,7 +677,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Uncommon,
-                    JokerTrigger::StartOfBlind,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::GameState(data)),
                 )
             }
@@ -938,7 +939,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Common,
-                    JokerTrigger::BeforePlayedCards,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
@@ -1015,7 +1016,7 @@ impl Joker {
                 (
                     7,
                     JokerRarity::Uncommon,
-                    JokerTrigger::EndOfBlind,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -1028,7 +1029,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Uncommon,
-                    JokerTrigger::EndOfBlind,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -1093,7 +1094,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Uncommon,
-                    JokerTrigger::EndOfBlind,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -1157,7 +1158,7 @@ impl Joker {
                 (
                     5,
                     JokerRarity::Uncommon,
-                    JokerTrigger::EndOfBlind,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -1235,7 +1236,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Common,
-                    JokerTrigger::EndOfBlind,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -1737,7 +1738,7 @@ impl Joker {
                 (
                     7,
                     JokerRarity::Uncommon,
-                    JokerTrigger::AfterHand,
+                    JokerTrigger::OnBossBlindAbility,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -2011,7 +2012,7 @@ impl Joker {
                 (
                     20,
                     JokerRarity::Legendary,
-                    JokerTrigger::EndOfBlind,
+                    JokerTrigger::None,
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
@@ -2026,8 +2027,11 @@ impl Joker {
             trigger,
             rarity,
             price,
+            sell_value: price / 2,
             debuffed: false,
             update_mask,
+            rounds_completed: 0,
+            active_hands: 0,
         }
     }
 }
@@ -2138,3 +2142,27 @@ impl JokerGenerate {
 #[cfg(test)]
 #[path = "tests/joker.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/joker_triggers.rs"]
+mod joker_triggers;
+
+#[cfg(test)]
+#[path = "tests/joker_retriggers.rs"]
+mod joker_retriggers;
+
+#[cfg(test)]
+#[path = "tests/joker_updates.rs"]
+mod joker_updates;
+
+#[cfg(test)]
+#[path = "tests/joker_economy.rs"]
+mod joker_economy;
+
+#[cfg(test)]
+#[path = "tests/joker_scoring.rs"]
+mod joker_scoring;
+
+#[cfg(test)]
+#[path = "tests/joker_coverage.rs"]
+mod joker_coverage;
