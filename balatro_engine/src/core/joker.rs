@@ -3,11 +3,14 @@ use crate::core::joker_types::{
     CopyType, GameStateModifications, GenerateType, JokerEdition, JokerKind, JokerRarity,
     JokerTrigger, RetriggerTarget,
 };
+use rand::prelude::IndexedRandom;
+use rand::rngs::StdRng;
 
 #[path = "joker_events.rs"]
 mod events;
 pub use events::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
 
+#[derive(Clone)]
 pub struct Joker {
     kind: JokerKind,
     structure: JokerStructure,
@@ -22,6 +25,7 @@ pub struct Joker {
     active_hands: u8,
 }
 
+#[derive(Clone)]
 pub(crate) enum JokerData {
     Scoring(JokerScoring),
     Econ(JokerEcon),
@@ -30,12 +34,48 @@ pub(crate) enum JokerData {
     Generate(JokerGenerate),
 }
 
+#[derive(Clone)]
 pub(crate) enum JokerStructure {
     Normal(JokerData),
     Copy(CopyType),
 }
 
 impl Joker {
+    pub(crate) fn kind(&self) -> JokerKind {
+        self.kind
+    }
+
+    pub(crate) fn edition(&self) -> JokerEdition {
+        self.edition
+    }
+
+    pub(crate) fn rarity(&self) -> JokerRarity {
+        self.rarity
+    }
+
+    pub(crate) fn sell_value(&self) -> u8 {
+        self.sell_value
+    }
+
+    pub(crate) fn set_edition(&mut self, edition: JokerEdition) {
+        self.edition = edition;
+    }
+
+    pub(crate) fn clear_negative_edition(&mut self) {
+        if self.edition == JokerEdition::Negative {
+            self.edition = JokerEdition::None;
+        }
+    }
+
+    pub(crate) fn random_with_rarity(rarity: JokerRarity, rng: &mut StdRng) -> Option<Joker> {
+        let kinds = JokerKind::ALL
+            .iter()
+            .copied()
+            .filter(|kind| Joker::create_joker(*kind).rarity == rarity)
+            .collect::<Vec<_>>();
+        kinds.choose(rng).copied().map(Joker::create_joker)
+    }
+
     pub(crate) fn create_joker(joker_kind: JokerKind) -> Joker {
         let (price, rarity, trigger, structure) = match joker_kind {
             JokerKind::Joker => {
@@ -2036,6 +2076,7 @@ impl Joker {
     }
 }
 
+#[derive(Clone)]
 pub struct JokerScoring {
     chips: u16,
     add_mult: u8,
@@ -2064,6 +2105,7 @@ impl JokerScoring {
     }
 }
 
+#[derive(Clone)]
 pub struct JokerEcon {
     money: u8,
     required_count: u8,
@@ -2088,6 +2130,7 @@ impl JokerEcon {
     }
 }
 
+#[derive(Clone)]
 pub struct JokerGameState {
     discards: i8,
     hand_size: i8,
@@ -2114,11 +2157,13 @@ impl JokerGameState {
     }
 }
 
+#[derive(Clone)]
 pub struct JokerRetrigger {
     retrigger: u8,
     target: RetriggerTarget,
 }
 
+#[derive(Clone)]
 pub struct JokerGenerate {
     probability: f32,
     amount: u8,

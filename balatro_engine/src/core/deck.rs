@@ -1,5 +1,5 @@
 use crate::core::card::Card;
-use crate::core::enums::{Decks, Edition, Enhancement, Rank, Seal, ALL_RANKS, ALL_SUITS};
+use crate::core::enums::{ALL_RANKS, ALL_SUITS, Decks, Edition, Enhancement, Rank, Seal};
 use crate::core::hand::Hand;
 use rand::prelude::IndexedRandom;
 use rand::rngs::StdRng;
@@ -82,6 +82,14 @@ impl Deck {
 
     pub(crate) fn discarded_cards(&self) -> &[Card] {
         &self.discarded_cards
+    }
+
+    pub(crate) fn card(&self, index: usize) -> Option<&Card> {
+        self.cards.get(index)
+    }
+
+    pub(crate) fn card_mut(&mut self, index: usize) -> Option<&mut Card> {
+        self.cards.get_mut(index)
     }
 
     pub(crate) fn size(&self) -> u16 {

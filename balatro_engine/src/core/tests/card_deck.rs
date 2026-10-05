@@ -1,8 +1,8 @@
 use crate::core::card::Card;
 use crate::core::deck::Deck;
 use crate::core::enums::{Decks, Edition, Enhancement, Rank, Seal, Suit};
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 #[test]
 fn card_mutations_update_card_identity_and_values() {

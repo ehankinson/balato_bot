@@ -17,6 +17,22 @@ impl Hand {
         &self.cards
     }
 
+    pub(crate) fn cards_mut(&mut self) -> &mut [Card] {
+        &mut self.cards
+    }
+
+    pub(crate) fn card(&self, index: usize) -> Option<&Card> {
+        self.cards.get(index)
+    }
+
+    pub(crate) fn card_mut(&mut self, index: usize) -> Option<&mut Card> {
+        self.cards.get_mut(index)
+    }
+
+    pub(crate) fn remove_card_at(&mut self, index: usize) -> Option<Card> {
+        (index < self.cards.len()).then(|| self.cards.remove(index))
+    }
+
     pub fn add_card(&mut self, card: Card) {
         self.cards.push(card);
     }

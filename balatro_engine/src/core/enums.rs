@@ -40,7 +40,7 @@ pub(crate) enum Suit {
     Spades = 3,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Enhancement {
     None = 0,
     Stone = 1,
@@ -53,7 +53,7 @@ pub(crate) enum Enhancement {
     Steel = 8,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Seal {
     None = 0,
     Gold = 1,
@@ -62,7 +62,7 @@ pub(crate) enum Seal {
     Red = 4,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Edition {
     None = 0,
     Foil = 1,
@@ -190,33 +190,36 @@ pub(crate) enum Vouchers {
     DirectorsCut = 29,
     Retcon = 30,
     PaintBrush = 31,
-    Palette = 32
+    Palette = 32,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Tarot {
     Fool = 1,
     Magician = 2,
     HighPriestess = 3,
-    Empress = 4,
-    Hierophant = 5,
-    Lovers = 6,
-    Chariot = 7,
-    Justice = 8,
-    Hermit = 9,
-    WheelOfFortune = 10,
-    Strength = 11,
-    HangedMan = 12,
-    Death = 13,
-    Temperance = 14,
-    Devil = 15,
-    Tower = 16,
-    Star = 17,
-    Moon = 18,
-    Sun = 19,
-    Judgement = 20,
-    World = 21
+    Emperor = 4,
+    Empress = 5,
+    Hierophant = 6,
+    Lovers = 7,
+    Chariot = 8,
+    Justice = 9,
+    Hermit = 10,
+    WheelOfFortune = 11,
+    Strength = 12,
+    HangedMan = 13,
+    Death = 14,
+    Temperance = 15,
+    Devil = 16,
+    Tower = 17,
+    Star = 18,
+    Moon = 19,
+    Sun = 20,
+    Judgement = 21,
+    World = 22,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Spectral {
     Familiar = 1,
     Grim = 2,
@@ -235,9 +238,10 @@ pub(crate) enum Spectral {
     Medium = 15,
     Cryptid = 16,
     Soul = 17,
-    BlackHole = 18 
+    BlackHole = 18,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Planet {
     Pluto = 1,
     Mercury = 2,
@@ -250,9 +254,10 @@ pub(crate) enum Planet {
     Neptune = 9,
     PlanetX = 10,
     Ceres = 11,
-    Eris = 12
+    Eris = 12,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Consumable {
     Tarot(Tarot),
     Planet(Planet),

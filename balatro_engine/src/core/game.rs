@@ -1,9 +1,12 @@
+use crate::core::consumable::{
+    ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_SLOTS, PokerHandLevel, PokerHandLevels,
+};
 use crate::core::deck::Deck;
-use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Suit, Vouchers};
+use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Suit, Tarot, Vouchers};
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 /// Run counters shared by the shop and blind phases.
 ///
@@ -65,6 +68,8 @@ pub struct GameState {
     pub(crate) money: i16,
     pub(crate) vouchers: Vec<Vouchers>,
     pub(crate) consumables: Vec<Consumable>,
+    pub(crate) last_consumable: Option<Consumable>,
+    pub(crate) hand_levels: PokerHandLevels,
     pub(crate) counters: GameCounters,
     pub(crate) boss_blind_disabled: bool,
     pub(crate) prevent_death: bool,
@@ -89,6 +94,8 @@ impl GameState {
             money: 0,
             vouchers: Vec::new(),
             consumables: Vec::new(),
+            last_consumable: None,
+            hand_levels: PokerHandLevels::new(),
             counters: GameCounters::new(),
             boss_blind_disabled: false,
             prevent_death: false,
@@ -118,6 +125,57 @@ impl GameState {
 
     pub(crate) fn nines_in_deck(&self) -> u16 {
         self.deck.rank_count(Rank::Nine)
+    }
+
+    pub(crate) fn hand_level(&self, hand: PokerHand) -> PokerHandLevel {
+        self.hand_levels.get(hand)
+    }
+
+    pub(crate) fn add_consumable(
+        &mut self,
+        consumable: Consumable,
+    ) -> Result<(), ConsumableUseError> {
+        if self.consumables.len() >= DEFAULT_CONSUMABLE_SLOTS {
+            return Err(ConsumableUseError::NoCapacity);
+        }
+        self.consumables.push(consumable);
+        Ok(())
+    }
+
+    pub(crate) fn use_consumable(
+        &mut self,
+        index: usize,
+        hand: &mut Hand,
+        target: ConsumableTarget,
+    ) -> Result<(), ConsumableUseError> {
+        let consumable = self
+            .consumables
+            .get(index)
+            .copied()
+            .ok_or(ConsumableUseError::ConsumableNotFound)?;
+        consumable.apply(self, hand, &target)?;
+
+        let used = self.consumables.remove(index);
+        match used {
+            Consumable::Tarot(Tarot::Fool) => {}
+            Consumable::Tarot(_) | Consumable::Planet(_) => {
+                self.last_consumable = Some(used);
+            }
+            Consumable::Spectral(_) => {}
+        }
+
+        match used {
+            Consumable::Tarot(_) => {
+                self.counters.tarot_cards_used = self.counters.tarot_cards_used.saturating_add(1);
+                self.update_jokers(UpdateEvent::TarotCardUsed);
+            }
+            Consumable::Planet(_) => {
+                self.counters.planet_cards_used = self.counters.planet_cards_used.saturating_add(1);
+                self.update_jokers(UpdateEvent::PlanetCardUsed);
+            }
+            Consumable::Spectral(_) => {}
+        }
+        Ok(())
     }
 
     pub(crate) fn deal_cards(&mut self, hand: &mut Hand) {
@@ -160,3 +218,7 @@ mod tests;
 #[cfg(test)]
 #[path = "tests/card_deck.rs"]
 mod card_deck_tests;
+
+#[cfg(test)]
+#[path = "tests/consumable.rs"]
+mod consumable_tests;

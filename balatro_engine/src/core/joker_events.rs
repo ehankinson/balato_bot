@@ -1,7 +1,7 @@
 use rand::prelude::{IndexedRandom, IteratorRandom, RngExt};
 
 use crate::core::card::Card;
-use crate::core::enums::{Enhancement, PokerHand, Rank, Suit, ALL_RANKS, ALL_SUITS};
+use crate::core::enums::{ALL_RANKS, ALL_SUITS, Enhancement, PokerHand, Rank, Suit};
 use crate::core::game::GameState;
 use crate::core::joker::{Joker, JokerData, JokerStructure};
 use crate::core::joker_types::{
@@ -197,6 +197,8 @@ pub struct Jokers {
 }
 
 impl Jokers {
+    pub(crate) const CAPACITY: usize = 5;
+
     pub fn new() -> Jokers {
         Jokers {
             jokers: Vec::with_capacity(5),
@@ -205,6 +207,45 @@ impl Jokers {
 
     pub fn add(&mut self, joker: Joker) {
         self.jokers.push(joker);
+    }
+
+    pub(crate) fn has_room(&self) -> bool {
+        self.jokers.len() < Self::CAPACITY
+    }
+
+    pub(crate) fn get(&self, index: usize) -> Option<&Joker> {
+        self.jokers.get(index)
+    }
+
+    pub(crate) fn get_mut(&mut self, index: usize) -> Option<&mut Joker> {
+        self.jokers.get_mut(index)
+    }
+
+    pub(crate) fn clone_at(&self, index: usize) -> Option<Joker> {
+        self.jokers.get(index).cloned()
+    }
+
+    pub(crate) fn replace_with(&mut self, joker: Joker) {
+        self.jokers.clear();
+        self.jokers.push(joker);
+    }
+
+    pub(crate) fn keep_only(&mut self, index: usize) -> bool {
+        if index >= self.jokers.len() {
+            return false;
+        }
+
+        let joker = self.jokers[index].clone();
+        self.jokers.clear();
+        self.jokers.push(joker);
+        true
+    }
+
+    pub(crate) fn total_sell_value(&self) -> u16 {
+        self.jokers
+            .iter()
+            .map(|joker| joker.sell_value() as u16)
+            .sum()
     }
 
     pub fn initialize(&mut self, game_state: &mut GameState) {

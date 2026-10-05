@@ -105,6 +105,15 @@ impl Card {
         self.refresh_id();
     }
 
+    pub(crate) fn copy_properties_from(&mut self, other: &Card) {
+        self.rank = other.rank;
+        self.suit = other.suit;
+        self.enhancement = other.enhancement;
+        self.seal = other.seal;
+        self.edition = other.edition;
+        self.refresh_id();
+    }
+
     fn refresh_id(&mut self) {
         self.id = Card::build_id(
             &self.rank,

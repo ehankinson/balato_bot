@@ -30,7 +30,7 @@ const COMBINATION: [[u128; MAX_DRAW + 1]; MAX_CARDS + 1] = {
         let mut k = 0;
 
         while k <= MAX_DRAW {
-            table[n][k] =  choose(n, k);
+            table[n][k] = choose(n, k);
             k += 1;
         }
 
@@ -39,7 +39,6 @@ const COMBINATION: [[u128; MAX_DRAW + 1]; MAX_CARDS + 1] = {
 
     table
 };
-
 
 static HAND_POSSIBILITIES: LazyLock<Vec<Vec<Vec<u8>>>> = LazyLock::new(|| {
     let rank_combos: Vec<Vec<u8>> = (0..13).map(|rank| vec![rank]).collect();
@@ -87,7 +86,6 @@ static HAND_POSSIBILITIES: LazyLock<Vec<Vec<Vec<u8>>>> = LazyLock::new(|| {
         suit_rank_combos,      // Flush Five
     ]
 });
-
 
 #[derive(Clone)]
 struct Holder {
@@ -196,9 +194,7 @@ fn calculate_odds(
             .map(|draw| {
                 draw.iter()
                     .zip(deck_val_amounts.iter())
-                    .map(|(&amount, &available)| {
-                        COMBINATION[available][amount]
-                    })
+                    .map(|(&amount, &available)| COMBINATION[available][amount])
                     .product::<u128>()
             })
             .sum();
