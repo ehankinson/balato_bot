@@ -156,3 +156,7 @@ impl Game {
 #[cfg(test)]
 #[path = "tests/game_state.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/card_deck.rs"]
+mod card_deck_tests;

@@ -38,28 +38,50 @@ impl Deck {
         self.cards.push(card);
     }
 
-    pub(crate) fn deal_cards(&mut self, hand: &mut Hand, hand_size: u8, rng: &mut StdRng) {
+    pub(crate) fn shuffle(&mut self, rng: &mut StdRng) {
         self.cards.shuffle(rng);
+    }
+
+    pub(crate) fn draw_card(&mut self) -> Option<Card> {
+        self.cards.pop()
+    }
+
+    pub(crate) fn draw_cards(&mut self, amount: usize) -> Vec<Card> {
+        (0..amount).filter_map(|_| self.draw_card()).collect()
+    }
+
+    pub(crate) fn deal_cards(&mut self, hand: &mut Hand, hand_size: u8, rng: &mut StdRng) {
+        self.shuffle(rng);
         let add_card_amount = hand_size.saturating_sub(hand.hand_size());
         for _ in 0..add_card_amount {
-            if let Some(card) = self.cards.pop() {
+            if let Some(card) = self.draw_card() {
                 hand.add_card(card);
             }
         }
     }
 
-    pub(crate) fn add_to_discard(&mut self, mut cards: Vec<Card>) {
-        let length = cards.len();
-        for _ in 0..length {
-            self.discarded_cards.push(cards.pop().unwrap());
-        }
+    pub(crate) fn discard_card(&mut self, card: Card) {
+        self.discarded_cards.push(card);
+    }
+
+    pub(crate) fn discard_cards(&mut self, cards: Vec<Card>) {
+        self.discarded_cards.extend(cards);
     }
 
     pub(crate) fn reset_deck(&mut self) {
-        let length = self.discarded_cards.len();
-        for _ in 0..length {
-            self.cards.push(self.discarded_cards.pop().unwrap());
-        }
+        self.cards.append(&mut self.discarded_cards);
+    }
+
+    pub(crate) fn remove_card_at(&mut self, index: usize) -> Option<Card> {
+        (index < self.cards.len()).then(|| self.cards.remove(index))
+    }
+
+    pub(crate) fn cards(&self) -> &[Card] {
+        &self.cards
+    }
+
+    pub(crate) fn discarded_cards(&self) -> &[Card] {
+        &self.discarded_cards
     }
 
     pub(crate) fn size(&self) -> u16 {
@@ -85,16 +107,19 @@ impl Deck {
         self.cards.iter().filter(|card| card.rank() == rank).count() as u16
     }
 
-    pub(crate) fn remove_cards_of_rank(&mut self, rank: Rank, amount: usize) {
+    pub(crate) fn remove_cards_of_rank(&mut self, rank: Rank, amount: usize) -> Vec<Card> {
         let mut remaining = amount;
+        let mut removed = Vec::new();
         self.cards.retain(|card| {
             if remaining > 0 && card.rank() == rank {
                 remaining -= 1;
+                removed.push(card.clone());
                 false
             } else {
                 true
             }
         });
+        removed
     }
 
     #[cfg(test)]
