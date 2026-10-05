@@ -1,65 +1,115 @@
 use crate::core::card::Card;
-use crate::core::enums::{ALL_RANKS, ALL_SUITS, Decks, Edition, Enhancement, Rank, Seal};
+use crate::core::enums::{Decks, Edition, Enhancement, Rank, Seal, ALL_RANKS, ALL_SUITS};
 use crate::core::hand::Hand;
 use rand::prelude::IndexedRandom;
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 
 const DECK_SIZE: u8 = 52;
+const BASE_HAND_SIZE: i8 = 8;
 
-struct Deck {
+pub(crate) struct Deck {
     deck_type: Decks,
-    available_cards: u8,
+    hand_size_modifier: i8,
+    starting_size: u16,
     cards: Vec<Card>,
     discarded_cards: Vec<Card>,
 }
 
 impl Deck {
-    pub fn new(deck_type: Decks) -> Deck {
-        let cards = Deck::build_cards(&deck_type);
+    pub(crate) fn new(deck_type: Decks, rng: &mut StdRng) -> Deck {
+        let cards = Deck::build_cards(&deck_type, rng);
+        let hand_size_modifier = match deck_type {
+            Decks::Black => -1,
+            Decks::Painted => 2,
+            _ => 0,
+        };
 
         Deck {
             deck_type,
-            available_cards: cards.len() as u8,
+            hand_size_modifier,
+            starting_size: cards.len() as u16,
             cards,
             discarded_cards: Vec::with_capacity(64),
         }
     }
 
-    pub fn add_card_to_deck(&mut self, card: Card) {
+    pub(crate) fn add_card_to_deck(&mut self, card: Card) {
         self.cards.push(card);
     }
 
-    pub fn deal_cards(&mut self, hand: &mut Hand, hand_size: u8) {
-        let mut rng = rand::rng();
-        self.cards.shuffle(&mut rng);
-        let add_card_amount = hand_size - hand.hand_size();
+    pub(crate) fn deal_cards(&mut self, hand: &mut Hand, hand_size: u8, rng: &mut StdRng) {
+        self.cards.shuffle(rng);
+        let add_card_amount = hand_size.saturating_sub(hand.hand_size());
         for _ in 0..add_card_amount {
-            hand.add_card(self.cards.pop().unwrap());
+            if let Some(card) = self.cards.pop() {
+                hand.add_card(card);
+            }
         }
     }
 
-    pub fn add_to_discard(mut self, mut cards: Vec<Card>) {
+    pub(crate) fn add_to_discard(&mut self, mut cards: Vec<Card>) {
         let length = cards.len();
         for _ in 0..length {
             self.discarded_cards.push(cards.pop().unwrap());
         }
     }
 
-    pub fn reset_deck(&mut self) {
+    pub(crate) fn reset_deck(&mut self) {
         let length = self.discarded_cards.len();
         for _ in 0..length {
             self.cards.push(self.discarded_cards.pop().unwrap());
         }
     }
 
-    fn build_cards(deck_type: &Decks) -> Vec<Card> {
+    pub(crate) fn size(&self) -> u16 {
+        self.cards.len() as u16
+    }
+
+    pub(crate) fn starting_size(&self) -> u16 {
+        self.starting_size
+    }
+
+    pub(crate) fn hand_size(&self) -> i8 {
+        BASE_HAND_SIZE + self.hand_size_modifier
+    }
+
+    pub(crate) fn enhanced_count(&self) -> u16 {
+        self.cards
+            .iter()
+            .filter(|card| card.enhancement() != Enhancement::None)
+            .count() as u16
+    }
+
+    pub(crate) fn rank_count(&self, rank: Rank) -> u16 {
+        self.cards.iter().filter(|card| card.rank() == rank).count() as u16
+    }
+
+    pub(crate) fn remove_cards_of_rank(&mut self, rank: Rank, amount: usize) {
+        let mut remaining = amount;
+        self.cards.retain(|card| {
+            if remaining > 0 && card.rank() == rank {
+                remaining -= 1;
+                false
+            } else {
+                true
+            }
+        });
+    }
+
+    #[cfg(test)]
+    pub(crate) fn remove_cards(&mut self, amount: usize) {
+        let new_length = self.cards.len().saturating_sub(amount);
+        self.cards.truncate(new_length);
+    }
+
+    fn build_cards(deck_type: &Decks, rng: &mut StdRng) -> Vec<Card> {
         let mut vec = Vec::with_capacity(64);
         if deck_type == &Decks::Erratic {
-            let mut rng = rand::rng();
             for _ in 0..DECK_SIZE {
                 vec.push(Card::new(
-                    *ALL_RANKS.choose(&mut rng).unwrap(),
-                    *ALL_SUITS.choose(&mut rng).unwrap(),
+                    *ALL_RANKS.choose(rng).unwrap(),
+                    *ALL_SUITS.choose(rng).unwrap(),
                     Enhancement::None,
                     Edition::None,
                     Seal::None,

@@ -193,6 +193,72 @@ pub(crate) enum Vouchers {
     Palette = 32
 }
 
+pub(crate) enum Tarot {
+    Fool = 1,
+    Magician = 2,
+    HighPriestess = 3,
+    Empress = 4,
+    Hierophant = 5,
+    Lovers = 6,
+    Chariot = 7,
+    Justice = 8,
+    Hermit = 9,
+    WheelOfFortune = 10,
+    Strength = 11,
+    HangedMan = 12,
+    Death = 13,
+    Temperance = 14,
+    Devil = 15,
+    Tower = 16,
+    Star = 17,
+    Moon = 18,
+    Sun = 19,
+    Judgement = 20,
+    World = 21
+}
+
+pub(crate) enum Spectral {
+    Familiar = 1,
+    Grim = 2,
+    Incantation = 3,
+    Talisman = 4,
+    Aura = 5,
+    Wraith = 6,
+    Sigil = 7,
+    Ouija = 8,
+    Ectoplasm = 9,
+    Immolate = 10,
+    Ankh = 11,
+    DejaVu = 12,
+    Hex = 13,
+    Trance = 14,
+    Medium = 15,
+    Cryptid = 16,
+    Soul = 17,
+    BlackHole = 18 
+}
+
+pub(crate) enum Planet {
+    Pluto = 1,
+    Mercury = 2,
+    Uranus = 3,
+    Venus = 4,
+    Saturn = 5,
+    Jupiter = 6,
+    Earth = 7,
+    Mars = 8,
+    Neptune = 9,
+    PlanetX = 10,
+    Ceres = 11,
+    Eris = 12
+}
+
+pub(crate) enum Consumable {
+    Tarot(Tarot),
+    Planet(Planet),
+    Spectral(Spectral),
+}
+
 impl PokerHand {
     pub(crate) const DISCARD_HANDS: [PokerHand; 11] = [
         PokerHand::Pair,

@@ -66,4 +66,8 @@ impl Card {
     pub(crate) fn is_low_card(&self) -> bool {
         self.rank.is_low_card()
     }
+
+    pub(crate) fn id(&self) -> u16 {
+        self.id
+    }
 }

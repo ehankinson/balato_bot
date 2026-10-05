@@ -64,7 +64,7 @@ fn hand_effect_with_state(
             held_cards,
             hand_type,
             hands_remaining: 3,
-            discards_remaining: state.discards_remaining,
+            discards_remaining: state.counters.discards_remaining,
             joker_count,
         },
         state,
@@ -212,7 +212,7 @@ fn special_scoring_jokers_respect_state_boundaries() {
     let played = [card(Rank::Seven, Suit::Spades)];
 
     let mut no_discards = GameState::new(102);
-    no_discards.discards_remaining = 0;
+    no_discards.counters.discards_remaining = 0;
     assert_eq!(
         hand_effect_with_state(
             JokerKind::MysticSummit,
@@ -227,7 +227,7 @@ fn special_scoring_jokers_respect_state_boundaries() {
     );
 
     let mut with_discards = GameState::new(103);
-    with_discards.discards_remaining = 1;
+    with_discards.counters.discards_remaining = 1;
     assert_eq!(
         hand_effect_with_state(
             JokerKind::MysticSummit,
@@ -242,12 +242,12 @@ fn special_scoring_jokers_respect_state_boundaries() {
     );
 
     let mut banner_state = GameState::new(104);
-    banner_state.discards_remaining = 2;
+    banner_state.counters.discards_remaining = 2;
     assert_eq!(
         hand_effect_with_state(JokerKind::Banner, &played, &[], None, &mut banner_state, 1,).chips,
         60
     );
-    banner_state.discards_remaining = 0;
+    banner_state.counters.discards_remaining = 0;
     assert_eq!(
         hand_effect_with_state(JokerKind::Banner, &played, &[], None, &mut banner_state, 1,).chips,
         0
@@ -278,25 +278,22 @@ fn deck_and_lineup_scoring_jokers_use_current_counts() {
     let played = [card(Rank::Seven, Suit::Spades)];
 
     let mut state = GameState::new(106);
-    state.deck_size = 52;
     assert_eq!(
         hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut state, 1).chips,
         26
     );
 
-    state.starting_deck_size = 52;
-    state.deck_size = 52;
     assert_eq!(
         hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut state, 1).add_mult,
         0
     );
-    state.deck_size = 50;
+    state.deck.remove_cards(2);
     assert_eq!(
         hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut state, 1).add_mult,
         8
     );
 
-    state.empty_joker_slots = 2;
+    state.counters.empty_joker_slots = 2;
     assert_eq!(
         hand_effect_with_state(JokerKind::Stencil, &played, &[], None, &mut state, 1).x_mult,
         3.0
@@ -467,7 +464,15 @@ fn state_scaled_and_held_rank_jokers_use_exact_thresholds() {
         0
     );
 
-    state.enhanced_cards = 15;
+    for _ in 0..15 {
+        state.deck.add_card_to_deck(Card::new(
+            Rank::Seven,
+            Suit::Spades,
+            Enhancement::Bonus,
+            Edition::None,
+            Seal::None,
+        ));
+    }
     assert_eq!(
         hand_effect_with_state(
             JokerKind::DriversLicense,
@@ -480,7 +485,13 @@ fn state_scaled_and_held_rank_jokers_use_exact_thresholds() {
         .x_mult,
         1.0
     );
-    state.enhanced_cards = 16;
+    state.deck.add_card_to_deck(Card::new(
+        Rank::Seven,
+        Suit::Spades,
+        Enhancement::Bonus,
+        Edition::None,
+        Seal::None,
+    ));
     assert_eq!(
         hand_effect_with_state(
             JokerKind::DriversLicense,
@@ -494,7 +505,7 @@ fn state_scaled_and_held_rank_jokers_use_exact_thresholds() {
         3.0
     );
 
-    state.blinds_skipped = 2;
+    state.counters.blinds_skipped = 2;
     assert_eq!(
         hand_effect_with_state(
             JokerKind::Throwback,
@@ -593,32 +604,35 @@ fn dynamic_scoring_jokers_use_zero_and_nonzero_state_boundaries() {
     let played = [card(Rank::Seven, Suit::Spades)];
     let mut state = GameState::new(109);
 
-    state.empty_joker_slots = 0;
+    state.counters.empty_joker_slots = 0;
     assert_eq!(
         hand_effect_with_state(JokerKind::Stencil, &played, &[], None, &mut state, 1).x_mult,
         1.0
     );
-    state.empty_joker_slots = 2;
+    state.counters.empty_joker_slots = 2;
     assert_eq!(
         hand_effect_with_state(JokerKind::Stencil, &played, &[], None, &mut state, 1).x_mult,
         3.0
     );
 
-    state.deck_size = 0;
+    let mut no_cards = GameState::new(110);
+    no_cards.deck.remove_cards(52);
     assert_eq!(
-        hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut state, 1).chips,
-        0
-    );
-    state.deck_size = 1;
-    assert_eq!(
-        hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut state, 1).chips,
+        hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut no_cards, 1).chips,
         0
     );
 
-    state.starting_deck_size = 52;
-    state.deck_size = 51;
+    let mut one_card = GameState::new(111);
+    one_card.deck.remove_cards(51);
     assert_eq!(
-        hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut state, 1).add_mult,
+        hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut one_card, 1).chips,
+        0
+    );
+
+    let mut eroded = GameState::new(112);
+    eroded.deck.remove_cards(1);
+    assert_eq!(
+        hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut eroded, 1).add_mult,
         4
     );
     state.money = -10;

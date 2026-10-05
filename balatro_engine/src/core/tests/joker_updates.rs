@@ -237,7 +237,7 @@ fn gift_card_increases_owned_joker_sell_values_at_round_end() {
 
     assert_eq!(effect.sell_value_bonus, 1);
     assert_eq!(jokers.jokers[1].sell_value, 2);
-    assert_eq!(state.consumable_sell_value_bonus, 1);
+    assert_eq!(state.counters.consumable_sell_value_bonus, 1);
 }
 
 #[test]
@@ -742,10 +742,10 @@ fn lifecycle_edges_are_safe_for_singletons_floors_and_expiration() {
 
     let mut burglar = Jokers::new();
     burglar.add(Joker::create_joker(JokerKind::Burglar));
-    state.discards_remaining = 1;
+    state.counters.discards_remaining = 1;
     let effect = burglar.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
     assert_eq!(effect.discards, -4);
-    assert_eq!(state.discards_remaining, 0);
+    assert_eq!(state.counters.discards_remaining, 0);
 
     let mut green = Jokers::new();
     green.add(Joker::create_joker(JokerKind::Green));
