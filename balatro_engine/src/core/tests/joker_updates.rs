@@ -236,7 +236,7 @@ fn gift_card_increases_owned_joker_sell_values_at_round_end() {
     let effect = jokers.update(UpdateEvent::RoundCompleted, &mut state);
 
     assert_eq!(effect.sell_value_bonus, 1);
-    assert_eq!(jokers.jokers[1].sell_value, 2);
+    assert_eq!(jokers.jokers[1].sell_value(), 2);
     assert_eq!(state.counters.consumable_sell_value_bonus, 1);
 }
 

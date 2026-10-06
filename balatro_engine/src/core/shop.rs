@@ -1,8 +1,10 @@
 use crate::core::card::Card;
-use crate::core::consumable::DEFAULT_CONSUMABLE_SLOTS;
-use crate::core::enums::{Consumable, Planet, Tarot, Vouchers};
+use crate::core::enums::{Consumable, Planet, Spectral, Tarot, Vouchers};
 use crate::core::game::GameState;
 use crate::core::joker::{Joker, UpdateEvent};
+use crate::core::pack::{
+    PackOpening, ShopPack, planet_for_hand, random_shop_pack, random_shop_playing_card,
+};
 use rand::prelude::{IndexedRandom, RngExt};
 use rand::rngs::StdRng;
 
@@ -15,6 +17,8 @@ pub(crate) enum ShopOfferKind {
     Joker,
     Tarot,
     Planet,
+    Spectral,
+    PlayingCard,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -35,8 +39,41 @@ impl ShopOfferWeights {
         cards: 0,
     };
 
+    pub(crate) fn for_state(state: &GameState) -> ShopOfferWeights {
+        let tarot_multiplier = if state.has_voucher(Vouchers::TarotTycoon) {
+            4
+        } else if state.has_voucher(Vouchers::TarotMerchant) {
+            2
+        } else {
+            1
+        };
+        let planet_multiplier = if state.has_voucher(Vouchers::PlanetTycoon) {
+            4
+        } else if state.has_voucher(Vouchers::PlanetMerchant) {
+            2
+        } else {
+            1
+        };
+
+        ShopOfferWeights {
+            jokers: Self::BASE.jokers,
+            tarot: Self::BASE.tarot * tarot_multiplier,
+            planets: Self::BASE.planets * planet_multiplier,
+            spectrals: if state.deck.has_spectral_shop_offers() {
+                2
+            } else {
+                0
+            },
+            cards: if state.has_voucher(Vouchers::MagicTrick) {
+                2
+            } else {
+                0
+            },
+        }
+    }
+
     pub(crate) fn total(self) -> u32 {
-        self.jokers + self.tarot + self.planets
+        self.jokers + self.tarot + self.planets + self.spectrals + self.cards
     }
 
     pub(crate) fn kind_for_roll(self, roll: u32) -> ShopOfferKind {
@@ -44,8 +81,12 @@ impl ShopOfferWeights {
             ShopOfferKind::Joker
         } else if roll < self.jokers + self.tarot {
             ShopOfferKind::Tarot
-        } else {
+        } else if roll < self.jokers + self.tarot + self.planets {
             ShopOfferKind::Planet
+        } else if roll < self.jokers + self.tarot + self.planets + self.spectrals {
+            ShopOfferKind::Spectral
+        } else {
+            ShopOfferKind::PlayingCard
         }
     }
 
@@ -60,27 +101,13 @@ pub(crate) enum ShopError {
     InsufficientFunds,
     InventoryFull,
     VoucherAlreadyOwned,
+    VoucherPrerequisiteMissing,
     ShopAlreadyActive,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) enum BoosterPackKind {
-    Standard,
-    Arcana,
-    Celestial,
-    Buffoon,
-    Spectral,
 }
 
 #[derive(Clone)]
 pub(crate) struct ShopVoucher {
     pub(crate) voucher: Vouchers,
-    pub(crate) price: u16,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) struct ShopPack {
-    pub(crate) kind: BoosterPackKind,
     pub(crate) price: u16,
 }
 
@@ -105,6 +132,7 @@ pub(crate) struct ShopState {
     pub(crate) voucher: Option<ShopVoucher>,
     pub(crate) packs: Vec<ShopPack>,
     pub(crate) items: Vec<ShopItem>,
+    pub(crate) item_slots: usize,
     pub(crate) reroll_cost: u16,
 }
 
@@ -114,6 +142,7 @@ impl ShopState {
             voucher: None,
             packs: Vec::with_capacity(SHOP_PACK_SLOTS),
             items: Vec::new(),
+            item_slots: 2,
             reroll_cost: DEFAULT_REROLL_COST,
         }
     }
@@ -129,12 +158,35 @@ impl ShopState {
         self.voucher = Some(voucher);
     }
 
+    pub(crate) fn refresh_voucher(&mut self, state: &mut GameState) {
+        if self.voucher.is_some() {
+            return;
+        }
+
+        let available = Vouchers::ALL
+            .iter()
+            .copied()
+            .filter(|voucher| state.can_redeem_voucher(*voucher))
+            .collect::<Vec<_>>();
+        self.voucher = available
+            .choose(&mut state.rng)
+            .copied()
+            .map(|voucher| ShopVoucher { voucher, price: 10 });
+    }
+
     pub(crate) fn add_pack(&mut self, pack: ShopPack) -> Result<(), ShopError> {
         if self.packs.len() >= SHOP_PACK_SLOTS {
             return Err(ShopError::InvalidOffer);
         }
         self.packs.push(pack);
         Ok(())
+    }
+
+    pub(crate) fn refresh_packs(&mut self, state: &mut GameState) {
+        self.packs.clear();
+        for _ in 0..SHOP_PACK_SLOTS {
+            self.packs.push(random_shop_pack(state));
+        }
     }
 
     pub(crate) fn add_item(&mut self, item: ShopItem) {
@@ -147,18 +199,28 @@ impl ShopState {
     }
 
     pub(crate) fn refresh_base_items(&mut self, state: &mut GameState) {
-        let item_slots = Self::base_item_slots(state);
+        self.sync_item_slots(state);
         self.items.clear();
-        self.items.reserve(item_slots);
+        self.items.reserve(self.item_slots);
 
-        for _ in 0..item_slots {
+        self.refill_base_items(state);
+    }
+
+    fn sync_item_slots(&mut self, state: &GameState) {
+        self.item_slots = Self::base_item_slots(state);
+    }
+
+    fn refill_base_items(&mut self, state: &mut GameState) {
+        self.items
+            .reserve(self.item_slots.saturating_sub(self.items.len()));
+        while self.items.len() < self.item_slots {
             let kind = Self::roll_base_offer_kind(state);
             self.items.push(random_base_item(kind, state));
         }
     }
 
     pub(crate) fn roll_base_offer_kind(state: &mut GameState) -> ShopOfferKind {
-        ShopOfferWeights::BASE.roll(&mut state.rng)
+        ShopOfferWeights::for_state(state).roll(&mut state.rng)
     }
 
     pub(crate) fn buy_item(
@@ -167,14 +229,16 @@ impl ShopState {
         state: &mut GameState,
     ) -> Result<(), ShopError> {
         let item = self.items.get(index).ok_or(ShopError::InvalidOffer)?;
-        let price = item.price();
+        let price = state.shop_price(item.price());
         require_funds(state, price)?;
 
         match item {
-            ShopItem::Joker { .. } if !state.jokers.has_room() => {
+            ShopItem::Joker { .. } if !state.joker_has_room() => {
                 return Err(ShopError::InventoryFull);
             }
-            ShopItem::Consumable { .. } if state.consumables.len() >= DEFAULT_CONSUMABLE_SLOTS => {
+            ShopItem::Consumable { .. }
+                if state.consumables.len() >= state.consumable_capacity() =>
+            {
                 return Err(ShopError::InventoryFull);
             }
             ShopItem::Joker { .. } | ShopItem::Consumable { .. } | ShopItem::PlayingCard { .. } => {
@@ -202,15 +266,27 @@ impl ShopState {
     }
 
     pub(crate) fn buy_voucher(&mut self, state: &mut GameState) -> Result<(), ShopError> {
-        let offer = self.voucher.as_ref().ok_or(ShopError::InvalidOffer)?;
-        if state.vouchers.contains(&offer.voucher) {
+        let (voucher, price) = {
+            let offer = self.voucher.as_ref().ok_or(ShopError::InvalidOffer)?;
+            (offer.voucher, offer.price)
+        };
+        if state.vouchers.contains(&voucher) {
             return Err(ShopError::VoucherAlreadyOwned);
         }
-        require_funds(state, offer.price)?;
+        require_funds(state, price)?;
 
-        let offer = self.voucher.take().expect("checked above");
-        state.money -= offer.price as i16;
-        state.vouchers.push(offer.voucher);
+        state.redeem_voucher(voucher).map_err(|error| match error {
+            crate::core::voucher::VoucherError::AlreadyOwned => ShopError::VoucherAlreadyOwned,
+            crate::core::voucher::VoucherError::PrerequisiteMissing => {
+                ShopError::VoucherPrerequisiteMissing
+            }
+        })?;
+        self.voucher.take().expect("the offer was checked above");
+        state.money -= price as i16;
+        if matches!(voucher, Vouchers::Overstock | Vouchers::OverstockPlus) {
+            self.sync_item_slots(state);
+            self.refill_base_items(state);
+        }
         Ok(())
     }
 
@@ -220,14 +296,30 @@ impl ShopState {
         state: &mut GameState,
     ) -> Result<ShopPack, ShopError> {
         let pack = self.packs.get(index).ok_or(ShopError::InvalidOffer)?;
-        require_funds(state, pack.price)?;
+        let price = state.shop_price(pack.price);
+        require_funds(state, price)?;
 
         let pack = self.packs.remove(index);
-        state.money -= pack.price as i16;
+        state.money -= price as i16;
         Ok(pack)
     }
 
+    pub(crate) fn buy_and_open_pack(
+        &mut self,
+        index: usize,
+        state: &mut GameState,
+    ) -> Result<PackOpening, ShopError> {
+        let pack = self.packs.get(index).ok_or(ShopError::InvalidOffer)?;
+        let price = state.shop_price(pack.price);
+        require_funds(state, price)?;
+
+        let pack = self.packs.remove(index);
+        state.money -= price as i16;
+        Ok(pack.open(state))
+    }
+
     pub(crate) fn reroll(&mut self, state: &mut GameState) -> Result<(), ShopError> {
+        self.reroll_cost = self.reroll_cost.min(state.counters.reroll_minimum);
         require_funds(state, self.reroll_cost)?;
         state.money -= self.reroll_cost as i16;
         state.counters.shop_rerolls = state.counters.shop_rerolls.saturating_add(1);
@@ -243,7 +335,8 @@ impl ShopState {
 fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> ShopItem {
     match kind {
         ShopOfferKind::Joker => {
-            let joker = Joker::random_shop_joker(&mut state.rng);
+            let mut joker = Joker::random_shop_joker(&mut state.rng);
+            joker.set_edition(crate::core::voucher::random_shop_joker_edition(state));
             let price = joker.price();
             ShopItem::Joker { joker, price }
         }
@@ -258,15 +351,35 @@ fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> ShopItem {
             }
         }
         ShopOfferKind::Planet => {
-            let planet = Planet::ALL
-                .choose(&mut state.rng)
-                .copied()
-                .expect("the Planet table must not be empty");
+            let planet = state
+                .most_played_hand
+                .filter(|_| state.always_show_most_played_hand)
+                .map(planet_for_hand)
+                .unwrap_or_else(|| {
+                    Planet::ALL
+                        .choose(&mut state.rng)
+                        .copied()
+                        .expect("the Planet table must not be empty")
+                });
             ShopItem::Consumable {
                 consumable: Consumable::Planet(planet),
                 price: DEFAULT_CONSUMABLE_PRICE,
             }
         }
+        ShopOfferKind::Spectral => {
+            let spectral = Spectral::ALL
+                .choose(&mut state.rng)
+                .copied()
+                .expect("the Spectral table must not be empty");
+            ShopItem::Consumable {
+                consumable: Consumable::Spectral(spectral),
+                price: DEFAULT_CONSUMABLE_PRICE,
+            }
+        }
+        ShopOfferKind::PlayingCard => ShopItem::PlayingCard {
+            card: random_shop_playing_card(state),
+            price: 1,
+        },
     }
 }
 

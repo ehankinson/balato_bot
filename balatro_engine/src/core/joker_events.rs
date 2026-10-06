@@ -4,6 +4,7 @@ use crate::core::card::Card;
 use crate::core::enums::{ALL_RANKS, ALL_SUITS, Enhancement, PokerHand, Rank, Suit};
 use crate::core::game::GameState;
 use crate::core::joker::{Joker, JokerData, JokerStructure};
+use crate::core::joker_types::JokerUpdate::*;
 use crate::core::joker_types::{
     GenerateType, JokerKind, JokerTrigger, JokerUpdate, RetriggerTarget,
 };
@@ -304,7 +305,9 @@ impl Jokers {
         }
         if effect.sell_value_bonus > 0 {
             for joker in &mut self.jokers {
-                joker.sell_value = joker.sell_value.saturating_add(effect.sell_value_bonus);
+                joker.sell_value_bonus = joker
+                    .sell_value_bonus
+                    .saturating_add(effect.sell_value_bonus);
             }
             game_state.counters.joker_sell_value_bonus = game_state
                 .counters
@@ -363,8 +366,6 @@ fn apply_game_effect(effect: &JokerEffect, game_state: &mut GameState) {
 
 impl Joker {
     pub(super) fn update_mask(joker_kind: JokerKind) -> u32 {
-        use JokerUpdate::*;
-
         let mut mask = 0;
         match joker_kind {
             JokerKind::Glass | JokerKind::Canio => mask |= CardDestroyed.mask(),
@@ -872,7 +873,7 @@ impl Joker {
                 self.rounds_completed = self.rounds_completed.saturating_add(1);
             }
             (UpdateEvent::RoundCompleted, JokerKind::Egg) => {
-                self.sell_value = self.sell_value.saturating_add(3);
+                self.sell_value_bonus = self.sell_value_bonus.saturating_add(3);
             }
             (UpdateEvent::RoundCompleted, JokerKind::Cloud9) => {
                 effect.money = game_state.nines_in_deck() as i16;

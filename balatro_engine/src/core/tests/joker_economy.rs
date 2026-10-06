@@ -3,7 +3,7 @@ use super::*;
 use crate::core::card::Card;
 use crate::core::enums::{Edition, Enhancement, PokerHand, Rank, Seal, Suit};
 use crate::core::game::GameState;
-use crate::core::joker_types::{GenerateType, JokerKind};
+use crate::core::joker_types::{GenerateType, JokerEdition, JokerKind};
 
 fn card(rank: Rank, suit: Suit, enhancement: Enhancement) -> Card {
     Card::new(rank, suit, enhancement, Edition::None, Seal::None)
@@ -185,10 +185,10 @@ fn rocket_and_egg_accumulate_only_at_their_lifecycle_events() {
     let mut egg = Jokers::new();
     egg.add(Joker::create_joker(JokerKind::Egg));
     let mut egg_state = GameState::new(23);
-    let initial_value = egg.jokers[0].sell_value;
+    let initial_value = egg.jokers[0].sell_value();
     egg.update(UpdateEvent::RoundCompleted, &mut egg_state);
     egg.update(UpdateEvent::RoundCompleted, &mut egg_state);
-    assert_eq!(egg.jokers[0].sell_value, initial_value + 6);
+    assert_eq!(egg.jokers[0].sell_value(), initial_value + 6);
     assert_eq!(
         egg.update(
             UpdateEvent::BlindSelected { is_boss: false },
@@ -196,6 +196,29 @@ fn rocket_and_egg_accumulate_only_at_their_lifecycle_events() {
         ),
         JokerEffect::default()
     );
+}
+
+#[test]
+fn joker_price_and_sell_value_include_edition_price() {
+    let mut joker = Joker::create_joker(JokerKind::Joker);
+    assert_eq!(joker.price(), 2);
+    assert_eq!(joker.sell_value(), 1);
+
+    joker.set_edition(JokerEdition::Foil);
+    assert_eq!(joker.price(), 4);
+    assert_eq!(joker.sell_value(), 2);
+
+    joker.set_edition(JokerEdition::Holographic);
+    assert_eq!(joker.price(), 5);
+    assert_eq!(joker.sell_value(), 2);
+
+    joker.set_edition(JokerEdition::Polychrome);
+    assert_eq!(joker.price(), 7);
+    assert_eq!(joker.sell_value(), 3);
+
+    joker.set_edition(JokerEdition::Negative);
+    assert_eq!(joker.price(), 7);
+    assert_eq!(joker.sell_value(), 3);
 }
 
 #[test]

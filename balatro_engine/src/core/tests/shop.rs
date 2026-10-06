@@ -6,9 +6,9 @@ use crate::core::enums::{
 };
 use crate::core::joker::Joker;
 use crate::core::joker_types::JokerKind;
+use crate::core::pack::{BoosterPackKind, BoosterPackSize, ShopPack};
 use crate::core::shop::{
-    BoosterPackKind, ShopError, ShopItem, ShopOfferKind, ShopOfferWeights, ShopPack, ShopState,
-    ShopVoucher,
+    ShopError, ShopItem, ShopOfferKind, ShopOfferWeights, ShopState, ShopVoucher,
 };
 
 fn playing_card() -> Card {
@@ -118,11 +118,13 @@ fn vouchers_and_packs_are_single_shop_offers_with_atomic_purchases() {
     });
     shop.add_pack(ShopPack {
         kind: BoosterPackKind::Arcana,
+        size: BoosterPackSize::Normal,
         price: 6,
     })
     .unwrap();
     shop.add_pack(ShopPack {
         kind: BoosterPackKind::Standard,
+        size: BoosterPackSize::Normal,
         price: 4,
     })
     .unwrap();
@@ -172,16 +174,19 @@ fn shop_refresh_uses_two_three_or_four_item_slots_from_overstock_vouchers() {
 
     assert_eq!(ShopState::base_item_slots(&state), 2);
     shop.refresh_base_items(&mut state);
+    assert_eq!(shop.item_slots, 2);
     assert_eq!(shop.items.len(), 2);
 
     state.vouchers.push(Vouchers::Overstock);
     assert_eq!(ShopState::base_item_slots(&state), 3);
     shop.refresh_base_items(&mut state);
+    assert_eq!(shop.item_slots, 3);
     assert_eq!(shop.items.len(), 3);
 
     state.vouchers.push(Vouchers::OverstockPlus);
     assert_eq!(ShopState::base_item_slots(&state), 4);
     shop.refresh_base_items(&mut state);
+    assert_eq!(shop.item_slots, 4);
     assert_eq!(shop.items.len(), 4);
 }
 
@@ -191,6 +196,8 @@ fn game_owns_the_active_shop_phase_and_rejects_nested_shops() {
     assert!(game.shop().is_none());
     game.enter_shop(ShopState::new()).unwrap();
     assert_eq!(game.shop().unwrap().items.len(), 2);
+    assert_eq!(game.shop().unwrap().packs.len(), 2);
+    assert!(game.shop().unwrap().voucher.is_some());
     assert_eq!(
         game.enter_shop(ShopState::new()),
         Err(ShopError::ShopAlreadyActive)
@@ -240,4 +247,59 @@ fn base_shop_offer_roll_uses_the_game_rng() {
         .collect::<Vec<_>>();
 
     assert_eq!(first, second);
+}
+
+#[test]
+fn ghost_deck_and_magic_trick_add_their_shop_offer_categories() {
+    let ghost_state = GameState::with_deck(10, Decks::Ghost);
+    let ghost_weights = ShopOfferWeights::for_state(&ghost_state);
+    assert!(ghost_weights.spectrals > 0);
+    assert_eq!(ghost_weights.cards, 0);
+
+    let mut magic_state = GameState::new(11);
+    magic_state.vouchers.push(Vouchers::MagicTrick);
+    let magic_weights = ShopOfferWeights::for_state(&magic_state);
+    assert_eq!(magic_weights.spectrals, 0);
+    assert!(magic_weights.cards > 0);
+}
+
+#[test]
+fn merchant_and_tycoon_vouchers_scale_their_shop_weights() {
+    let mut state = GameState::new(13);
+    state.vouchers.push(Vouchers::TarotMerchant);
+    state.vouchers.push(Vouchers::PlanetMerchant);
+    let merchant = ShopOfferWeights::for_state(&state);
+    assert_eq!(merchant.tarot, 8);
+    assert_eq!(merchant.planets, 8);
+
+    state.vouchers.push(Vouchers::TarotTycoon);
+    state.vouchers.push(Vouchers::PlanetTycoon);
+    let tycoon = ShopOfferWeights::for_state(&state);
+    assert_eq!(tycoon.tarot, 16);
+    assert_eq!(tycoon.planets, 16);
+}
+
+#[test]
+fn buying_overstock_replenishes_the_new_shop_slot() {
+    let mut state = GameState::new(12);
+    state.money = 10;
+    let mut shop = ShopState::new();
+    shop.add_item(ShopItem::PlayingCard {
+        card: playing_card(),
+        price: 1,
+    });
+    shop.add_item(ShopItem::PlayingCard {
+        card: playing_card(),
+        price: 1,
+    });
+    shop.set_voucher(ShopVoucher {
+        voucher: Vouchers::Overstock,
+        price: 5,
+    });
+
+    shop.buy_voucher(&mut state).unwrap();
+
+    assert_eq!(shop.item_slots, 3);
+    assert_eq!(shop.items.len(), 3);
+    assert!(state.vouchers.contains(&Vouchers::Overstock));
 }

@@ -18,7 +18,7 @@ pub struct Joker {
     trigger: JokerTrigger,
     rarity: JokerRarity,
     price: u8,
-    sell_value: u8,
+    sell_value_bonus: u8,
     debuffed: bool,
     update_mask: u32,
     rounds_completed: u8,
@@ -54,11 +54,18 @@ impl Joker {
     }
 
     pub(crate) fn sell_value(&self) -> u8 {
-        self.sell_value
+        (self.price().saturating_div(2).min(u8::MAX as u16) as u8)
+            .saturating_add(self.sell_value_bonus)
     }
 
     pub(crate) fn price(&self) -> u16 {
         self.price as u16
+            + match self.edition {
+                JokerEdition::Foil => 2,
+                JokerEdition::Holographic => 3,
+                JokerEdition::Polychrome | JokerEdition::Negative => 5,
+                JokerEdition::None => 0,
+            }
     }
 
     pub(crate) fn set_edition(&mut self, edition: JokerEdition) {
@@ -2081,7 +2088,7 @@ impl Joker {
             trigger,
             rarity,
             price,
-            sell_value: price / 2,
+            sell_value_bonus: 0,
             debuffed: false,
             update_mask,
             rounds_completed: 0,

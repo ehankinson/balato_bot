@@ -1,8 +1,9 @@
 use crate::core::card::Card;
 use crate::core::enums::{
     ALL_RANKS, ALL_SUITS, Consumable, Edition, Enhancement, Planet, PokerHand, Rank, Seal,
-    Spectral, Suit, Tarot,
+    Spectral, Suit, Tarot, Vouchers,
 };
+use crate::core::enums::{Spectral::*, Tarot::*};
 use crate::core::game::GameState;
 use crate::core::hand::Hand;
 use crate::core::joker::{Joker, UpdateEvent};
@@ -167,8 +168,6 @@ fn apply_tarot(
     hand: &mut Hand,
     target: &ConsumableTarget,
 ) -> Result<(), ConsumableUseError> {
-    use Tarot::*;
-
     match card {
         Fool => {
             if state.last_consumable.is_none() {
@@ -238,7 +237,14 @@ fn apply_tarot(
 }
 
 fn apply_planet(card: Planet, state: &mut GameState) -> Result<(), ConsumableUseError> {
-    let hand = match card {
+    let hand = planet_hand(card);
+    let (chips, mult) = planet_upgrade(hand);
+    state.hand_levels.upgrade(hand, chips, mult);
+    Ok(())
+}
+
+pub(crate) fn planet_hand(card: Planet) -> PokerHand {
+    match card {
         Planet::Pluto => PokerHand::HighCard,
         Planet::Mercury => PokerHand::Pair,
         Planet::Uranus => PokerHand::TwoPair,
@@ -251,10 +257,7 @@ fn apply_planet(card: Planet, state: &mut GameState) -> Result<(), ConsumableUse
         Planet::PlanetX => PokerHand::FiveOfAKind,
         Planet::Ceres => PokerHand::FlushHouse,
         Planet::Eris => PokerHand::FlushFive,
-    };
-    let (chips, mult) = planet_upgrade(hand);
-    state.hand_levels.upgrade(hand, chips, mult);
-    Ok(())
+    }
 }
 
 fn apply_spectral(
@@ -263,8 +266,6 @@ fn apply_spectral(
     hand: &mut Hand,
     target: &ConsumableTarget,
 ) -> Result<(), ConsumableUseError> {
-    use Spectral::*;
-
     match card {
         Familiar => {
             destroy_random_hand_card(state, hand)?;
@@ -303,10 +304,7 @@ fn apply_spectral(
         Talisman => apply_hand_seal(hand, target, Seal::Gold)?,
         Aura => {
             let indices = validate_hand_target(hand, target, 1, 1)?;
-            let edition = [Edition::Foil, Edition::Holographic, Edition::Polychrome]
-                .choose(&mut state.rng)
-                .copied()
-                .expect("edition choices are non-empty");
+            let edition = edition_for_roll(state.rng.random_range(0..100));
             hand.card_mut(indices[0])
                 .expect("validated hand target")
                 .set_edition(edition);
@@ -413,7 +411,8 @@ fn add_random_consumables(
     maximum: usize,
     kind: ConsumableKind,
 ) -> Result<(), ConsumableUseError> {
-    let room = DEFAULT_CONSUMABLE_SLOTS
+    let room = state
+        .consumable_capacity()
         .saturating_add(1)
         .saturating_sub(state.consumables.len());
     if room == 0 {
@@ -478,7 +477,7 @@ fn add_random_consumables(
 }
 
 fn require_consumable_room(state: &GameState, amount: usize) -> Result<(), ConsumableUseError> {
-    if state.consumables.len() + amount > DEFAULT_CONSUMABLE_SLOTS.saturating_add(1) {
+    if state.consumables.len() + amount > state.consumable_capacity().saturating_add(1) {
         Err(ConsumableUseError::NoCapacity)
     } else {
         Ok(())
@@ -486,7 +485,7 @@ fn require_consumable_room(state: &GameState, amount: usize) -> Result<(), Consu
 }
 
 fn require_joker_room(state: &GameState) -> Result<(), ConsumableUseError> {
-    if state.jokers.has_room() {
+    if state.joker_has_room() {
         Ok(())
     } else {
         Err(ConsumableUseError::NoCapacity)
@@ -565,20 +564,30 @@ fn apply_wheel_of_fortune(state: &mut GameState) -> Result<(), ConsumableUseErro
     if state.rng.random_range(0..4) != 0 {
         return Ok(());
     }
-    let edition = [
-        JokerEdition::Foil,
-        JokerEdition::Holographic,
-        JokerEdition::Polychrome,
-    ]
-    .choose(&mut state.rng)
-    .copied()
-    .expect("edition choices are non-empty");
+    let edition = joker_edition_for_roll(state.rng.random_range(0..100));
     state
         .jokers
         .get_mut(index)
         .expect("validated Joker target")
         .set_edition(edition);
     Ok(())
+}
+
+pub(crate) fn edition_for_roll(roll: u8) -> Edition {
+    match roll {
+        0..50 => Edition::Foil,
+        50..85 => Edition::Holographic,
+        _ => Edition::Polychrome,
+    }
+}
+
+pub(crate) fn joker_edition_for_roll(roll: u8) -> JokerEdition {
+    match edition_for_roll(roll) {
+        Edition::Foil => JokerEdition::Foil,
+        Edition::Holographic => JokerEdition::Holographic,
+        Edition::Polychrome => JokerEdition::Polychrome,
+        Edition::None => unreachable!("edition roll always produces an edition"),
+    }
 }
 
 fn next_rank(rank: Rank) -> Rank {
@@ -594,7 +603,8 @@ fn next_rank(rank: Rank) -> Rank {
         Rank::Ten => Rank::Jack,
         Rank::Jack => Rank::Queen,
         Rank::Queen => Rank::King,
-        Rank::King | Rank::Ace => Rank::Ace,
+        Rank::King => Rank::Ace,
+        Rank::Ace => Rank::Two,
     }
 }
 

@@ -104,6 +104,17 @@ impl Deck {
         BASE_HAND_SIZE + self.hand_size_modifier
     }
 
+    pub(crate) fn consumable_slot_modifier(&self) -> i8 {
+        match self.deck_type {
+            Decks::Nebula => -1,
+            _ => 0,
+        }
+    }
+
+    pub(crate) fn has_spectral_shop_offers(&self) -> bool {
+        self.deck_type == Decks::Ghost
+    }
+
     pub(crate) fn enhanced_count(&self) -> u16 {
         self.cards
             .iter()

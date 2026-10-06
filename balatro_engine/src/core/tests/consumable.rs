@@ -2,7 +2,8 @@ use super::*;
 
 use crate::core::card::Card;
 use crate::core::consumable::{
-    ConsumableTarget, ConsumableUseError, judgement_edition, judgement_rarity,
+    ConsumableTarget, ConsumableUseError, edition_for_roll, joker_edition_for_roll,
+    judgement_edition, judgement_rarity,
 };
 use crate::core::enums::{
     Consumable, Edition, Enhancement, Planet, PokerHand, Rank, Seal, Spectral, Suit, Tarot,
@@ -454,4 +455,18 @@ fn judgement_uses_the_updated_rarity_and_edition_boundaries() {
     assert_eq!(judgement_edition(399), JokerEdition::Foil);
     assert_eq!(judgement_edition(400), JokerEdition::None);
     assert_eq!(judgement_edition(9_999), JokerEdition::None);
+}
+
+#[test]
+fn aura_and_wheel_share_the_requested_edition_distribution() {
+    assert_eq!(edition_for_roll(0), Edition::Foil);
+    assert_eq!(edition_for_roll(49), Edition::Foil);
+    assert_eq!(edition_for_roll(50), Edition::Holographic);
+    assert_eq!(edition_for_roll(84), Edition::Holographic);
+    assert_eq!(edition_for_roll(85), Edition::Polychrome);
+    assert_eq!(edition_for_roll(99), Edition::Polychrome);
+
+    assert_eq!(joker_edition_for_roll(0), JokerEdition::Foil);
+    assert_eq!(joker_edition_for_roll(50), JokerEdition::Holographic);
+    assert_eq!(joker_edition_for_roll(85), JokerEdition::Polychrome);
 }

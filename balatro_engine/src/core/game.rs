@@ -5,7 +5,9 @@ use crate::core::deck::Deck;
 use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Suit, Tarot, Vouchers};
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
+use crate::core::pack::PackError;
 use crate::core::shop::{ShopError, ShopState};
+use crate::core::voucher::VoucherError;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
@@ -34,6 +36,16 @@ pub(crate) struct GameCounters {
     pub(crate) joker_sell_value_bonus: u8,
     pub(crate) consumable_sell_value_bonus: u8,
     pub(crate) hand_size_modifier: i8,
+    pub(crate) hands_bonus: i8,
+    pub(crate) discards_bonus: i8,
+    pub(crate) consumable_slot_modifier: i8,
+    pub(crate) joker_slot_modifier: i8,
+    pub(crate) interest_cap: i16,
+    pub(crate) shop_discount_percent: u8,
+    pub(crate) reroll_minimum: u16,
+    pub(crate) edition_rate_multiplier: u8,
+    pub(crate) boss_rerolls_per_ante: u8,
+    pub(crate) boss_reroll_unlimited: bool,
 }
 
 impl GameCounters {
@@ -59,6 +71,16 @@ impl GameCounters {
             joker_sell_value_bonus: 0,
             consumable_sell_value_bonus: 0,
             hand_size_modifier: 0,
+            hands_bonus: 0,
+            discards_bonus: 0,
+            consumable_slot_modifier: 0,
+            joker_slot_modifier: 0,
+            interest_cap: 5,
+            shop_discount_percent: 0,
+            reroll_minimum: 5,
+            edition_rate_multiplier: 1,
+            boss_rerolls_per_ante: 0,
+            boss_reroll_unlimited: false,
         }
     }
 }
@@ -78,6 +100,7 @@ pub struct GameState {
     pub(crate) current_hand: Option<PokerHand>,
     pub(crate) target_suit: Option<Suit>,
     pub(crate) blind_is_boss: bool,
+    pub(crate) always_show_most_played_hand: bool,
     pub(crate) rng: StdRng,
 }
 
@@ -104,12 +127,85 @@ impl GameState {
             current_hand: None,
             target_suit: None,
             blind_is_boss: false,
+            always_show_most_played_hand: false,
             rng,
         }
     }
 
     pub(crate) fn hand_size(&self) -> i8 {
         self.deck.hand_size() + self.counters.hand_size_modifier
+    }
+
+    pub(crate) fn consumable_capacity(&self) -> usize {
+        (DEFAULT_CONSUMABLE_SLOTS as i8
+            + self.deck.consumable_slot_modifier()
+            + self.counters.consumable_slot_modifier)
+            .max(0) as usize
+    }
+
+    pub(crate) fn joker_capacity(&self) -> usize {
+        (Jokers::CAPACITY as i8 + self.counters.joker_slot_modifier).max(0) as usize
+    }
+
+    pub(crate) fn joker_has_room(&self) -> bool {
+        self.jokers.as_slice().len() < self.joker_capacity()
+    }
+
+    pub(crate) fn hands_per_blind(&self) -> u8 {
+        (4i8 + self.counters.hands_bonus).max(0) as u8
+    }
+
+    pub(crate) fn discards_per_blind(&self) -> u8 {
+        (4i8 + self.counters.discards_bonus).max(0) as u8
+    }
+
+    pub(crate) fn begin_blind(&mut self) {
+        self.counters.hands_remaining = self.hands_per_blind();
+        self.counters.discards_remaining = self.discards_per_blind();
+        self.counters.discards_used = 0;
+    }
+
+    pub(crate) fn has_voucher(&self, voucher: Vouchers) -> bool {
+        self.vouchers.contains(&voucher)
+    }
+
+    pub(crate) fn planet_mult_multiplier(&self, hand: PokerHand) -> f32 {
+        if !self.has_voucher(Vouchers::Observatory) {
+            return 1.0;
+        }
+
+        let matching_planets = self
+            .consumables
+            .iter()
+            .filter(|consumable| {
+                matches!(consumable, Consumable::Planet(planet) if crate::core::consumable::planet_hand(*planet) == hand)
+            })
+            .count() as i32;
+        1.5_f32.powi(matching_planets)
+    }
+
+    pub(crate) fn shop_price(&self, base_price: u16) -> u16 {
+        let remaining_percent = 100u32.saturating_sub(self.counters.shop_discount_percent as u32);
+        if base_price == 0 {
+            return 0;
+        }
+        ((base_price as u32 * remaining_percent) / 100).max(1) as u16
+    }
+
+    pub(crate) fn redeem_voucher(&mut self, voucher: Vouchers) -> Result<(), VoucherError> {
+        crate::core::voucher::redeem(self, voucher)
+    }
+
+    pub(crate) fn can_redeem_voucher(&self, voucher: Vouchers) -> bool {
+        crate::core::voucher::can_redeem(self, voucher)
+    }
+
+    pub(crate) fn choose_pack(
+        &mut self,
+        opening: crate::core::pack::PackOpening,
+        selections: &[usize],
+    ) -> Result<(), PackError> {
+        opening.choose(selections, self)
     }
 
     pub(crate) fn deck_size(&self) -> u16 {
@@ -136,7 +232,7 @@ impl GameState {
         &mut self,
         consumable: Consumable,
     ) -> Result<(), ConsumableUseError> {
-        if self.consumables.len() >= DEFAULT_CONSUMABLE_SLOTS {
+        if self.consumables.len() >= self.consumable_capacity() {
             return Err(ConsumableUseError::NoCapacity);
         }
         self.consumables.push(consumable);
@@ -218,6 +314,8 @@ impl Game {
             return Err(ShopError::ShopAlreadyActive);
         }
         shop.refresh_base_items(&mut self.state);
+        shop.refresh_packs(&mut self.state);
+        shop.refresh_voucher(&mut self.state);
         self.shop = Some(shop);
         Ok(())
     }
@@ -250,3 +348,11 @@ mod consumable_tests;
 #[cfg(test)]
 #[path = "tests/shop.rs"]
 mod shop_tests;
+
+#[cfg(test)]
+#[path = "tests/pack.rs"]
+mod pack_tests;
+
+#[cfg(test)]
+#[path = "tests/voucher.rs"]
+mod voucher_tests;

@@ -183,7 +183,7 @@ pub(crate) enum Vouchers {
     SeedMoney = 21,
     MoneyTree = 22,
     Blank = 23,
-    Anitmatter = 24,
+    Antimatter = 24,
     MagicTrick = 25,
     Illusion = 26,
     Hieroglyph = 27,
@@ -192,6 +192,43 @@ pub(crate) enum Vouchers {
     Retcon = 30,
     PaintBrush = 31,
     Palette = 32,
+}
+
+impl Vouchers {
+    pub(crate) const ALL: [Vouchers; 32] = [
+        Vouchers::Overstock,
+        Vouchers::OverstockPlus,
+        Vouchers::ClearanceSale,
+        Vouchers::Liquidation,
+        Vouchers::Hone,
+        Vouchers::GlowUp,
+        Vouchers::RerollSurplus,
+        Vouchers::RerollGlut,
+        Vouchers::CrystalBall,
+        Vouchers::OmenGlobe,
+        Vouchers::Telescope,
+        Vouchers::Observatory,
+        Vouchers::Grabber,
+        Vouchers::NachoTong,
+        Vouchers::Wasteful,
+        Vouchers::Recyclomancy,
+        Vouchers::TarotMerchant,
+        Vouchers::TarotTycoon,
+        Vouchers::PlanetMerchant,
+        Vouchers::PlanetTycoon,
+        Vouchers::SeedMoney,
+        Vouchers::MoneyTree,
+        Vouchers::Blank,
+        Vouchers::Antimatter,
+        Vouchers::MagicTrick,
+        Vouchers::Illusion,
+        Vouchers::Hieroglyph,
+        Vouchers::Petroglpyh,
+        Vouchers::DirectorsCut,
+        Vouchers::Retcon,
+        Vouchers::PaintBrush,
+        Vouchers::Palette,
+    ];
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -267,6 +304,29 @@ pub(crate) enum Spectral {
     Cryptid = 16,
     Soul = 17,
     BlackHole = 18,
+}
+
+impl Spectral {
+    pub(crate) const ALL: [Spectral; 18] = [
+        Spectral::Familiar,
+        Spectral::Grim,
+        Spectral::Incantation,
+        Spectral::Talisman,
+        Spectral::Aura,
+        Spectral::Wraith,
+        Spectral::Sigil,
+        Spectral::Ouija,
+        Spectral::Ectoplasm,
+        Spectral::Immolate,
+        Spectral::Ankh,
+        Spectral::DejaVu,
+        Spectral::Hex,
+        Spectral::Trance,
+        Spectral::Medium,
+        Spectral::Cryptid,
+        Spectral::Soul,
+        Spectral::BlackHole,
+    ];
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
