@@ -88,6 +88,10 @@ impl Deck {
         self.cards.get(index)
     }
 
+    pub(crate) fn deck_type(&self) -> Decks {
+        self.deck_type
+    }
+
     pub(crate) fn card_mut(&mut self, index: usize) -> Option<&mut Card> {
         self.cards.get_mut(index)
     }
@@ -109,10 +113,6 @@ impl Deck {
             Decks::Nebula => -1,
             _ => 0,
         }
-    }
-
-    pub(crate) fn has_spectral_shop_offers(&self) -> bool {
-        self.deck_type == Decks::Ghost
     }
 
     pub(crate) fn enhanced_count(&self) -> u16 {

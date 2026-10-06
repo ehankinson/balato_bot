@@ -1,7 +1,7 @@
 use crate::core::card::Card;
 use crate::core::enums::{
     ALL_RANKS, ALL_SUITS, Consumable, Edition, Enhancement, Planet, PokerHand, Rank, Seal,
-    Spectral, Suit, Tarot, Vouchers,
+    Spectral, Suit, Tarot,
 };
 use crate::core::enums::{Spectral::*, Tarot::*};
 use crate::core::game::GameState;

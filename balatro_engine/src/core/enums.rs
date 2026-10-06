@@ -70,7 +70,7 @@ pub(crate) enum Edition {
     Polychrome = 3,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Decks {
     Red = 1,
     Blue = 2,
@@ -89,6 +89,7 @@ pub(crate) enum Decks {
     Erratic = 15,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum Stakes {
     White = 1,
     Red = 2,
@@ -100,6 +101,7 @@ pub(crate) enum Stakes {
     Gold = 8,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum BossBlinds {
     Hook = 1,
     Ox = 2,
@@ -195,6 +197,10 @@ pub(crate) enum Vouchers {
 }
 
 impl Vouchers {
+    pub(crate) const fn tier(self) -> u8 {
+        if self as u8 % 2 == 1 { 1 } else { 2 }
+    }
+
     pub(crate) const ALL: [Vouchers; 32] = [
         Vouchers::Overstock,
         Vouchers::OverstockPlus,
@@ -360,6 +366,10 @@ impl Planet {
         Planet::Ceres,
         Planet::Eris,
     ];
+
+    pub(crate) const fn mask(self) -> u16 {
+        1_u16 << (self as u16 - 1)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

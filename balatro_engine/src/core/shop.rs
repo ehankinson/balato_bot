@@ -1,5 +1,5 @@
 use crate::core::card::Card;
-use crate::core::enums::{Consumable, Planet, Spectral, Tarot, Vouchers};
+use crate::core::enums::{Consumable, Decks, Planet, Spectral, Tarot, Vouchers};
 use crate::core::game::GameState;
 use crate::core::joker::{Joker, UpdateEvent};
 use crate::core::pack::{
@@ -59,7 +59,7 @@ impl ShopOfferWeights {
             jokers: Self::BASE.jokers,
             tarot: Self::BASE.tarot * tarot_multiplier,
             planets: Self::BASE.planets * planet_multiplier,
-            spectrals: if state.deck.has_spectral_shop_offers() {
+            spectrals: if state.deck.deck_type() == Decks::Ghost {
                 2
             } else {
                 0
@@ -163,14 +163,9 @@ impl ShopState {
             return;
         }
 
-        let available = Vouchers::ALL
-            .iter()
-            .copied()
+        self.voucher = state
+            .ante_voucher
             .filter(|voucher| state.can_redeem_voucher(*voucher))
-            .collect::<Vec<_>>();
-        self.voucher = available
-            .choose(&mut state.rng)
-            .copied()
             .map(|voucher| ShopVoucher { voucher, price: 10 });
     }
 
@@ -250,8 +245,6 @@ impl ShopState {
         match item {
             ShopItem::Joker { joker, .. } => {
                 state.jokers.add(joker);
-                state.counters.empty_joker_slots =
-                    state.counters.empty_joker_slots.saturating_sub(1);
                 state.update_jokers(UpdateEvent::JokerOrderChanged);
             }
             ShopItem::Consumable { consumable, .. } => {
@@ -353,7 +346,7 @@ fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> ShopItem {
         ShopOfferKind::Planet => {
             let planet = state
                 .most_played_hand
-                .filter(|_| state.always_show_most_played_hand)
+                .filter(|_| state.has_voucher(Vouchers::Telescope))
                 .map(planet_for_hand)
                 .unwrap_or_else(|| {
                     Planet::ALL

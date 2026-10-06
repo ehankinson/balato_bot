@@ -253,7 +253,7 @@ impl Jokers {
         self.update(UpdateEvent::RoundStarted, game_state);
         self.update(
             UpdateEvent::BlindCompleted {
-                is_boss: game_state.blind_is_boss,
+                is_boss: game_state.blind.kind.is_boss(),
             },
             game_state,
         );
@@ -309,13 +309,9 @@ impl Jokers {
                     .sell_value_bonus
                     .saturating_add(effect.sell_value_bonus);
             }
-            game_state.counters.joker_sell_value_bonus = game_state
+            game_state.counters.sell_value_bonus = game_state
                 .counters
-                .joker_sell_value_bonus
-                .saturating_add(effect.sell_value_bonus);
-            game_state.counters.consumable_sell_value_bonus = game_state
-                .counters
-                .consumable_sell_value_bonus
+                .sell_value_bonus
                 .saturating_add(effect.sell_value_bonus);
         }
 
@@ -328,8 +324,6 @@ impl Jokers {
         let effect = self.update(UpdateEvent::JokerSold { kind }, game_state);
         self.jokers.remove(index);
         game_state.counters.cards_sold = game_state.counters.cards_sold.saturating_add(1);
-        game_state.counters.empty_joker_slots =
-            game_state.counters.empty_joker_slots.saturating_add(1);
         effect
     }
 }
@@ -337,28 +331,28 @@ impl Jokers {
 fn apply_game_effect(effect: &JokerEffect, game_state: &mut GameState) {
     game_state.money += effect.money;
     game_state.counters.life += effect.life;
-    game_state.boss_blind_disabled |= effect.disable_boss_blind;
-    game_state.prevent_death |= effect.prevent_death;
+    game_state.blind.boss_ability_disabled |= effect.disable_boss_blind;
+    game_state.blind.prevent_death |= effect.prevent_death;
     game_state.counters.hand_size_modifier += effect.hand_size;
     if effect.hands >= 0 {
-        game_state.counters.hands_remaining = game_state
-            .counters
+        game_state.blind.hands_remaining = game_state
+            .blind
             .hands_remaining
             .saturating_add(effect.hands as u8);
     } else {
-        game_state.counters.hands_remaining = game_state
-            .counters
+        game_state.blind.hands_remaining = game_state
+            .blind
             .hands_remaining
             .saturating_sub(effect.hands.unsigned_abs());
     }
     if effect.discards >= 0 {
-        game_state.counters.discards_remaining = game_state
-            .counters
+        game_state.blind.discards_remaining = game_state
+            .blind
             .discards_remaining
             .saturating_add(effect.discards as u8);
     } else {
-        game_state.counters.discards_remaining = game_state
-            .counters
+        game_state.blind.discards_remaining = game_state
+            .blind
             .discards_remaining
             .saturating_sub(effect.discards.unsigned_abs());
     }
@@ -642,6 +636,7 @@ impl Joker {
             },
             JokerKind::Castle => {
                 let count = game_state
+                    .blind
                     .target_suit
                     .map(|suit| cards.iter().filter(|card| card.suit() == suit).count())
                     .unwrap_or(0);
@@ -714,7 +709,7 @@ impl Joker {
                 effect
             }
             JokerStructure::Normal(JokerData::Econ(data)) => match self.kind {
-                JokerKind::DelayedGratification if game_state.counters.discards_used == 0 => {
+                JokerKind::DelayedGratification if game_state.blind.discards_used == 0 => {
                     JokerEffect {
                         money: data.money as i16,
                         ..JokerEffect::default()
@@ -888,7 +883,7 @@ impl Joker {
                 effect.money = 4;
             }
             (UpdateEvent::RoundCompleted, JokerKind::Satellite) => {
-                effect.money = game_state.counters.unique_planet_cards_used as i16;
+                effect.money = game_state.unique_planet_cards_used() as i16;
             }
             (UpdateEvent::RoundCompleted, JokerKind::Rocket) => {
                 if let JokerStructure::Normal(JokerData::Econ(data)) = &self.structure {
@@ -911,7 +906,7 @@ impl Joker {
             ) => {
                 let suit = *ALL_SUITS.choose(&mut game_state.rng).unwrap();
                 if self.kind == JokerKind::Castle {
-                    game_state.target_suit = Some(suit);
+                    game_state.blind.target_suit = Some(suit);
                 }
                 if let JokerStructure::Normal(JokerData::Scoring(data)) = &mut self.structure {
                     if self.kind == JokerKind::Ancient {
@@ -1057,7 +1052,7 @@ impl Joker {
                 }
             }
             (UpdateEvent::CardsDiscarded { cards }, JokerKind::Castle) => {
-                if let Some(target_suit) = game_state.target_suit {
+                if let Some(target_suit) = game_state.blind.target_suit {
                     if let JokerStructure::Normal(JokerData::Scoring(data)) = &mut self.structure {
                         data.chips = data.chips.saturating_add(
                             cards
@@ -1116,13 +1111,13 @@ fn add_scoring_effect(
     }
 
     match kind {
-        JokerKind::Banner => effect.chips += game_state.counters.discards_remaining as i32 * 30,
-        JokerKind::MysticSummit if game_state.counters.discards_remaining == 0 => {
+        JokerKind::Banner => effect.chips += game_state.blind.discards_remaining as i32 * 30,
+        JokerKind::MysticSummit if game_state.blind.discards_remaining == 0 => {
             effect.add_mult += 15
         }
         JokerKind::Abstract => effect.add_mult += joker_count.saturating_sub(1) as i32 * 3,
         JokerKind::Stencil => {
-            effect.x_mult *= 1.0 + game_state.counters.empty_joker_slots as f32;
+            effect.x_mult *= 1.0 + game_state.empty_joker_slots() as f32;
         }
         JokerKind::Steel => {
             let steel_cards = held_cards
@@ -1155,7 +1150,7 @@ fn add_scoring_effect(
         }
         JokerKind::Hiker => effect.chips += 5,
         JokerKind::Supernova => {
-            if game_state.current_hand == hand_type {
+            if game_state.blind.current_hand == hand_type {
                 effect.add_mult += 1;
             }
         }
@@ -1248,9 +1243,9 @@ fn scoring_condition(
         | JokerKind::Supernova
         | JokerKind::GrosMichel
         | JokerKind::Misprint => true,
-        JokerKind::MysticSummit => game_state.counters.discards_remaining == 0,
+        JokerKind::MysticSummit => game_state.blind.discards_remaining == 0,
         JokerKind::Loyalty => {
-            game_state.counters.hands_played > 0 && game_state.counters.hands_played % 6 == 0
+            game_state.blind.hands_played > 0 && game_state.blind.hands_played % 6 == 0
         }
         JokerKind::Fibonacci => matches!(
             card.rank(),
@@ -1278,7 +1273,7 @@ fn scoring_condition(
         JokerKind::SpareTrousers => hand_type == Some(PokerHand::TwoPair),
         JokerKind::DriversLicense => game_state.enhanced_cards() >= 16,
         JokerKind::Obelisk => game_state.most_played_hand != hand_type,
-        JokerKind::CardSharp => game_state.current_hand == hand_type,
+        JokerKind::CardSharp => game_state.blind.current_hand == hand_type,
         _ => true,
     }
 }

@@ -20,11 +20,11 @@ fn voucher_redemption_updates_persistent_run_modifiers() {
     assert_eq!(state.discards_per_blind(), 5);
     assert_eq!(state.counters.interest_cap, 10);
     assert_eq!(state.joker_capacity(), 6);
-    assert_eq!(state.counters.empty_joker_slots, 6);
+    assert_eq!(state.empty_joker_slots(), 6);
 
     state.begin_blind();
-    assert_eq!(state.counters.hands_remaining, 5);
-    assert_eq!(state.counters.discards_remaining, 5);
+    assert_eq!(state.blind.hands_remaining, 5);
+    assert_eq!(state.blind.discards_remaining, 5);
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn observatory_scales_planet_upgrades() {
         .add_consumable(Consumable::Planet(Planet::Saturn))
         .unwrap();
 
-    assert!(state.always_show_most_played_hand);
+    assert!(state.has_voucher(Vouchers::Telescope));
     assert_eq!(state.planet_mult_multiplier(PokerHand::Straight), 1.5);
     assert_eq!(state.planet_mult_multiplier(PokerHand::Flush), 1.0);
 
@@ -94,13 +94,44 @@ fn voucher_prerequisites_are_enforced() {
 #[test]
 fn telescope_and_consumable_slot_vouchers_update_game_state() {
     let mut state = GameState::new(26);
-    assert!(!state.always_show_most_played_hand);
+    assert!(!state.has_voucher(Vouchers::Telescope));
     state.redeem_voucher(Vouchers::Telescope).unwrap();
-    assert!(state.always_show_most_played_hand);
+    assert!(state.has_voucher(Vouchers::Telescope));
 
     state.redeem_voucher(Vouchers::CrystalBall).unwrap();
     state.redeem_voucher(Vouchers::OmenGlobe).unwrap();
     assert_eq!(state.consumable_capacity(), 4);
+}
+
+#[test]
+fn ante_voucher_selection_prefers_tier_one_vouchers() {
+    let state = GameState::new(27);
+
+    assert_eq!(state.ante_voucher.unwrap().tier(), 1);
+}
+
+#[test]
+fn tier_two_vouchers_are_used_only_after_all_tier_one_vouchers_are_owned() {
+    let mut state = GameState::new(28);
+    state.vouchers = Vouchers::ALL
+        .iter()
+        .copied()
+        .filter(|voucher| voucher.tier() == 1)
+        .collect();
+
+    state.begin_next_ante();
+
+    assert_eq!(state.ante_voucher.unwrap().tier(), 2);
+}
+
+#[test]
+fn fully_owned_voucher_pairs_are_removed_from_the_selection_pool() {
+    let mut state = GameState::new(29);
+    state.vouchers = Vouchers::ALL.to_vec();
+
+    state.begin_next_ante();
+
+    assert_eq!(state.ante_voucher, None);
 }
 
 #[test]

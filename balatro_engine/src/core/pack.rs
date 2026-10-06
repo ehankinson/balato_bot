@@ -103,8 +103,6 @@ impl PackOpening {
             match self.options.get(*index).expect("validated pack selection") {
                 PackOption::Joker(joker) => {
                     state.jokers.add(joker.clone());
-                    state.counters.empty_joker_slots =
-                        state.counters.empty_joker_slots.saturating_sub(1);
                     state.update_jokers(UpdateEvent::JokerOrderChanged);
                 }
                 PackOption::Consumable(consumable) => state

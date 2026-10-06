@@ -1,7 +1,8 @@
 use super::*;
 
+use crate::core::blind::BlindKind;
 use crate::core::card::Card;
-use crate::core::enums::{Decks, Edition, Enhancement, Rank, Seal, Suit};
+use crate::core::enums::{BossBlinds, Decks, Edition, Enhancement, Rank, Seal, Stakes, Suit};
 use crate::core::hand::Hand;
 use crate::core::joker::Joker;
 use crate::core::joker::TriggerEvent;
@@ -17,8 +18,48 @@ fn game_state_owns_the_run_collections_and_deck_counts() {
     assert!(state.jokers.as_slice().is_empty());
     assert!(state.vouchers.is_empty());
     assert!(state.consumables.is_empty());
-    assert_eq!(state.counters.hands_remaining, 4);
-    assert_eq!(state.counters.discards_remaining, 4);
+    assert_eq!(state.blind.hands_remaining, 4);
+    assert_eq!(state.blind.discards_remaining, 4);
+}
+
+#[test]
+fn blind_state_owns_the_active_blind_counters_and_kind() {
+    let mut state = GameState::new(8);
+
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Hook));
+
+    assert!(state.blind.kind.is_boss());
+    assert_eq!(state.blind.hands_remaining, 4);
+    assert_eq!(state.blind.discards_remaining, 4);
+    assert_eq!(state.blind.chips_scored, 0);
+    assert_eq!(state.blind.stake, Stakes::White);
+    assert_eq!(state.blind.score_requirement, 600);
+}
+
+#[test]
+fn blind_score_requirement_uses_stake_ante_and_blind_kind() {
+    let mut state = GameState::new(9);
+    state.blind.stake = Stakes::Green;
+    state.counters.ante = 2;
+
+    state.begin_blind_as(BlindKind::Small);
+    assert_eq!(state.blind.score_requirement, 900);
+    state.begin_blind_as(BlindKind::Big);
+    assert_eq!(state.blind.score_requirement, 1_350);
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Hook));
+    assert_eq!(state.blind.score_requirement, 1_800);
+}
+
+#[test]
+fn blind_score_requirement_uses_endless_scaling_after_ante_eight() {
+    let mut state = GameState::new(10);
+    state.blind.stake = Stakes::Gold;
+    state.counters.ante = 9;
+
+    state.begin_blind_as(BlindKind::Small);
+
+    let expected = crate::consts::ante_scores::endless_ante_stakes(Stakes::Gold, 9)[0] as u64;
+    assert_eq!(state.blind.score_requirement, expected);
 }
 
 #[test]

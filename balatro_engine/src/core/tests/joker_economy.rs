@@ -147,7 +147,7 @@ fn round_end_economy_jokers_pay_only_for_their_current_state() {
     let mut satellite = Jokers::new();
     satellite.add(Joker::create_joker(JokerKind::Satellite));
     let mut satellite_state = GameState::new(21);
-    satellite_state.counters.unique_planet_cards_used = 2;
+    satellite_state.counters.used_planets = 0b11;
     assert_eq!(
         satellite
             .update(UpdateEvent::RoundCompleted, &mut satellite_state)

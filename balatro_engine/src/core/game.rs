@@ -1,40 +1,30 @@
+use crate::core::blind::{BlindKind, BlindState};
 use crate::core::consumable::{
     ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_SLOTS, PokerHandLevel, PokerHandLevels,
 };
 use crate::core::deck::Deck;
-use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Suit, Tarot, Vouchers};
+use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
 use crate::core::pack::PackError;
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::voucher::VoucherError;
 use rand::SeedableRng;
+use rand::prelude::IndexedRandom;
 use rand::rngs::StdRng;
 
-/// Run counters shared by the shop and blind phases.
-///
-/// Hands and discards remain here until the dedicated blind state is added.
-/// They are per-blind values today; the other fields accumulate across the run.
+/// Counters that persist across blind transitions and shop phases.
 pub(crate) struct GameCounters {
-    pub(crate) discards_used: u8,
-    pub(crate) discards_remaining: u8,
-    pub(crate) hands_remaining: u8,
-    pub(crate) hands_played: u32,
     pub(crate) round: u32,
     pub(crate) ante: u8,
     pub(crate) life: i16,
     pub(crate) cards_sold: u16,
-    pub(crate) discarded_cards_since_gain: u32,
     pub(crate) tarot_cards_used: u32,
     pub(crate) planet_cards_used: u32,
-    pub(crate) booster_packs_skipped: u32,
     pub(crate) shop_rerolls: u32,
     pub(crate) blinds_skipped: u32,
-    pub(crate) unique_planet_cards_used: u32,
-    pub(crate) uncommon_jokers: u8,
-    pub(crate) empty_joker_slots: u8,
-    pub(crate) joker_sell_value_bonus: u8,
-    pub(crate) consumable_sell_value_bonus: u8,
+    pub(crate) used_planets: u16,
+    pub(crate) sell_value_bonus: u8,
     pub(crate) hand_size_modifier: i8,
     pub(crate) hands_bonus: i8,
     pub(crate) discards_bonus: i8,
@@ -51,25 +41,16 @@ pub(crate) struct GameCounters {
 impl GameCounters {
     fn new() -> GameCounters {
         GameCounters {
-            discards_used: 0,
-            discards_remaining: 4,
-            hands_remaining: 4,
-            hands_played: 0,
             round: 1,
             ante: 1,
             life: 1,
             cards_sold: 0,
-            discarded_cards_since_gain: 0,
             tarot_cards_used: 0,
             planet_cards_used: 0,
-            booster_packs_skipped: 0,
             shop_rerolls: 0,
             blinds_skipped: 0,
-            unique_planet_cards_used: 0,
-            uncommon_jokers: 0,
-            empty_joker_slots: 5,
-            joker_sell_value_bonus: 0,
-            consumable_sell_value_bonus: 0,
+            used_planets: 0,
+            sell_value_bonus: 0,
             hand_size_modifier: 0,
             hands_bonus: 0,
             discards_bonus: 0,
@@ -86,6 +67,7 @@ impl GameCounters {
 }
 
 pub struct GameState {
+    pub(crate) blind: BlindState,
     pub(crate) deck: Deck,
     pub(crate) jokers: Jokers,
     pub(crate) money: i16,
@@ -94,13 +76,8 @@ pub struct GameState {
     pub(crate) last_consumable: Option<Consumable>,
     pub(crate) hand_levels: PokerHandLevels,
     pub(crate) counters: GameCounters,
-    pub(crate) boss_blind_disabled: bool,
-    pub(crate) prevent_death: bool,
     pub(crate) most_played_hand: Option<PokerHand>,
-    pub(crate) current_hand: Option<PokerHand>,
-    pub(crate) target_suit: Option<Suit>,
-    pub(crate) blind_is_boss: bool,
-    pub(crate) always_show_most_played_hand: bool,
+    pub(crate) ante_voucher: Option<Vouchers>,
     pub(crate) rng: StdRng,
 }
 
@@ -112,7 +89,8 @@ impl GameState {
     pub(crate) fn with_deck(seed: u64, deck_type: Decks) -> GameState {
         let mut rng = StdRng::seed_from_u64(seed);
 
-        GameState {
+        let mut state = GameState {
+            blind: BlindState::new(),
             deck: Deck::new(deck_type, &mut rng),
             jokers: Jokers::new(),
             money: 0,
@@ -121,15 +99,12 @@ impl GameState {
             last_consumable: None,
             hand_levels: PokerHandLevels::new(),
             counters: GameCounters::new(),
-            boss_blind_disabled: false,
-            prevent_death: false,
             most_played_hand: None,
-            current_hand: None,
-            target_suit: None,
-            blind_is_boss: false,
-            always_show_most_played_hand: false,
+            ante_voucher: None,
             rng,
-        }
+        };
+        state.roll_ante_voucher();
+        state
     }
 
     pub(crate) fn hand_size(&self) -> i8 {
@@ -147,6 +122,15 @@ impl GameState {
         (Jokers::CAPACITY as i8 + self.counters.joker_slot_modifier).max(0) as usize
     }
 
+    pub(crate) fn empty_joker_slots(&self) -> usize {
+        self.joker_capacity()
+            .saturating_sub(self.jokers.as_slice().len())
+    }
+
+    pub(crate) fn unique_planet_cards_used(&self) -> u32 {
+        self.counters.used_planets.count_ones()
+    }
+
     pub(crate) fn joker_has_room(&self) -> bool {
         self.jokers.as_slice().len() < self.joker_capacity()
     }
@@ -160,9 +144,36 @@ impl GameState {
     }
 
     pub(crate) fn begin_blind(&mut self) {
-        self.counters.hands_remaining = self.hands_per_blind();
-        self.counters.discards_remaining = self.discards_per_blind();
-        self.counters.discards_used = 0;
+        self.begin_blind_as(BlindKind::Small);
+    }
+
+    pub(crate) fn begin_blind_as(&mut self, kind: BlindKind) {
+        self.blind.begin(
+            kind,
+            self.counters.ante,
+            self.hands_per_blind(),
+            self.discards_per_blind(),
+        );
+    }
+
+    pub(crate) fn begin_next_ante(&mut self) {
+        self.counters.ante = self.counters.ante.saturating_add(1);
+        self.roll_ante_voucher();
+    }
+
+    fn roll_ante_voucher(&mut self) {
+        let available = Vouchers::ALL
+            .iter()
+            .copied()
+            .filter(|voucher| self.can_redeem_voucher(*voucher))
+            .collect::<Vec<_>>();
+        let lowest_available_tier = available.iter().map(|voucher| voucher.tier()).min();
+        self.ante_voucher = available
+            .into_iter()
+            .filter(|voucher| Some(voucher.tier()) == lowest_available_tier)
+            .collect::<Vec<_>>()
+            .choose(&mut self.rng)
+            .copied();
     }
 
     pub(crate) fn has_voucher(&self, voucher: Vouchers) -> bool {
@@ -268,6 +279,9 @@ impl GameState {
             }
             Consumable::Planet(_) => {
                 self.counters.planet_cards_used = self.counters.planet_cards_used.saturating_add(1);
+                if let Consumable::Planet(planet) = used {
+                    self.counters.used_planets |= planet.mask();
+                }
                 self.update_jokers(UpdateEvent::PlanetCardUsed);
             }
             Consumable::Spectral(_) => {}

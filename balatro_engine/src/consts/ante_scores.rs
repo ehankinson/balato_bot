@@ -1,6 +1,6 @@
 use crate::core::enums::Stakes;
 
-pub const ANTE_SCORES: [[[u64; 3]; 8]; 3] = [
+pub(crate) const ANTE_SCORES: [[[u64; 3]; 8]; 3] = [
     // Easy: White / Red
     [
         [300, 450, 600],
@@ -36,7 +36,7 @@ pub const ANTE_SCORES: [[[u64; 3]; 8]; 3] = [
     ],
 ];
 
-pub fn endless_ante_stakes(stake: &Stakes, ante: u8) -> [f64; 3] {
+pub(crate) fn endless_ante_stakes(stake: Stakes, ante: u8) -> [f64; 3] {
     assert!(ante > 8, "endless ante_stakes requires ante > 8");
 
     let difficulty = match stake {
@@ -54,4 +54,24 @@ pub fn endless_ante_stakes(stake: &Stakes, ante: u8) -> [f64; 3] {
     let base_score = (true_score / z).floor() * z;
 
     [base_score, base_score * 1.5, base_score * 2.0]
+}
+
+pub(crate) fn score_requirements(stake: Stakes, ante: u8) -> [u64; 3] {
+    let ante = ante.max(1);
+
+    if ante <= 8 {
+        ANTE_SCORES[stake.difficulty_index()][ante as usize - 1]
+    } else {
+        endless_ante_stakes(stake, ante).map(|score| score as u64)
+    }
+}
+
+impl Stakes {
+    const fn difficulty_index(self) -> usize {
+        match self {
+            Stakes::White | Stakes::Red => 0,
+            Stakes::Green | Stakes::Black | Stakes::Blue => 1,
+            Stakes::Purple | Stakes::Orange | Stakes::Gold => 2,
+        }
+    }
 }

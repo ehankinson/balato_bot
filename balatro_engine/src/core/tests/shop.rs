@@ -207,6 +207,48 @@ fn game_owns_the_active_shop_phase_and_rejects_nested_shops() {
 }
 
 #[test]
+fn ante_voucher_is_reused_by_each_shop_until_the_ante_changes() {
+    let mut game = Game::new(30);
+    let ante_one_voucher = game.state.ante_voucher.expect("ante 1 voucher");
+
+    game.enter_shop(ShopState::new()).unwrap();
+    assert_eq!(
+        game.shop().unwrap().voucher.as_ref().unwrap().voucher,
+        ante_one_voucher
+    );
+    game.leave_shop();
+
+    game.enter_shop(ShopState::new()).unwrap();
+    assert_eq!(
+        game.shop().unwrap().voucher.as_ref().unwrap().voucher,
+        ante_one_voucher
+    );
+}
+
+#[test]
+fn advancing_to_the_next_ante_rolls_a_new_eligible_voucher() {
+    let mut game = Game::new(31);
+    game.state.money = 10;
+    let ante_one_voucher = game.state.ante_voucher.expect("ante 1 voucher");
+
+    game.enter_shop(ShopState::new()).unwrap();
+    let mut shop = game.leave_shop().expect("active shop");
+    shop.buy_voucher(&mut game.state).unwrap();
+
+    game.state.begin_next_ante();
+    assert_eq!(game.state.counters.ante, 2);
+    let ante_two_voucher = game.state.ante_voucher.expect("ante 2 voucher");
+    assert_ne!(ante_two_voucher, ante_one_voucher);
+    assert!(game.state.can_redeem_voucher(ante_two_voucher));
+
+    game.enter_shop(ShopState::new()).unwrap();
+    assert_eq!(
+        game.shop().unwrap().voucher.as_ref().unwrap().voucher,
+        ante_two_voucher
+    );
+}
+
+#[test]
 fn game_state_can_start_with_a_non_red_deck_for_shop_card_purchases() {
     let mut state = GameState::with_deck(7, Decks::Black);
     state.money = 10;

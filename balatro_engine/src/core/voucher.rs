@@ -112,8 +112,8 @@ fn apply_effect(state: &mut GameState, voucher: Vouchers) {
         Vouchers::Liquidation => counters.shop_discount_percent = 50,
         Vouchers::Hone => counters.edition_rate_multiplier = 2,
         Vouchers::GlowUp => counters.edition_rate_multiplier = 4,
-        Vouchers::RerollSurplus => counters.reroll_minimum = 4,
-        Vouchers::RerollGlut => counters.reroll_minimum = 2,
+        Vouchers::RerollSurplus => counters.reroll_minimum = 3,
+        Vouchers::RerollGlut => counters.reroll_minimum = 1,
         Vouchers::CrystalBall | Vouchers::OmenGlobe => counters.consumable_slot_modifier += 1,
         Vouchers::Grabber => counters.hands_bonus += 1,
         Vouchers::NachoTong => counters.hands_bonus += 1,
@@ -123,7 +123,6 @@ fn apply_effect(state: &mut GameState, voucher: Vouchers) {
         Vouchers::MoneyTree => counters.interest_cap = counters.interest_cap.max(20),
         Vouchers::Antimatter => {
             counters.joker_slot_modifier += 1;
-            counters.empty_joker_slots = counters.empty_joker_slots.saturating_add(1);
         }
         Vouchers::Hieroglyph => {
             counters.ante = counters.ante.saturating_sub(1);
@@ -148,9 +147,5 @@ fn apply_effect(state: &mut GameState, voucher: Vouchers) {
         | Vouchers::MagicTrick
         | Vouchers::Observatory
         | Vouchers::Illusion => {}
-    }
-
-    if voucher == Vouchers::Telescope {
-        state.always_show_most_played_hand = true;
     }
 }

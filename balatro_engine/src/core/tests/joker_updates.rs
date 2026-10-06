@@ -184,7 +184,7 @@ fn sold_and_death_lifecycle_events_apply_their_one_shot_effects() {
     let mut state = GameState::new(23);
     let effect = jokers.sell(0, &mut state);
     assert!(effect.disable_boss_blind);
-    assert!(state.boss_blind_disabled);
+    assert!(state.blind.boss_ability_disabled);
 
     let mut bones = Jokers::new();
     bones.add(Joker::create_joker(JokerKind::MrBones));
@@ -196,7 +196,7 @@ fn sold_and_death_lifecycle_events_apply_their_one_shot_effects() {
         &mut state,
     );
     assert!(effect.prevent_death);
-    assert!(state.prevent_death);
+    assert!(state.blind.prevent_death);
     assert!(bones.as_slice().is_empty());
 }
 
@@ -237,7 +237,7 @@ fn gift_card_increases_owned_joker_sell_values_at_round_end() {
 
     assert_eq!(effect.sell_value_bonus, 1);
     assert_eq!(jokers.jokers[1].sell_value(), 2);
-    assert_eq!(state.counters.consumable_sell_value_bonus, 1);
+    assert_eq!(state.counters.sell_value_bonus, 1);
 }
 
 #[test]
@@ -625,6 +625,7 @@ fn castle_tracks_only_cards_matching_its_current_target_suit() {
     let mut state = GameState::new(33);
     castle.update(UpdateEvent::RoundStarted, &mut state);
     let target = state
+        .blind
         .target_suit
         .expect("Castle did not choose a target suit");
     let other = if target == Suit::Hearts {
@@ -742,10 +743,10 @@ fn lifecycle_edges_are_safe_for_singletons_floors_and_expiration() {
 
     let mut burglar = Jokers::new();
     burglar.add(Joker::create_joker(JokerKind::Burglar));
-    state.counters.discards_remaining = 1;
+    state.blind.discards_remaining = 1;
     let effect = burglar.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
     assert_eq!(effect.discards, -4);
-    assert_eq!(state.counters.discards_remaining, 0);
+    assert_eq!(state.blind.discards_remaining, 0);
 
     let mut green = Jokers::new();
     green.add(Joker::create_joker(JokerKind::Green));

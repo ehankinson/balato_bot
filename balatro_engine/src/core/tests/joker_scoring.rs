@@ -64,7 +64,7 @@ fn hand_effect_with_state(
             held_cards,
             hand_type,
             hands_remaining: 3,
-            discards_remaining: state.counters.discards_remaining,
+            discards_remaining: state.blind.discards_remaining,
             joker_count,
         },
         state,
@@ -212,7 +212,7 @@ fn special_scoring_jokers_respect_state_boundaries() {
     let played = [card(Rank::Seven, Suit::Spades)];
 
     let mut no_discards = GameState::new(102);
-    no_discards.counters.discards_remaining = 0;
+    no_discards.blind.discards_remaining = 0;
     assert_eq!(
         hand_effect_with_state(
             JokerKind::MysticSummit,
@@ -227,7 +227,7 @@ fn special_scoring_jokers_respect_state_boundaries() {
     );
 
     let mut with_discards = GameState::new(103);
-    with_discards.counters.discards_remaining = 1;
+    with_discards.blind.discards_remaining = 1;
     assert_eq!(
         hand_effect_with_state(
             JokerKind::MysticSummit,
@@ -242,12 +242,12 @@ fn special_scoring_jokers_respect_state_boundaries() {
     );
 
     let mut banner_state = GameState::new(104);
-    banner_state.counters.discards_remaining = 2;
+    banner_state.blind.discards_remaining = 2;
     assert_eq!(
         hand_effect_with_state(JokerKind::Banner, &played, &[], None, &mut banner_state, 1,).chips,
         60
     );
-    banner_state.counters.discards_remaining = 0;
+    banner_state.blind.discards_remaining = 0;
     assert_eq!(
         hand_effect_with_state(JokerKind::Banner, &played, &[], None, &mut banner_state, 1,).chips,
         0
@@ -293,13 +293,15 @@ fn deck_and_lineup_scoring_jokers_use_current_counts() {
         8
     );
 
-    state.counters.empty_joker_slots = 2;
+    for _ in 0..3 {
+        state.jokers.add(Joker::create_joker(JokerKind::Joker));
+    }
     assert_eq!(
         hand_effect_with_state(JokerKind::Stencil, &played, &[], None, &mut state, 1).x_mult,
         3.0
     );
 
-    state.current_hand = Some(PokerHand::Pair);
+    state.blind.current_hand = Some(PokerHand::Pair);
     assert_eq!(
         hand_effect_with_state(
             JokerKind::CardSharp,
@@ -602,16 +604,41 @@ fn direct_rank_and_suit_scoring_jokers_have_matching_and_negative_cases() {
 #[test]
 fn dynamic_scoring_jokers_use_zero_and_nonzero_state_boundaries() {
     let played = [card(Rank::Seven, Suit::Spades)];
-    let mut state = GameState::new(109);
-
-    state.counters.empty_joker_slots = 0;
+    let mut no_empty_slots = GameState::new(109);
+    for _ in 0..Jokers::CAPACITY {
+        no_empty_slots
+            .jokers
+            .add(Joker::create_joker(JokerKind::Joker));
+    }
     assert_eq!(
-        hand_effect_with_state(JokerKind::Stencil, &played, &[], None, &mut state, 1).x_mult,
+        hand_effect_with_state(
+            JokerKind::Stencil,
+            &played,
+            &[],
+            None,
+            &mut no_empty_slots,
+            1,
+        )
+        .x_mult,
         1.0
     );
-    state.counters.empty_joker_slots = 2;
+
+    let mut two_empty_slots = GameState::new(109);
+    for _ in 0..3 {
+        two_empty_slots
+            .jokers
+            .add(Joker::create_joker(JokerKind::Joker));
+    }
     assert_eq!(
-        hand_effect_with_state(JokerKind::Stencil, &played, &[], None, &mut state, 1).x_mult,
+        hand_effect_with_state(
+            JokerKind::Stencil,
+            &played,
+            &[],
+            None,
+            &mut two_empty_slots,
+            1,
+        )
+        .x_mult,
         3.0
     );
 
@@ -635,6 +662,7 @@ fn dynamic_scoring_jokers_use_zero_and_nonzero_state_boundaries() {
         hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut eroded, 1).add_mult,
         4
     );
+    let mut state = GameState::new(113);
     state.money = -10;
     assert_eq!(
         hand_effect_with_state(JokerKind::Bull, &played, &[], None, &mut state, 1).chips,
