@@ -39,37 +39,12 @@ impl ShopOfferWeights {
         cards: 0,
     };
 
-    pub(crate) fn for_state(state: &GameState) -> ShopOfferWeights {
-        let tarot_multiplier = if state.has_voucher(Vouchers::TarotTycoon) {
-            4
-        } else if state.has_voucher(Vouchers::TarotMerchant) {
-            2
-        } else {
-            1
-        };
-        let planet_multiplier = if state.has_voucher(Vouchers::PlanetTycoon) {
-            4
-        } else if state.has_voucher(Vouchers::PlanetMerchant) {
-            2
-        } else {
-            1
-        };
+    pub(crate) fn multiply_tarot_weight(&mut self, multiplier: u32) {
+        self.tarot = self.tarot.saturating_mul(multiplier);
+    }
 
-        ShopOfferWeights {
-            jokers: Self::BASE.jokers,
-            tarot: Self::BASE.tarot * tarot_multiplier,
-            planets: Self::BASE.planets * planet_multiplier,
-            spectrals: if state.deck.deck_type() == Decks::Ghost {
-                2
-            } else {
-                0
-            },
-            cards: if state.has_voucher(Vouchers::MagicTrick) {
-                2
-            } else {
-                0
-            },
-        }
+    pub(crate) fn multiply_planet_weight(&mut self, multiplier: u32) {
+        self.planets = self.planets.saturating_mul(multiplier);
     }
 
     pub(crate) fn total(self) -> u32 {
@@ -132,8 +107,10 @@ pub(crate) struct ShopState {
     pub(crate) voucher: Option<ShopVoucher>,
     pub(crate) packs: Vec<ShopPack>,
     pub(crate) items: Vec<ShopItem>,
-    pub(crate) item_slots: usize,
+    pub(crate) number_of_shop_items: usize,
+    pub(crate) initial_reroll_cost: u16,
     pub(crate) reroll_cost: u16,
+    pub(crate) offer_weights: ShopOfferWeights,
 }
 
 impl ShopState {
@@ -142,8 +119,10 @@ impl ShopState {
             voucher: None,
             packs: Vec::with_capacity(SHOP_PACK_SLOTS),
             items: Vec::new(),
-            item_slots: 2,
+            number_of_shop_items: 2,
+            initial_reroll_cost: DEFAULT_REROLL_COST,
             reroll_cost: DEFAULT_REROLL_COST,
+            offer_weights: ShopOfferWeights::BASE,
         }
     }
 
@@ -156,6 +135,19 @@ impl ShopState {
 
     pub(crate) fn set_voucher(&mut self, voucher: ShopVoucher) {
         self.voucher = Some(voucher);
+    }
+
+    pub(crate) fn begin_shop(&mut self) {
+        self.voucher = None;
+        self.packs.clear();
+        self.items.clear();
+        self.reroll_cost = self.initial_reroll_cost;
+    }
+
+    pub(crate) fn apply_deck_rules(&mut self, deck_type: Decks) {
+        if deck_type == Decks::Ghost {
+            self.offer_weights.spectrals = 2;
+        }
     }
 
     pub(crate) fn refresh_voucher(&mut self, state: &mut GameState) {
@@ -188,34 +180,24 @@ impl ShopState {
         self.items.push(item);
     }
 
-    pub(crate) fn base_item_slots(state: &GameState) -> usize {
-        2 + usize::from(state.vouchers.contains(&Vouchers::Overstock))
-            + usize::from(state.vouchers.contains(&Vouchers::OverstockPlus))
-    }
-
     pub(crate) fn refresh_base_items(&mut self, state: &mut GameState) {
-        self.sync_item_slots(state);
         self.items.clear();
-        self.items.reserve(self.item_slots);
+        self.items.reserve(self.number_of_shop_items);
 
         self.refill_base_items(state);
     }
 
-    fn sync_item_slots(&mut self, state: &GameState) {
-        self.item_slots = Self::base_item_slots(state);
-    }
-
-    fn refill_base_items(&mut self, state: &mut GameState) {
+    pub(crate) fn refill_base_items(&mut self, state: &mut GameState) {
         self.items
-            .reserve(self.item_slots.saturating_sub(self.items.len()));
-        while self.items.len() < self.item_slots {
-            let kind = Self::roll_base_offer_kind(state);
+            .reserve(self.number_of_shop_items.saturating_sub(self.items.len()));
+        while self.items.len() < self.number_of_shop_items {
+            let kind = self.roll_base_offer_kind(state);
             self.items.push(random_base_item(kind, state));
         }
     }
 
-    pub(crate) fn roll_base_offer_kind(state: &mut GameState) -> ShopOfferKind {
-        ShopOfferWeights::for_state(state).roll(&mut state.rng)
+    pub(crate) fn roll_base_offer_kind(&self, state: &mut GameState) -> ShopOfferKind {
+        self.offer_weights.roll(&mut state.rng)
     }
 
     pub(crate) fn buy_item(
@@ -258,31 +240,6 @@ impl ShopState {
         Ok(())
     }
 
-    pub(crate) fn buy_voucher(&mut self, state: &mut GameState) -> Result<(), ShopError> {
-        let (voucher, price) = {
-            let offer = self.voucher.as_ref().ok_or(ShopError::InvalidOffer)?;
-            (offer.voucher, offer.price)
-        };
-        if state.vouchers.contains(&voucher) {
-            return Err(ShopError::VoucherAlreadyOwned);
-        }
-        require_funds(state, price)?;
-
-        state.redeem_voucher(voucher).map_err(|error| match error {
-            crate::core::voucher::VoucherError::AlreadyOwned => ShopError::VoucherAlreadyOwned,
-            crate::core::voucher::VoucherError::PrerequisiteMissing => {
-                ShopError::VoucherPrerequisiteMissing
-            }
-        })?;
-        self.voucher.take().expect("the offer was checked above");
-        state.money -= price as i16;
-        if matches!(voucher, Vouchers::Overstock | Vouchers::OverstockPlus) {
-            self.sync_item_slots(state);
-            self.refill_base_items(state);
-        }
-        Ok(())
-    }
-
     pub(crate) fn buy_pack(
         &mut self,
         index: usize,
@@ -312,7 +269,6 @@ impl ShopState {
     }
 
     pub(crate) fn reroll(&mut self, state: &mut GameState) -> Result<(), ShopError> {
-        self.reroll_cost = self.reroll_cost.min(state.counters.reroll_minimum);
         require_funds(state, self.reroll_cost)?;
         state.money -= self.reroll_cost as i16;
         state.counters.shop_rerolls = state.counters.shop_rerolls.saturating_add(1);

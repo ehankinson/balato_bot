@@ -15,10 +15,15 @@ impl BlindKind {
     }
 }
 
-/// State that exists only while the current blind is active.
+/// Blind configuration and state for the current blind lifecycle.
+///
+/// The per-blind hand and discard limits persist between blind transitions;
+/// the remaining counters are reset from them when a new blind begins.
 pub(crate) struct BlindState {
     pub(crate) kind: BlindKind,
     pub(crate) stake: Stakes,
+    pub(crate) hands_per_blind: u8,
+    pub(crate) discards_per_blind: u8,
     pub(crate) hands_remaining: u8,
     pub(crate) discards_remaining: u8,
     pub(crate) discards_used: u8,
@@ -36,6 +41,8 @@ impl BlindState {
         BlindState {
             kind: BlindKind::Small,
             stake: Stakes::White,
+            hands_per_blind: 4,
+            discards_per_blind: 4,
             hands_remaining: 4,
             discards_remaining: 4,
             discards_used: 0,
@@ -49,11 +56,11 @@ impl BlindState {
         }
     }
 
-    pub(crate) fn begin(&mut self, kind: BlindKind, ante: u8, hands: u8, discards: u8) {
+    pub(crate) fn begin(&mut self, kind: BlindKind, ante: u8) {
         self.kind = kind;
         self.score_requirement = score_requirements(self.stake, ante)[kind.score_index()];
-        self.hands_remaining = hands;
-        self.discards_remaining = discards;
+        self.hands_remaining = self.hands_per_blind;
+        self.discards_remaining = self.discards_per_blind;
         self.discards_used = 0;
         self.hands_played = 0;
         self.chips_scored = 0;
@@ -61,6 +68,22 @@ impl BlindState {
         self.prevent_death = false;
         self.current_hand = None;
         self.target_suit = None;
+    }
+
+    pub(crate) fn adjust_hands_per_blind(&mut self, amount: i8) {
+        self.hands_per_blind = adjust_per_blind_amount(self.hands_per_blind, amount);
+    }
+
+    pub(crate) fn adjust_discards_per_blind(&mut self, amount: i8) {
+        self.discards_per_blind = adjust_per_blind_amount(self.discards_per_blind, amount);
+    }
+}
+
+fn adjust_per_blind_amount(current: u8, amount: i8) -> u8 {
+    if amount >= 0 {
+        current.saturating_add(amount as u8)
+    } else {
+        current.saturating_sub(amount.unsigned_abs())
     }
 }
 

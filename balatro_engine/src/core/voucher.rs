@@ -55,7 +55,7 @@ const SHOP_FOIL_RATE: u32 = 200;
 const SHOP_EDITION_ROLL_MAX: u32 = 10_000;
 
 pub(crate) fn random_shop_joker_edition(state: &mut GameState) -> JokerEdition {
-    let multiplier = state.counters.edition_rate_multiplier as u32;
+    let multiplier = state.edition_rate_multiplier as u32;
     let roll = state.rng.random_range(0..SHOP_EDITION_ROLL_MAX);
     shop_edition_for_roll(roll, multiplier)
 }
@@ -65,7 +65,7 @@ const STANDARD_PACK_HOLOGRAPHIC_RATE: u32 = 280;
 const STANDARD_PACK_FOIL_RATE: u32 = 400;
 
 pub(crate) fn random_standard_pack_edition(state: &mut GameState) -> Edition {
-    let multiplier = state.counters.edition_rate_multiplier as u32;
+    let multiplier = state.edition_rate_multiplier as u32;
     let roll = state.rng.random_range(0..SHOP_EDITION_ROLL_MAX);
     standard_pack_edition_for_roll(roll, multiplier)
 }
@@ -105,47 +105,41 @@ pub(crate) fn shop_edition_for_roll(roll: u32, multiplier: u32) -> JokerEdition 
 }
 
 fn apply_effect(state: &mut GameState, voucher: Vouchers) {
-    let counters = &mut state.counters;
-
     match voucher {
-        Vouchers::ClearanceSale => counters.shop_discount_percent = 25,
-        Vouchers::Liquidation => counters.shop_discount_percent = 50,
-        Vouchers::Hone => counters.edition_rate_multiplier = 2,
-        Vouchers::GlowUp => counters.edition_rate_multiplier = 4,
-        Vouchers::RerollSurplus => counters.reroll_minimum = 3,
-        Vouchers::RerollGlut => counters.reroll_minimum = 1,
-        Vouchers::CrystalBall | Vouchers::OmenGlobe => counters.consumable_slot_modifier += 1,
-        Vouchers::Grabber => counters.hands_bonus += 1,
-        Vouchers::NachoTong => counters.hands_bonus += 1,
-        Vouchers::Wasteful => counters.discards_bonus += 1,
-        Vouchers::Recyclomancy => counters.discards_bonus += 1,
-        Vouchers::SeedMoney => counters.interest_cap = counters.interest_cap.max(10),
-        Vouchers::MoneyTree => counters.interest_cap = counters.interest_cap.max(20),
-        Vouchers::Antimatter => {
-            counters.joker_slot_modifier += 1;
+        Vouchers::ClearanceSale => state.shop_discount_percent = 25,
+        Vouchers::Liquidation => state.shop_discount_percent = 50,
+        Vouchers::Hone => state.edition_rate_multiplier = 2,
+        Vouchers::GlowUp => state.edition_rate_multiplier = 4,
+        Vouchers::RerollSurplus => state.shop.initial_reroll_cost = 3,
+        Vouchers::RerollGlut => state.shop.initial_reroll_cost = 1,
+        Vouchers::CrystalBall | Vouchers::OmenGlobe => {
+            state.consumable_capacity = state.consumable_capacity.saturating_add(1);
         }
+        Vouchers::Grabber | Vouchers::NachoTong => state.blind.adjust_hands_per_blind(1),
+        Vouchers::Wasteful | Vouchers::Recyclomancy => state.blind.adjust_discards_per_blind(1),
+        Vouchers::SeedMoney => state.interest_cap = state.interest_cap.max(10),
+        Vouchers::MoneyTree => state.interest_cap = state.interest_cap.max(20),
+        Vouchers::Antimatter => state.jokers.increase_capacity(1),
         Vouchers::Hieroglyph => {
-            counters.ante = counters.ante.saturating_sub(1);
-            counters.hands_bonus -= 1;
+            state.counters.ante = state.counters.ante.saturating_sub(1);
+            state.blind.adjust_hands_per_blind(-1);
         }
         Vouchers::Petroglpyh => {
-            counters.ante = counters.ante.saturating_sub(1);
-            counters.hand_size_modifier -= 1;
+            state.counters.ante = state.counters.ante.saturating_sub(1);
+            state.blind.adjust_discards_per_blind(-1);
         }
-        Vouchers::DirectorsCut => counters.boss_rerolls_per_ante = 1,
-        Vouchers::Retcon => counters.boss_reroll_unlimited = true,
-        Vouchers::PaintBrush => counters.hand_size_modifier += 1,
-        Vouchers::Palette => counters.hand_size_modifier += 1,
-        Vouchers::Overstock
-        | Vouchers::OverstockPlus
-        | Vouchers::Telescope
-        | Vouchers::TarotMerchant
-        | Vouchers::TarotTycoon
-        | Vouchers::PlanetMerchant
-        | Vouchers::PlanetTycoon
-        | Vouchers::Blank
-        | Vouchers::MagicTrick
-        | Vouchers::Observatory
-        | Vouchers::Illusion => {}
+        Vouchers::DirectorsCut => state.boss_rerolls_per_ante = 1,
+        Vouchers::Retcon => state.boss_reroll_unlimited = true,
+        Vouchers::PaintBrush => state.deck.adjust_hand_size(1),
+        Vouchers::Palette => state.deck.adjust_hand_size(1),
+        Vouchers::Overstock | Vouchers::OverstockPlus => {
+            state.shop.number_of_shop_items = state.shop.number_of_shop_items.saturating_add(1);
+        }
+        Vouchers::TarotMerchant => state.shop.offer_weights.multiply_tarot_weight(2),
+        Vouchers::TarotTycoon => state.shop.offer_weights.multiply_tarot_weight(4),
+        Vouchers::PlanetMerchant => state.shop.offer_weights.multiply_planet_weight(2),
+        Vouchers::PlanetTycoon => state.shop.offer_weights.multiply_planet_weight(4),
+        Vouchers::MagicTrick => state.shop.offer_weights.cards = 2,
+        Vouchers::Telescope | Vouchers::Blank | Vouchers::Observatory | Vouchers::Illusion => {}
     }
 }

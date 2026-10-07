@@ -108,6 +108,16 @@ impl Deck {
         BASE_HAND_SIZE + self.hand_size_modifier
     }
 
+    pub(crate) fn adjust_hand_size(&mut self, amount: i8) {
+        if amount >= 0 {
+            self.hand_size_modifier = self.hand_size_modifier.saturating_add(amount);
+        } else {
+            self.hand_size_modifier = self
+                .hand_size_modifier
+                .saturating_sub(amount.unsigned_abs() as i8);
+        }
+    }
+
     pub(crate) fn consumable_slot_modifier(&self) -> i8 {
         match self.deck_type {
             Decks::Nebula => -1,

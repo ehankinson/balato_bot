@@ -339,7 +339,7 @@ fn apply_spectral(
             for card in hand.cards_mut() {
                 card.set_rank(rank);
             }
-            state.counters.hand_size_modifier = state.counters.hand_size_modifier.saturating_sub(1);
+            state.deck.adjust_hand_size(-1);
         }
         Ectoplasm => {
             let index = random_joker_index(state)?;
@@ -348,7 +348,7 @@ fn apply_spectral(
                 .get_mut(index)
                 .expect("validated Joker target")
                 .set_edition(JokerEdition::Negative);
-            state.counters.hand_size_modifier = state.counters.hand_size_modifier.saturating_sub(1);
+            state.deck.adjust_hand_size(-1);
         }
         Immolate => {
             if hand.hand_size() < 5 {

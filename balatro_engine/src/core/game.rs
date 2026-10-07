@@ -25,17 +25,6 @@ pub(crate) struct GameCounters {
     pub(crate) blinds_skipped: u32,
     pub(crate) used_planets: u16,
     pub(crate) sell_value_bonus: u8,
-    pub(crate) hand_size_modifier: i8,
-    pub(crate) hands_bonus: i8,
-    pub(crate) discards_bonus: i8,
-    pub(crate) consumable_slot_modifier: i8,
-    pub(crate) joker_slot_modifier: i8,
-    pub(crate) interest_cap: i16,
-    pub(crate) shop_discount_percent: u8,
-    pub(crate) reroll_minimum: u16,
-    pub(crate) edition_rate_multiplier: u8,
-    pub(crate) boss_rerolls_per_ante: u8,
-    pub(crate) boss_reroll_unlimited: bool,
 }
 
 impl GameCounters {
@@ -51,17 +40,6 @@ impl GameCounters {
             blinds_skipped: 0,
             used_planets: 0,
             sell_value_bonus: 0,
-            hand_size_modifier: 0,
-            hands_bonus: 0,
-            discards_bonus: 0,
-            consumable_slot_modifier: 0,
-            joker_slot_modifier: 0,
-            interest_cap: 5,
-            shop_discount_percent: 0,
-            reroll_minimum: 5,
-            edition_rate_multiplier: 1,
-            boss_rerolls_per_ante: 0,
-            boss_reroll_unlimited: false,
         }
     }
 }
@@ -71,6 +49,13 @@ pub struct GameState {
     pub(crate) deck: Deck,
     pub(crate) jokers: Jokers,
     pub(crate) money: i16,
+    pub(crate) interest_cap: i16,
+    pub(crate) consumable_capacity: usize,
+    pub(crate) shop_discount_percent: u8,
+    pub(crate) edition_rate_multiplier: u8,
+    pub(crate) boss_rerolls_per_ante: u8,
+    pub(crate) boss_reroll_unlimited: bool,
+    pub(crate) shop: ShopState,
     pub(crate) vouchers: Vec<Vouchers>,
     pub(crate) consumables: Vec<Consumable>,
     pub(crate) last_consumable: Option<Consumable>,
@@ -89,11 +74,22 @@ impl GameState {
     pub(crate) fn with_deck(seed: u64, deck_type: Decks) -> GameState {
         let mut rng = StdRng::seed_from_u64(seed);
 
+        let deck = Deck::new(deck_type, &mut rng);
+        let consumable_capacity =
+            (DEFAULT_CONSUMABLE_SLOTS as i8 + deck.consumable_slot_modifier()).max(0) as usize;
+
         let mut state = GameState {
             blind: BlindState::new(),
-            deck: Deck::new(deck_type, &mut rng),
+            deck,
             jokers: Jokers::new(),
             money: 0,
+            interest_cap: 5,
+            consumable_capacity,
+            shop_discount_percent: 0,
+            edition_rate_multiplier: 1,
+            boss_rerolls_per_ante: 0,
+            boss_reroll_unlimited: false,
+            shop: ShopState::new(),
             vouchers: Vec::new(),
             consumables: Vec::new(),
             last_consumable: None,
@@ -108,18 +104,15 @@ impl GameState {
     }
 
     pub(crate) fn hand_size(&self) -> i8 {
-        self.deck.hand_size() + self.counters.hand_size_modifier
+        self.deck.hand_size()
     }
 
     pub(crate) fn consumable_capacity(&self) -> usize {
-        (DEFAULT_CONSUMABLE_SLOTS as i8
-            + self.deck.consumable_slot_modifier()
-            + self.counters.consumable_slot_modifier)
-            .max(0) as usize
+        self.consumable_capacity
     }
 
     pub(crate) fn joker_capacity(&self) -> usize {
-        (Jokers::CAPACITY as i8 + self.counters.joker_slot_modifier).max(0) as usize
+        self.jokers.capacity()
     }
 
     pub(crate) fn empty_joker_slots(&self) -> usize {
@@ -136,11 +129,11 @@ impl GameState {
     }
 
     pub(crate) fn hands_per_blind(&self) -> u8 {
-        (4i8 + self.counters.hands_bonus).max(0) as u8
+        self.blind.hands_per_blind
     }
 
     pub(crate) fn discards_per_blind(&self) -> u8 {
-        (4i8 + self.counters.discards_bonus).max(0) as u8
+        self.blind.discards_per_blind
     }
 
     pub(crate) fn begin_blind(&mut self) {
@@ -148,12 +141,7 @@ impl GameState {
     }
 
     pub(crate) fn begin_blind_as(&mut self, kind: BlindKind) {
-        self.blind.begin(
-            kind,
-            self.counters.ante,
-            self.hands_per_blind(),
-            self.discards_per_blind(),
-        );
+        self.blind.begin(kind, self.counters.ante);
     }
 
     pub(crate) fn begin_next_ante(&mut self) {
@@ -196,7 +184,7 @@ impl GameState {
     }
 
     pub(crate) fn shop_price(&self, base_price: u16) -> u16 {
-        let remaining_percent = 100u32.saturating_sub(self.counters.shop_discount_percent as u32);
+        let remaining_percent = 100u32.saturating_sub(self.shop_discount_percent as u32);
         if base_price == 0 {
             return 0;
         }
@@ -205,6 +193,34 @@ impl GameState {
 
     pub(crate) fn redeem_voucher(&mut self, voucher: Vouchers) -> Result<(), VoucherError> {
         crate::core::voucher::redeem(self, voucher)
+    }
+
+    pub(crate) fn buy_shop_voucher(&mut self) -> Result<(), ShopError> {
+        let (voucher, price) = {
+            let offer = self.shop.voucher.as_ref().ok_or(ShopError::InvalidOffer)?;
+            (offer.voucher, offer.price)
+        };
+        if self.vouchers.contains(&voucher) {
+            return Err(ShopError::VoucherAlreadyOwned);
+        }
+        let price = self.shop_price(price);
+        if self.money < price as i16 {
+            return Err(ShopError::InsufficientFunds);
+        }
+
+        self.redeem_voucher(voucher).map_err(|error| match error {
+            VoucherError::AlreadyOwned => ShopError::VoucherAlreadyOwned,
+            VoucherError::PrerequisiteMissing => ShopError::VoucherPrerequisiteMissing,
+        })?;
+        self.shop.voucher.take();
+        self.money -= price as i16;
+
+        if matches!(voucher, Vouchers::Overstock | Vouchers::OverstockPlus) {
+            let mut shop = std::mem::replace(&mut self.shop, ShopState::new());
+            shop.refill_base_items(self);
+            self.shop = shop;
+        }
+        Ok(())
     }
 
     pub(crate) fn can_redeem_voucher(&self, voucher: Vouchers) -> bool {
@@ -312,38 +328,44 @@ impl GameState {
 /// The runtime object that will coordinate phase transitions.
 pub struct Game {
     pub(crate) state: GameState,
-    pub(crate) shop: Option<ShopState>,
+    shop_active: bool,
 }
 
 impl Game {
     pub fn new(seed: u64) -> Game {
         Game {
             state: GameState::new(seed),
-            shop: None,
+            shop_active: false,
         }
     }
 
-    pub(crate) fn enter_shop(&mut self, mut shop: ShopState) -> Result<(), ShopError> {
-        if self.shop.is_some() {
+    pub(crate) fn enter_shop(&mut self) -> Result<(), ShopError> {
+        if self.shop_active {
             return Err(ShopError::ShopAlreadyActive);
         }
+        let mut shop = std::mem::replace(&mut self.state.shop, ShopState::new());
+        shop.begin_shop();
+        shop.apply_deck_rules(self.state.deck.deck_type());
         shop.refresh_base_items(&mut self.state);
         shop.refresh_packs(&mut self.state);
         shop.refresh_voucher(&mut self.state);
-        self.shop = Some(shop);
+        self.state.shop = shop;
+        self.shop_active = true;
         Ok(())
     }
 
     pub(crate) fn shop(&self) -> Option<&ShopState> {
-        self.shop.as_ref()
+        self.shop_active.then_some(&self.state.shop)
     }
 
     pub(crate) fn shop_mut(&mut self) -> Option<&mut ShopState> {
-        self.shop.as_mut()
+        self.shop_active.then_some(&mut self.state.shop)
     }
 
-    pub(crate) fn leave_shop(&mut self) -> Option<ShopState> {
-        self.shop.take()
+    pub(crate) fn leave_shop(&mut self) -> Option<()> {
+        self.shop_active.then_some(()).inspect(|_| {
+            self.shop_active = false;
+        })
     }
 }
 

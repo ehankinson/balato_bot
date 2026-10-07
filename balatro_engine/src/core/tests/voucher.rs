@@ -18,7 +18,9 @@ fn voucher_redemption_updates_persistent_run_modifiers() {
     assert_eq!(state.consumable_capacity(), 3);
     assert_eq!(state.hands_per_blind(), 5);
     assert_eq!(state.discards_per_blind(), 5);
-    assert_eq!(state.counters.interest_cap, 10);
+    assert_eq!(state.blind.hands_per_blind, 5);
+    assert_eq!(state.blind.discards_per_blind, 5);
+    assert_eq!(state.interest_cap, 10);
     assert_eq!(state.joker_capacity(), 6);
     assert_eq!(state.empty_joker_slots(), 6);
 
@@ -37,7 +39,7 @@ fn voucher_discount_upgrades_and_duplicate_redemption_are_atomic() {
     assert_eq!(state.shop_price(4), 2);
     state.redeem_voucher(Vouchers::Hone).unwrap();
     state.redeem_voucher(Vouchers::GlowUp).unwrap();
-    assert_eq!(state.counters.edition_rate_multiplier, 4);
+    assert_eq!(state.edition_rate_multiplier, 4);
 
     assert_eq!(
         state.redeem_voucher(Vouchers::GlowUp),
@@ -47,7 +49,7 @@ fn voucher_discount_upgrades_and_duplicate_redemption_are_atomic() {
 }
 
 #[test]
-fn voucher_ante_and_hand_modifiers_apply_through_game_state() {
+fn voucher_ante_discard_and_hand_modifiers_apply_through_game_state() {
     let mut state = GameState::new(23);
     state.redeem_voucher(Vouchers::Hieroglyph).unwrap();
 
@@ -55,10 +57,12 @@ fn voucher_ante_and_hand_modifiers_apply_through_game_state() {
     assert_eq!(state.hands_per_blind(), 3);
 
     state.redeem_voucher(Vouchers::Petroglpyh).unwrap();
+    assert_eq!(state.discards_per_blind(), 3);
+
     state.redeem_voucher(Vouchers::PaintBrush).unwrap();
     state.redeem_voucher(Vouchers::Palette).unwrap();
     assert_eq!(state.counters.ante, 0);
-    assert_eq!(state.hand_size(), 9);
+    assert_eq!(state.hand_size(), 10);
 }
 
 #[test]

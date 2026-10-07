@@ -195,6 +195,7 @@ impl JokerEffect {
 
 pub struct Jokers {
     pub(super) jokers: Vec<Joker>,
+    capacity: usize,
 }
 
 impl Jokers {
@@ -202,7 +203,8 @@ impl Jokers {
 
     pub fn new() -> Jokers {
         Jokers {
-            jokers: Vec::with_capacity(5),
+            jokers: Vec::with_capacity(Self::CAPACITY),
+            capacity: Self::CAPACITY,
         }
     }
 
@@ -210,8 +212,16 @@ impl Jokers {
         self.jokers.push(joker);
     }
 
+    pub(crate) fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub(crate) fn increase_capacity(&mut self, amount: usize) {
+        self.capacity = self.capacity.saturating_add(amount);
+    }
+
     pub(crate) fn has_room(&self) -> bool {
-        self.jokers.len() < Self::CAPACITY
+        self.jokers.len() < self.capacity
     }
 
     pub(crate) fn get(&self, index: usize) -> Option<&Joker> {
@@ -333,7 +343,7 @@ fn apply_game_effect(effect: &JokerEffect, game_state: &mut GameState) {
     game_state.counters.life += effect.life;
     game_state.blind.boss_ability_disabled |= effect.disable_boss_blind;
     game_state.blind.prevent_death |= effect.prevent_death;
-    game_state.counters.hand_size_modifier += effect.hand_size;
+    game_state.deck.adjust_hand_size(effect.hand_size);
     if effect.hands >= 0 {
         game_state.blind.hands_remaining = game_state
             .blind
