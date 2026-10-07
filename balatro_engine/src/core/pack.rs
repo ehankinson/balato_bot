@@ -247,29 +247,33 @@ pub(crate) fn random_playing_card(state: &mut GameState) -> Card {
 }
 
 pub(crate) fn random_shop_playing_card(state: &mut GameState) -> Card {
-    let edition = match state.rng.random_range(0..100u8) {
-        0..10 => Edition::Foil,
-        10..17 => Edition::Holographic,
-        17..20 => Edition::Polychrome,
-        _ => Edition::None,
-    };
-    let enhancement = if state.rng.random_range(0..100u8) < 40 {
-        [
-            Enhancement::Bonus,
-            Enhancement::Mult,
-            Enhancement::Wild,
-            Enhancement::Lucky,
-            Enhancement::Glass,
-            Enhancement::Steel,
-            Enhancement::Stone,
-            Enhancement::Gold,
-        ]
-        .choose(&mut state.rng)
-        .copied()
-        .expect("enhancement choices are non-empty")
+    let edition = if state.rng.random_range(0..100u8) < state.shop.playing_card_edition_chance {
+        match state.rng.random_range(0..100u8) {
+            0..50 => Edition::Foil,
+            50..85 => Edition::Holographic,
+            _ => Edition::Polychrome,
+        }
     } else {
-        Enhancement::None
+        Edition::None
     };
+    let enhancement =
+        if state.rng.random_range(0..100u8) < state.shop.playing_card_enhancement_chance {
+            [
+                Enhancement::Bonus,
+                Enhancement::Mult,
+                Enhancement::Wild,
+                Enhancement::Lucky,
+                Enhancement::Glass,
+                Enhancement::Steel,
+                Enhancement::Stone,
+                Enhancement::Gold,
+            ]
+            .choose(&mut state.rng)
+            .copied()
+            .expect("enhancement choices are non-empty")
+        } else {
+            Enhancement::None
+        };
     Card::new(
         *ALL_RANKS
             .choose(&mut state.rng)
@@ -298,11 +302,22 @@ fn random_arcana_card(state: &mut GameState) -> Consumable {
 }
 
 fn random_planet_card(state: &mut GameState) -> Consumable {
-    let planet = Planet::ALL
+    let planet = if state.shop.most_played_planet_in_pack {
+        state
+            .most_played_hand
+            .map(planet_for_hand)
+            .unwrap_or_else(|| random_planet(state))
+    } else {
+        random_planet(state)
+    };
+    Consumable::Planet(planet)
+}
+
+fn random_planet(state: &mut GameState) -> Planet {
+    Planet::ALL
         .choose(&mut state.rng)
         .copied()
-        .expect("planet choices are non-empty");
-    Consumable::Planet(planet)
+        .expect("planet choices are non-empty")
 }
 
 fn random_spectral_card(state: &mut GameState) -> Consumable {

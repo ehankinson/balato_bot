@@ -140,6 +140,11 @@ fn apply_effect(state: &mut GameState, voucher: Vouchers) {
         Vouchers::PlanetMerchant => state.shop.offer_weights.multiply_planet_weight(2),
         Vouchers::PlanetTycoon => state.shop.offer_weights.multiply_planet_weight(4),
         Vouchers::MagicTrick => state.shop.offer_weights.cards = 2,
-        Vouchers::Telescope | Vouchers::Blank | Vouchers::Observatory | Vouchers::Illusion => {}
+        Vouchers::Telescope => state.shop.most_played_planet_in_pack = true,
+        Vouchers::Blank | Vouchers::Observatory => {}
+        Vouchers::Illusion => {
+            state.shop.playing_card_edition_chance = 20;
+            state.shop.playing_card_enhancement_chance = 40;
+        }
     }
 }

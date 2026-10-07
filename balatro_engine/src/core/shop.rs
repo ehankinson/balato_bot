@@ -11,6 +11,8 @@ use rand::rngs::StdRng;
 pub(crate) const DEFAULT_REROLL_COST: u16 = 5;
 pub(crate) const DEFAULT_CONSUMABLE_PRICE: u16 = 3;
 pub(crate) const SHOP_PACK_SLOTS: usize = 2;
+pub(crate) const DEFAULT_PLAYING_CARD_EDITION_CHANCE: u8 = 0;
+pub(crate) const DEFAULT_PLAYING_CARD_ENHANCEMENT_CHANCE: u8 = 0;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum ShopOfferKind {
@@ -111,6 +113,9 @@ pub(crate) struct ShopState {
     pub(crate) initial_reroll_cost: u16,
     pub(crate) reroll_cost: u16,
     pub(crate) offer_weights: ShopOfferWeights,
+    pub(crate) most_played_planet_in_pack: bool,
+    pub(crate) playing_card_edition_chance: u8,
+    pub(crate) playing_card_enhancement_chance: u8,
 }
 
 impl ShopState {
@@ -123,6 +128,9 @@ impl ShopState {
             initial_reroll_cost: DEFAULT_REROLL_COST,
             reroll_cost: DEFAULT_REROLL_COST,
             offer_weights: ShopOfferWeights::BASE,
+            most_played_planet_in_pack: false,
+            playing_card_edition_chance: DEFAULT_PLAYING_CARD_EDITION_CHANCE,
+            playing_card_enhancement_chance: DEFAULT_PLAYING_CARD_ENHANCEMENT_CHANCE,
         }
     }
 
@@ -302,7 +310,7 @@ fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> ShopItem {
         ShopOfferKind::Planet => {
             let planet = state
                 .most_played_hand
-                .filter(|_| state.has_voucher(Vouchers::Telescope))
+                .filter(|_| state.shop.most_played_planet_in_pack)
                 .map(planet_for_hand)
                 .unwrap_or_else(|| {
                     Planet::ALL

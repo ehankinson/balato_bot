@@ -1,5 +1,6 @@
 use super::*;
 
+use crate::core::enums::{Consumable, Planet, PokerHand};
 use crate::core::pack::{
     BoosterPackKind, BoosterPackSize, PackError, PackOption, SHOP_PACK_WEIGHTS, ShopPack,
 };
@@ -80,4 +81,19 @@ fn shop_pack_weights_match_the_configured_distribution() {
         ]
     );
     assert_eq!(weights.into_iter().sum::<u32>(), 2242);
+}
+
+#[test]
+fn telescope_uses_the_most_played_hand_for_celestial_pack_planets() {
+    let mut state = GameState::new(28);
+    state.most_played_hand = Some(PokerHand::Pair);
+    state.shop.most_played_planet_in_pack = true;
+
+    let pack = ShopPack::new(BoosterPackKind::Celestial, BoosterPackSize::Normal, 4);
+    let opening = pack.open(&mut state);
+
+    assert!(opening.options().iter().all(|option| matches!(
+        option,
+        PackOption::Consumable(Consumable::Planet(Planet::Mercury))
+    )));
 }

@@ -101,10 +101,24 @@ fn telescope_and_consumable_slot_vouchers_update_game_state() {
     assert!(!state.has_voucher(Vouchers::Telescope));
     state.redeem_voucher(Vouchers::Telescope).unwrap();
     assert!(state.has_voucher(Vouchers::Telescope));
+    assert!(state.shop.most_played_planet_in_pack);
 
     state.redeem_voucher(Vouchers::CrystalBall).unwrap();
     state.redeem_voucher(Vouchers::OmenGlobe).unwrap();
     assert_eq!(state.consumable_capacity(), 4);
+}
+
+#[test]
+fn illusion_sets_direct_shop_playing_card_odds() {
+    let mut state = GameState::new(27);
+    assert_eq!(state.shop.playing_card_edition_chance, 0);
+    assert_eq!(state.shop.playing_card_enhancement_chance, 0);
+
+    state.redeem_voucher(Vouchers::MagicTrick).unwrap();
+    state.redeem_voucher(Vouchers::Illusion).unwrap();
+
+    assert_eq!(state.shop.playing_card_edition_chance, 20);
+    assert_eq!(state.shop.playing_card_enhancement_chance, 40);
 }
 
 #[test]
