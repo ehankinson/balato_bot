@@ -8,7 +8,8 @@ use crate::core::joker::Joker;
 use crate::core::joker_types::JokerKind;
 use crate::core::pack::{BoosterPackKind, BoosterPackSize, ShopPack};
 use crate::core::shop::{
-    ShopError, ShopItem, ShopOfferKind, ShopOfferWeights, ShopState, ShopVoucher,
+    SPECTRAL_CONSUMABLE_PRICE, ShopError, ShopItem, ShopOfferKind, ShopOfferWeights, ShopState,
+    ShopVoucher, random_base_item,
 };
 
 fn playing_card() -> Card {
@@ -349,4 +350,17 @@ fn buying_overstock_replenishes_the_new_shop_slot() {
     assert_eq!(state.shop.number_of_shop_items, 3);
     assert_eq!(state.shop.items.len(), 3);
     assert!(state.vouchers.contains(&Vouchers::Overstock));
+}
+
+#[test]
+fn shop_consumable_prices_match_their_card_types() {
+    let mut state = GameState::new(14);
+
+    let tarot = random_base_item(ShopOfferKind::Tarot, &mut state);
+    let planet = random_base_item(ShopOfferKind::Planet, &mut state);
+    let spectral = random_base_item(ShopOfferKind::Spectral, &mut state);
+
+    assert_eq!(tarot.price(), 3);
+    assert_eq!(planet.price(), 3);
+    assert_eq!(spectral.price(), SPECTRAL_CONSUMABLE_PRICE);
 }

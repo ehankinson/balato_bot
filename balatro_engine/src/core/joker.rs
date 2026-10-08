@@ -17,7 +17,9 @@ pub struct Joker {
     edition: JokerEdition,
     trigger: JokerTrigger,
     rarity: JokerRarity,
-    price: u8,
+    original_price: u8,
+    current_price: u16,
+    discount_percent: u8,
     sell_value_bonus: u8,
     debuffed: bool,
     update_mask: u32,
@@ -54,12 +56,12 @@ impl Joker {
     }
 
     pub(crate) fn sell_value(&self) -> u8 {
-        (self.price().saturating_div(2).min(u8::MAX as u16) as u8)
+        (self.current_price.saturating_div(2).min(u8::MAX as u16) as u8)
             .saturating_add(self.sell_value_bonus)
     }
 
     pub(crate) fn price(&self) -> u16 {
-        self.price as u16
+        self.original_price as u16
             + match self.edition {
                 JokerEdition::Foil => 2,
                 JokerEdition::Holographic => 3,
@@ -68,13 +70,36 @@ impl Joker {
             }
     }
 
+    pub(crate) fn original_price(&self) -> u16 {
+        self.original_price as u16
+            + match self.edition {
+                JokerEdition::Foil => 2,
+                JokerEdition::Holographic => 3,
+                JokerEdition::Polychrome | JokerEdition::Negative => 5,
+                JokerEdition::None => 0,
+            }
+    }
+
+    pub(crate) fn current_price(&self) -> u16 {
+        self.current_price
+    }
+
+    pub(crate) fn apply_discount(&mut self, discount_percent: u8) {
+        self.discount_percent = discount_percent;
+        let remaining_percent = 100u32.saturating_sub(discount_percent as u32);
+        self.current_price =
+            ((self.original_price() as u32 * remaining_percent) / 100).max(1) as u16;
+    }
+
     pub(crate) fn set_edition(&mut self, edition: JokerEdition) {
         self.edition = edition;
+        self.apply_discount(self.discount_percent);
     }
 
     pub(crate) fn clear_negative_edition(&mut self) {
         if self.edition == JokerEdition::Negative {
             self.edition = JokerEdition::None;
+            self.apply_discount(self.discount_percent);
         }
     }
 
@@ -2087,7 +2112,9 @@ impl Joker {
             edition: JokerEdition::None,
             trigger,
             rarity,
-            price,
+            original_price: price,
+            current_price: price as u16,
+            discount_percent: 0,
             sell_value_bonus: 0,
             debuffed: false,
             update_mask,

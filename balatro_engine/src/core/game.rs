@@ -1,6 +1,7 @@
 use crate::core::blind::{BlindKind, BlindState};
 use crate::core::consumable::{
-    ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_SLOTS, PokerHandLevel, PokerHandLevels,
+    ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_PRICE, DEFAULT_CONSUMABLE_SLOTS,
+    OwnedConsumable, PokerHandLevel, PokerHandLevels,
 };
 use crate::core::deck::Deck;
 use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
@@ -57,8 +58,8 @@ pub struct GameState {
     pub(crate) boss_reroll_unlimited: bool,
     pub(crate) shop: ShopState,
     pub(crate) vouchers: Vec<Vouchers>,
-    pub(crate) consumables: Vec<Consumable>,
-    pub(crate) last_consumable: Option<Consumable>,
+    pub(crate) consumables: Vec<OwnedConsumable>,
+    pub(crate) last_consumable: Option<OwnedConsumable>,
     pub(crate) hand_levels: PokerHandLevels,
     pub(crate) counters: GameCounters,
     pub(crate) most_played_hand: Option<PokerHand>,
@@ -177,7 +178,7 @@ impl GameState {
             .consumables
             .iter()
             .filter(|consumable| {
-                matches!(consumable, Consumable::Planet(planet) if crate::core::consumable::planet_hand(*planet) == hand)
+                matches!(consumable.consumable, Consumable::Planet(planet) if crate::core::consumable::planet_hand(planet) == hand)
             })
             .count() as i32;
         1.5_f32.powi(matching_planets)
@@ -259,10 +260,41 @@ impl GameState {
         &mut self,
         consumable: Consumable,
     ) -> Result<(), ConsumableUseError> {
+        self.add_owned_consumable(OwnedConsumable::new(consumable, DEFAULT_CONSUMABLE_PRICE))
+    }
+
+    pub(crate) fn add_negative_consumable(
+        &mut self,
+        consumable: Consumable,
+    ) -> Result<(), ConsumableUseError> {
+        self.add_owned_consumable(OwnedConsumable::negative(
+            consumable,
+            DEFAULT_CONSUMABLE_PRICE,
+        ))
+    }
+
+    pub(crate) fn add_owned_consumable(
+        &mut self,
+        mut consumable: OwnedConsumable,
+    ) -> Result<(), ConsumableUseError> {
         if self.consumables.len() >= self.consumable_capacity() {
             return Err(ConsumableUseError::NoCapacity);
         }
+        consumable.apply_discount(self.shop_discount_percent);
         self.consumables.push(consumable);
+        Ok(())
+    }
+
+    pub(crate) fn add_consumable_during_use(
+        &mut self,
+        consumable: Consumable,
+    ) -> Result<(), ConsumableUseError> {
+        if self.consumables.len() >= self.consumable_capacity().saturating_add(1) {
+            return Err(ConsumableUseError::NoCapacity);
+        }
+        let mut owned = OwnedConsumable::new(consumable, DEFAULT_CONSUMABLE_PRICE);
+        owned.apply_discount(self.shop_discount_percent);
+        self.consumables.push(owned);
         Ok(())
     }
 
@@ -272,15 +304,15 @@ impl GameState {
         hand: &mut Hand,
         target: ConsumableTarget,
     ) -> Result<(), ConsumableUseError> {
-        let consumable = self
+        let owned = self
             .consumables
             .get(index)
             .copied()
             .ok_or(ConsumableUseError::ConsumableNotFound)?;
-        consumable.apply(self, hand, &target)?;
+        owned.consumable.apply(self, hand, &target)?;
 
         let used = self.consumables.remove(index);
-        match used {
+        match used.consumable {
             Consumable::Tarot(Tarot::Fool) => {}
             Consumable::Tarot(_) | Consumable::Planet(_) => {
                 self.last_consumable = Some(used);
@@ -288,14 +320,14 @@ impl GameState {
             Consumable::Spectral(_) => {}
         }
 
-        match used {
+        match used.consumable {
             Consumable::Tarot(_) => {
                 self.counters.tarot_cards_used = self.counters.tarot_cards_used.saturating_add(1);
                 self.update_jokers(UpdateEvent::TarotCardUsed);
             }
             Consumable::Planet(_) => {
                 self.counters.planet_cards_used = self.counters.planet_cards_used.saturating_add(1);
-                if let Consumable::Planet(planet) = used {
+                if let Consumable::Planet(planet) = used.consumable {
                     self.counters.used_planets |= planet.mask();
                 }
                 self.update_jokers(UpdateEvent::PlanetCardUsed);
@@ -303,6 +335,15 @@ impl GameState {
             Consumable::Spectral(_) => {}
         }
         Ok(())
+    }
+
+    pub(crate) fn apply_shop_discount_to_owned_items(&mut self) {
+        for joker in self.jokers.as_mut_slice() {
+            joker.apply_discount(self.shop_discount_percent);
+        }
+        for consumable in &mut self.consumables {
+            consumable.apply_discount(self.shop_discount_percent);
+        }
     }
 
     pub(crate) fn deal_cards(&mut self, hand: &mut Hand) {

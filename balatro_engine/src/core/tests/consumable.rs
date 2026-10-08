@@ -2,8 +2,8 @@ use super::*;
 
 use crate::core::card::Card;
 use crate::core::consumable::{
-    ConsumableTarget, ConsumableUseError, edition_for_roll, joker_edition_for_roll,
-    judgement_edition, judgement_rarity,
+    ConsumableTarget, ConsumableUseError, OwnedConsumable, edition_for_roll,
+    joker_edition_for_roll, judgement_edition, judgement_rarity,
 };
 use crate::core::enums::{
     Consumable, Edition, Enhancement, Planet, PokerHand, Rank, Seal, Spectral, Suit, Tarot,
@@ -41,7 +41,7 @@ fn tarot_card_mutates_target_and_leaves_inventory_after_use() {
     assert_eq!(state.counters.tarot_cards_used, 1);
     assert_eq!(
         state.last_consumable,
-        Some(Consumable::Tarot(Tarot::Magician))
+        Some(OwnedConsumable::new(Consumable::Tarot(Tarot::Magician), 3,))
     );
 }
 
@@ -111,7 +111,10 @@ fn tarot_creation_and_fool_use_the_previous_tarot() {
     assert_eq!(state.consumables.len(), 2);
     assert_eq!(
         state.last_consumable,
-        Some(Consumable::Tarot(Tarot::HighPriestess))
+        Some(OwnedConsumable::new(
+            Consumable::Tarot(Tarot::HighPriestess),
+            3,
+        ))
     );
 
     state.consumables.clear();
@@ -124,11 +127,17 @@ fn tarot_creation_and_fool_use_the_previous_tarot() {
 
     assert_eq!(
         state.consumables,
-        vec![Consumable::Tarot(Tarot::HighPriestess)]
+        vec![OwnedConsumable::new(
+            Consumable::Tarot(Tarot::HighPriestess),
+            3,
+        )]
     );
     assert_eq!(
         state.last_consumable,
-        Some(Consumable::Tarot(Tarot::HighPriestess))
+        Some(OwnedConsumable::new(
+            Consumable::Tarot(Tarot::HighPriestess),
+            3,
+        ))
     );
 }
 
@@ -332,7 +341,7 @@ fn every_tarot_branch_accepts_a_valid_use() {
             Edition::None,
             Seal::None,
         ));
-        state.last_consumable = Some(Consumable::Tarot(Tarot::Magician));
+        state.last_consumable = Some(OwnedConsumable::new(Consumable::Tarot(Tarot::Magician), 3));
         if matches!(
             card,
             Tarot::WheelOfFortune | Tarot::Temperance | Tarot::Judgement

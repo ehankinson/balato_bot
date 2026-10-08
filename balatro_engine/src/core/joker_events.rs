@@ -196,6 +196,12 @@ impl JokerEffect {
 pub struct Jokers {
     pub(super) jokers: Vec<Joker>,
     capacity: usize,
+    pub(crate) on_played: Vec<usize>,
+    pub(crate) on_held: Vec<usize>,
+    pub(crate) on_discard: Vec<usize>,
+    pub(crate) before_played: Vec<usize>,
+    pub(crate) after_hand: Vec<usize>,
+    pub(crate) played_retriggers: Vec<usize>,
 }
 
 impl Jokers {
@@ -205,11 +211,70 @@ impl Jokers {
         Jokers {
             jokers: Vec::with_capacity(Self::CAPACITY),
             capacity: Self::CAPACITY,
+            on_played: Vec::new(),
+            on_held: Vec::new(),
+            on_discard: Vec::new(),
+            before_played: Vec::new(),
+            after_hand: Vec::new(),
+            played_retriggers: Vec::new(),
         }
     }
 
     pub fn add(&mut self, joker: Joker) {
         self.jokers.push(joker);
+        self.rebuild_categories();
+    }
+
+    fn rebuild_categories(&mut self) {
+        self.on_played.clear();
+        self.on_held.clear();
+        self.on_discard.clear();
+        self.before_played.clear();
+        self.after_hand.clear();
+        self.played_retriggers.clear();
+
+        for (index, joker) in self.jokers.iter().enumerate() {
+            if let JokerStructure::Normal(JokerData::Retrigger(data)) = &joker.structure {
+                if !matches!(data.target, RetriggerTarget::HeldCards) {
+                    self.played_retriggers.push(index);
+                }
+            }
+
+            match joker.trigger {
+                JokerTrigger::OnPlayedCard => self.on_played.push(index),
+                JokerTrigger::OnHeldCard => self.on_held.push(index),
+                JokerTrigger::OnDiscard => self.on_discard.push(index),
+                JokerTrigger::BeforePlayedCards => self.before_played.push(index),
+                JokerTrigger::AfterHand => self.after_hand.push(index),
+                JokerTrigger::OnBossBlindAbility | JokerTrigger::None => {}
+            }
+        }
+    }
+
+    pub(crate) fn on_played_jokers(&self) -> impl Iterator<Item = &Joker> {
+        self.on_played.iter().map(|&index| &self.jokers[index])
+    }
+
+    pub(crate) fn on_held_jokers(&self) -> impl Iterator<Item = &Joker> {
+        self.on_held.iter().map(|&index| &self.jokers[index])
+    }
+
+    pub(crate) fn on_discard_jokers(&self) -> impl Iterator<Item = &Joker> {
+        self.on_discard.iter().map(|&index| &self.jokers[index])
+    }
+
+    pub(crate) fn before_played_jokers(&self) -> impl Iterator<Item = &Joker> {
+        self.before_played.iter().map(|&index| &self.jokers[index])
+    }
+
+    pub(crate) fn after_hand_jokers(&self) -> impl Iterator<Item = &Joker> {
+        self.after_hand.iter().map(|&index| &self.jokers[index])
+    }
+
+    pub(crate) fn played_retrigger_jokers(&self) -> impl Iterator<Item = &Joker> {
+        self.played_retriggers
+            .iter()
+            .map(|&index| &self.jokers[index])
     }
 
     pub(crate) fn capacity(&self) -> usize {
@@ -239,6 +304,7 @@ impl Jokers {
     pub(crate) fn replace_with(&mut self, joker: Joker) {
         self.jokers.clear();
         self.jokers.push(joker);
+        self.rebuild_categories();
     }
 
     pub(crate) fn keep_only(&mut self, index: usize) -> bool {
@@ -249,6 +315,7 @@ impl Jokers {
         let joker = self.jokers[index].clone();
         self.jokers.clear();
         self.jokers.push(joker);
+        self.rebuild_categories();
         true
     }
 
@@ -271,6 +338,10 @@ impl Jokers {
 
     pub fn as_slice(&self) -> &[Joker] {
         &self.jokers
+    }
+
+    pub(crate) fn as_mut_slice(&mut self) -> &mut [Joker] {
+        &mut self.jokers
     }
 
     pub fn trigger(&mut self, event: TriggerEvent<'_>, game_state: &mut GameState) -> JokerEffect {
@@ -313,6 +384,7 @@ impl Jokers {
                 self.jokers.remove(index);
             }
         }
+        self.rebuild_categories();
         if effect.sell_value_bonus > 0 {
             for joker in &mut self.jokers {
                 joker.sell_value_bonus = joker
@@ -333,6 +405,7 @@ impl Jokers {
         let kind = self.jokers[index].kind;
         let effect = self.update(UpdateEvent::JokerSold { kind }, game_state);
         self.jokers.remove(index);
+        self.rebuild_categories();
         game_state.counters.cards_sold = game_state.counters.cards_sold.saturating_add(1);
         effect
     }

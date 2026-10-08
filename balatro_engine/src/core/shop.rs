@@ -1,4 +1,5 @@
 use crate::core::card::Card;
+use crate::core::consumable::{DEFAULT_CONSUMABLE_PRICE, OwnedConsumable};
 use crate::core::enums::{Consumable, Decks, Planet, Spectral, Tarot, Vouchers};
 use crate::core::game::GameState;
 use crate::core::joker::{Joker, UpdateEvent};
@@ -9,7 +10,7 @@ use rand::prelude::{IndexedRandom, RngExt};
 use rand::rngs::StdRng;
 
 pub(crate) const DEFAULT_REROLL_COST: u16 = 5;
-pub(crate) const DEFAULT_CONSUMABLE_PRICE: u16 = 3;
+pub(crate) const SPECTRAL_CONSUMABLE_PRICE: u16 = 4;
 pub(crate) const SHOP_PACK_SLOTS: usize = 2;
 pub(crate) const DEFAULT_PLAYING_CARD_EDITION_CHANCE: u8 = 0;
 pub(crate) const DEFAULT_PLAYING_CARD_ENHANCEMENT_CHANCE: u8 = 0;
@@ -233,12 +234,15 @@ impl ShopState {
         let item = self.items.remove(index);
         state.money -= price as i16;
         match item {
-            ShopItem::Joker { joker, .. } => {
+            ShopItem::Joker { mut joker, .. } => {
+                joker.apply_discount(state.shop_discount_percent);
                 state.jokers.add(joker);
                 state.update_jokers(UpdateEvent::JokerOrderChanged);
             }
-            ShopItem::Consumable { consumable, .. } => {
-                state.consumables.push(consumable);
+            ShopItem::Consumable { consumable, price } => {
+                state
+                    .add_owned_consumable(OwnedConsumable::new(consumable, price))
+                    .expect("capacity was checked before removing the offer");
             }
             ShopItem::PlayingCard { card, .. } => {
                 state.deck.add_card_to_deck(card);
@@ -289,7 +293,7 @@ impl ShopState {
     }
 }
 
-fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> ShopItem {
+pub(crate) fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> ShopItem {
     match kind {
         ShopOfferKind::Joker => {
             let mut joker = Joker::random_shop_joker(&mut state.rng);
@@ -330,7 +334,7 @@ fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> ShopItem {
                 .expect("the Spectral table must not be empty");
             ShopItem::Consumable {
                 consumable: Consumable::Spectral(spectral),
-                price: DEFAULT_CONSUMABLE_PRICE,
+                price: SPECTRAL_CONSUMABLE_PRICE,
             }
         }
         ShopOfferKind::PlayingCard => ShopItem::PlayingCard {

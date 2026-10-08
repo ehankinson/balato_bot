@@ -12,6 +12,42 @@ use rand::prelude::{IndexedRandom, IteratorRandom, RngExt};
 use rand::rngs::StdRng;
 
 pub(crate) const DEFAULT_CONSUMABLE_SLOTS: usize = 2;
+pub(crate) const DEFAULT_CONSUMABLE_PRICE: u16 = 3;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct OwnedConsumable {
+    pub(crate) consumable: Consumable,
+    pub(crate) original_price: u16,
+    pub(crate) current_price: u16,
+    pub(crate) negative: bool,
+}
+
+impl OwnedConsumable {
+    pub(crate) fn new(consumable: Consumable, original_price: u16) -> OwnedConsumable {
+        OwnedConsumable {
+            consumable,
+            original_price,
+            current_price: original_price,
+            negative: false,
+        }
+    }
+
+    pub(crate) fn negative(consumable: Consumable, original_price: u16) -> OwnedConsumable {
+        OwnedConsumable {
+            negative: true,
+            ..OwnedConsumable::new(consumable, original_price)
+        }
+    }
+
+    pub(crate) fn apply_discount(&mut self, discount_percent: u8) {
+        let remaining_percent = 100u32.saturating_sub(discount_percent as u32);
+        self.current_price = ((self.original_price as u32 * remaining_percent) / 100).max(1) as u16;
+    }
+
+    pub(crate) fn sell_value(&self) -> u16 {
+        self.current_price / 2
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum ConsumableUseError {
@@ -471,7 +507,7 @@ fn add_random_consumables(
                 .expect("planet choices are non-empty"),
             ),
         };
-        state.consumables.push(consumable);
+        state.add_consumable_during_use(consumable)?;
     }
     Ok(())
 }

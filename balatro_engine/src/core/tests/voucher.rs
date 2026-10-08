@@ -1,7 +1,9 @@
 use super::*;
 
-use crate::core::enums::{Consumable, Edition, Planet, PokerHand, Vouchers};
+use crate::core::enums::{Consumable, Edition, Planet, PokerHand, Tarot, Vouchers};
+use crate::core::joker::Joker;
 use crate::core::joker_types::JokerEdition;
+use crate::core::joker_types::JokerKind;
 use crate::core::voucher::{VoucherError, shop_edition_for_roll, standard_pack_edition_for_roll};
 
 #[test]
@@ -46,6 +48,47 @@ fn voucher_discount_upgrades_and_duplicate_redemption_are_atomic() {
         Err(VoucherError::AlreadyOwned)
     );
     assert_eq!(state.vouchers.len(), 4);
+}
+
+#[test]
+fn shop_discounts_reprice_owned_items_from_their_original_prices() {
+    let mut state = GameState::new(29);
+    state.jokers.add(Joker::create_joker(JokerKind::Joker));
+    state
+        .add_consumable(Consumable::Tarot(Tarot::Magician))
+        .unwrap();
+
+    assert_eq!(state.jokers.as_slice()[0].original_price(), 2);
+    assert_eq!(state.jokers.as_slice()[0].current_price(), 2);
+    assert_eq!(state.consumables[0].original_price, 3);
+    assert_eq!(state.consumables[0].current_price, 3);
+
+    state.redeem_voucher(Vouchers::ClearanceSale).unwrap();
+
+    assert_eq!(state.jokers.as_slice()[0].current_price(), 1);
+    assert_eq!(state.jokers.as_slice()[0].sell_value(), 0);
+    assert_eq!(state.consumables[0].current_price, 2);
+    assert_eq!(state.consumables[0].sell_value(), 1);
+
+    state.redeem_voucher(Vouchers::Liquidation).unwrap();
+
+    assert_eq!(state.jokers.as_slice()[0].current_price(), 1);
+    assert_eq!(state.consumables[0].current_price, 1);
+}
+
+#[test]
+fn perkeo_style_consumables_keep_the_negative_marker() {
+    let mut state = GameState::new(30);
+
+    state
+        .add_negative_consumable(Consumable::Tarot(Tarot::Magician))
+        .unwrap();
+
+    assert!(state.consumables[0].negative);
+    assert_eq!(
+        state.consumables[0].consumable,
+        Consumable::Tarot(Tarot::Magician)
+    );
 }
 
 #[test]

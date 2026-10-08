@@ -106,8 +106,14 @@ pub(crate) fn shop_edition_for_roll(roll: u32, multiplier: u32) -> JokerEdition 
 
 fn apply_effect(state: &mut GameState, voucher: Vouchers) {
     match voucher {
-        Vouchers::ClearanceSale => state.shop_discount_percent = 25,
-        Vouchers::Liquidation => state.shop_discount_percent = 50,
+        Vouchers::ClearanceSale => {
+            state.shop_discount_percent = 25;
+            state.apply_shop_discount_to_owned_items();
+        }
+        Vouchers::Liquidation => {
+            state.shop_discount_percent = 50;
+            state.apply_shop_discount_to_owned_items();
+        }
         Vouchers::Hone => state.edition_rate_multiplier = 2,
         Vouchers::GlowUp => state.edition_rate_multiplier = 4,
         Vouchers::RerollSurplus => state.shop.initial_reroll_cost = 3,
