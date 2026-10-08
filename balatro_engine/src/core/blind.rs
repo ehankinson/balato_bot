@@ -1,5 +1,44 @@
 use crate::consts::ante_scores::score_requirements;
+use crate::core::card::Card;
 use crate::core::enums::{BossBlinds, PokerHand, Stakes, Suit};
+
+/// A card reference used while scoring. The ID contains the card properties;
+/// the source index preserves which occurrence was played when cards share an
+/// identical ID.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ScoringCard {
+    pub(crate) index: usize,
+    pub(crate) id: u16,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct ScoringData {
+    pub(crate) scoring_played_cards: Vec<ScoringCard>,
+    pub(crate) non_scoring_played_cards: Vec<ScoringCard>,
+    pub(crate) scoring_held_cards: Vec<ScoringCard>,
+    pub(crate) non_scoring_held_cards: Vec<ScoringCard>,
+}
+
+impl ScoringData {
+    pub(crate) fn from_card_ids(played_ids: &[u16], held_ids: &[u16]) -> ScoringData {
+        ScoringData {
+            non_scoring_played_cards: scoring_cards(played_ids),
+            non_scoring_held_cards: scoring_cards(held_ids),
+            ..ScoringData::default()
+        }
+    }
+}
+
+fn scoring_cards(ids: &[u16]) -> Vec<ScoringCard> {
+    ids.iter()
+        .enumerate()
+        .map(|(index, &id)| ScoringCard { index, id })
+        .collect()
+}
+
+pub(crate) fn card_ids(cards: &[Card]) -> Vec<u16> {
+    cards.iter().map(Card::id).collect()
+}
 
 /// The kind of blind currently being played.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
