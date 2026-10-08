@@ -62,7 +62,7 @@ fn invalid_target_does_not_consume_or_mutate_card() {
 }
 
 #[test]
-fn planet_cards_update_the_explicit_hand_level_table() {
+fn planet_cards_update_the_hand_score_table() {
     let mut state = GameState::new(3);
     state
         .add_consumable(Consumable::Planet(Planet::Saturn))
@@ -73,10 +73,9 @@ fn planet_cards_update_the_explicit_hand_level_table() {
         .use_consumable(0, &mut hand, ConsumableTarget::default())
         .unwrap();
 
-    let level = state.hand_level(PokerHand::Straight);
-    assert_eq!(level.level, 2);
-    assert_eq!(level.chips, 30);
-    assert_eq!(level.mult, 3);
+    let score = state.hand_score(PokerHand::Straight);
+    assert_eq!(score.chips, 60);
+    assert_eq!(score.mult, 7);
 }
 
 #[test]
@@ -93,8 +92,8 @@ fn black_hole_upgrades_every_poker_hand() {
         .use_consumable(0, &mut hand, ConsumableTarget::default())
         .unwrap();
 
-    assert_eq!(state.hand_level(PokerHand::HighCard).level, 2);
-    assert_eq!(state.hand_level(PokerHand::FlushFive).level, 2);
+    assert_eq!(state.hand_score(PokerHand::HighCard).chips, 15);
+    assert_eq!(state.hand_score(PokerHand::FlushFive).chips, 210);
 }
 
 #[test]

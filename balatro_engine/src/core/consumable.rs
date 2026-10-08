@@ -88,67 +88,7 @@ impl ConsumableTarget {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct PokerHandLevel {
-    pub(crate) level: u16,
-    pub(crate) chips: u32,
-    pub(crate) mult: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PokerHandLevels {
-    levels: [PokerHandLevel; 12],
-}
-
-impl PokerHandLevels {
-    pub(crate) fn new() -> PokerHandLevels {
-        let initial_level = PokerHandLevel {
-            level: 1,
-            chips: 0,
-            mult: 0,
-        };
-        PokerHandLevels {
-            levels: [initial_level; 12],
-        }
-    }
-
-    pub(crate) fn get(&self, hand: PokerHand) -> PokerHandLevel {
-        self.levels[hand_index(hand)]
-    }
-
-    pub(crate) fn upgrade(&mut self, hand: PokerHand, chips: u32, mult: u32) {
-        let entry = &mut self.levels[hand_index(hand)];
-        entry.level = entry.level.saturating_add(1);
-        entry.chips = entry.chips.saturating_add(chips);
-        entry.mult = entry.mult.saturating_add(mult);
-    }
-
-    pub(crate) fn upgrade_all(&mut self) {
-        for hand in [
-            PokerHand::HighCard,
-            PokerHand::Pair,
-            PokerHand::ThreeOfAKind,
-            PokerHand::FourOfAKind,
-            PokerHand::FiveOfAKind,
-            PokerHand::TwoPair,
-            PokerHand::Straight,
-            PokerHand::Flush,
-            PokerHand::FullHouse,
-            PokerHand::StraightFlush,
-            PokerHand::FlushHouse,
-            PokerHand::FlushFive,
-        ] {
-            let (chips, mult) = planet_upgrade(hand);
-            self.upgrade(hand, chips, mult);
-        }
-    }
-}
-
-fn hand_index(hand: PokerHand) -> usize {
-    hand as usize - 1
-}
-
-fn planet_upgrade(hand: PokerHand) -> (u32, u32) {
+pub(crate) fn planet_upgrade_values(hand: PokerHand) -> (u16, u16) {
     match hand {
         PokerHand::HighCard => (10, 1),
         PokerHand::Pair => (15, 1),
@@ -274,8 +214,8 @@ fn apply_tarot(
 
 fn apply_planet(card: Planet, state: &mut GameState) -> Result<(), ConsumableUseError> {
     let hand = planet_hand(card);
-    let (chips, mult) = planet_upgrade(hand);
-    state.hand_levels.upgrade(hand, chips, mult);
+    let (chips, mult) = planet_upgrade_values(hand);
+    state.upgrade_hand_score(hand, chips, mult);
     Ok(())
 }
 
@@ -431,7 +371,7 @@ fn apply_spectral(
                 .expect("the Joker factory has Legendary Jokers");
             state.jokers.add(joker);
         }
-        BlackHole => state.hand_levels.upgrade_all(),
+        BlackHole => state.upgrade_all_hand_scores(),
     }
 
     Ok(())

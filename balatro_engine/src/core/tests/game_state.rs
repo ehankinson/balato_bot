@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::core::blind::BlindKind;
+use crate::core::blind::{BlindKind, calculate_score, score_played_hand};
 use crate::core::card::Card;
 use crate::core::enums::{BossBlinds, Decks, Edition, Enhancement, Rank, Seal, Stakes, Suit};
 use crate::core::hand::Hand;
@@ -84,6 +84,156 @@ fn dealing_uses_the_seeded_game_rng() {
     let first_cards: Vec<u16> = first_hand.cards().iter().map(Card::id).collect();
     let second_cards: Vec<u16> = second_hand.cards().iter().map(Card::id).collect();
     assert_eq!(first_cards, second_cards);
+}
+
+#[test]
+fn played_hand_partition_uses_the_poker_calculation() {
+    let mut hand = Hand::new();
+    hand.add_card(Card::new(
+        Rank::Two,
+        Suit::Spades,
+        Enhancement::None,
+        Edition::None,
+        Seal::None,
+    ));
+    hand.add_card(Card::new(
+        Rank::Five,
+        Suit::Hearts,
+        Enhancement::None,
+        Edition::None,
+        Seal::None,
+    ));
+    hand.add_card(Card::new(
+        Rank::Ace,
+        Suit::Clubs,
+        Enhancement::None,
+        Edition::None,
+        Seal::None,
+    ));
+
+    let (hand_type, scoring) = score_played_hand(&hand, &[0, 1, 2]).unwrap();
+
+    assert_eq!(hand_type, PokerHand::HighCard);
+    assert_eq!(scoring.scoring_played_cards.len(), 1);
+    assert_eq!(scoring.scoring_played_cards[0].index, 2);
+    assert_eq!(scoring.non_scoring_played_cards.len(), 2);
+    assert!(scoring.scoring_held_cards.is_empty());
+    assert!(scoring.non_scoring_held_cards.is_empty());
+}
+
+#[test]
+fn played_hand_scoring_uses_only_selected_cards() {
+    let mut hand = Hand::new();
+    for (rank, suit) in [
+        (Rank::Two, Suit::Spades),
+        (Rank::Five, Suit::Hearts),
+        (Rank::Ace, Suit::Clubs),
+        (Rank::Nine, Suit::Diamonds),
+        (Rank::Seven, Suit::Hearts),
+        (Rank::King, Suit::Spades),
+        (Rank::Queen, Suit::Clubs),
+        (Rank::Jack, Suit::Diamonds),
+    ] {
+        hand.add_card(Card::new(
+            rank,
+            suit,
+            Enhancement::None,
+            Edition::None,
+            Seal::None,
+        ));
+    }
+
+    let (hand_type, scoring) = score_played_hand(&hand, &[0, 1, 2, 3, 4]).unwrap();
+
+    assert_eq!(hand_type, PokerHand::HighCard);
+    assert_eq!(scoring.scoring_played_cards[0].index, 2);
+    assert_eq!(scoring.non_scoring_played_cards.len(), 4);
+}
+
+#[test]
+fn selecting_cards_removes_them_and_preserves_the_remaining_hand() {
+    let mut hand = Hand::new();
+    for rank in [Rank::Two, Rank::Three, Rank::Four, Rank::Five] {
+        hand.add_card(Card::new(
+            rank,
+            Suit::Spades,
+            Enhancement::None,
+            Edition::None,
+            Seal::None,
+        ));
+    }
+
+    let selected = hand.select_cards(vec![0, 2]);
+
+    assert_eq!(selected.len(), 2);
+    assert_eq!(selected[0].rank(), Rank::Two);
+    assert_eq!(selected[1].rank(), Rank::Four);
+    assert_eq!(hand.hand_size(), 2);
+    assert_eq!(hand.card(0).unwrap().rank(), Rank::Three);
+    assert_eq!(hand.card(1).unwrap().rank(), Rank::Five);
+}
+
+#[test]
+fn calculate_score_combines_hand_base_and_scoring_card_chips() {
+    let mut state = GameState::new(31);
+    let mut hand = Hand::new();
+    hand.add_card(Card::new(
+        Rank::Ace,
+        Suit::Spades,
+        Enhancement::None,
+        Edition::None,
+        Seal::None,
+    ));
+
+    let result = calculate_score(&mut state, &hand, &[0]).unwrap();
+
+    assert_eq!(result.hand, PokerHand::HighCard);
+    assert_eq!(result.chips, 16);
+    assert_eq!(result.mult, 1.0);
+    assert_eq!(result.score, 16.0);
+    assert!(result.on_played_scoring_jokers.is_empty());
+}
+
+#[test]
+fn calculate_score_finds_on_played_scoring_jokers() {
+    let mut state = GameState::new(32);
+    state.jokers.add(Joker::create_joker(JokerKind::Greedy));
+    state
+        .jokers
+        .add(Joker::create_joker(JokerKind::GoldenTicket));
+
+    let mut hand = Hand::new();
+    hand.add_card(Card::new(
+        Rank::Ace,
+        Suit::Diamonds,
+        Enhancement::None,
+        Edition::None,
+        Seal::None,
+    ));
+
+    let result = calculate_score(&mut state, &hand, &[0]).unwrap();
+
+    assert_eq!(result.on_played_scoring_jokers, vec![0]);
+    assert_eq!(result.mult, 4.0);
+    assert_eq!(result.score, 64.0);
+}
+
+#[test]
+fn cards_build_scoring_values_from_attributes_and_permanent_modifiers() {
+    let mut card = Card::new(
+        Rank::Ace,
+        Suit::Spades,
+        Enhancement::Bonus,
+        Edition::Foil,
+        Seal::None,
+    );
+    card.scoring_values_mut().chips += 7;
+
+    let values = card.scoring_values();
+
+    assert_eq!(values.chips, 98);
+    assert_eq!(values.add_mult, 0);
+    assert_eq!(values.x_mult, 1.0);
 }
 
 #[test]

@@ -8,7 +8,10 @@ use rand::rngs::StdRng;
 
 #[path = "joker_events.rs"]
 mod events;
-pub use events::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
+pub use events::{
+    JokerEconomyEffect, JokerEffect, JokerGameStateEffect, JokerGenerateEffect,
+    JokerRetriggerEffect, JokerScoringEffect, Jokers, TriggerEvent, UpdateEvent,
+};
 
 #[derive(Clone)]
 pub struct Joker {
@@ -49,6 +52,31 @@ impl Joker {
 
     pub(crate) fn edition(&self) -> JokerEdition {
         self.edition
+    }
+
+    pub(crate) fn has_scoring_edition(&self) -> bool {
+        matches!(
+            self.edition,
+            JokerEdition::Foil | JokerEdition::Holographic | JokerEdition::Polychrome
+        )
+    }
+
+    pub(crate) fn edition_scoring_effect(&self) -> JokerScoringEffect {
+        match self.edition {
+            JokerEdition::Foil => JokerScoringEffect {
+                chips: 50,
+                ..JokerScoringEffect::default()
+            },
+            JokerEdition::Holographic => JokerScoringEffect {
+                add_mult: 10,
+                ..JokerScoringEffect::default()
+            },
+            JokerEdition::Polychrome => JokerScoringEffect {
+                x_mult: 1.5,
+                ..JokerScoringEffect::default()
+            },
+            JokerEdition::None | JokerEdition::Negative => JokerScoringEffect::default(),
+        }
     }
 
     pub(crate) fn rarity(&self) -> JokerRarity {

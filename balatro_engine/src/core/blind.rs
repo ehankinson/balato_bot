@@ -1,6 +1,11 @@
+pub(crate) use crate::calculation::calculate_score::ScoreResult;
+use crate::calculation::calculate_score::calculate_score as calculate_score_impl;
+use crate::calculation::poker::determine_poker_hand;
 use crate::consts::ante_scores::score_requirements;
 use crate::core::card::Card;
 use crate::core::enums::{BossBlinds, PokerHand, Stakes, Suit};
+use crate::core::game::GameState;
+use crate::core::hand::Hand;
 
 /// A card reference used while scoring. The ID contains the card properties;
 /// the source index preserves which occurrence was played when cards share an
@@ -20,6 +25,46 @@ pub(crate) struct ScoringData {
 }
 
 impl ScoringData {
+    pub(crate) fn from_played_hand(
+        hand: &Hand,
+        selected_indices: &[usize],
+    ) -> Option<(PokerHand, ScoringData)> {
+        if selected_indices
+            .iter()
+            .enumerate()
+            .any(|(position, index)| selected_indices[..position].contains(index))
+        {
+            return None;
+        }
+        let selected_cards = selected_indices
+            .iter()
+            .map(|&index| hand.card(index))
+            .collect::<Option<Vec<_>>>()?;
+        let ids = selected_cards
+            .iter()
+            .map(|card| card.id())
+            .collect::<Vec<_>>();
+        let result = determine_poker_hand(&ids)?;
+        let scoring_indices = result.scoring_card_indices;
+
+        let mut data = ScoringData::default();
+        for (selected_index, (&hand_index, &id)) in
+            selected_indices.iter().zip(ids.iter()).enumerate()
+        {
+            let card = ScoringCard {
+                index: hand_index,
+                id,
+            };
+            if scoring_indices.contains(&selected_index) {
+                data.scoring_played_cards.push(card);
+            } else {
+                data.non_scoring_played_cards.push(card);
+            }
+        }
+
+        Some((result.hand, data))
+    }
+
     pub(crate) fn from_card_ids(played_ids: &[u16], held_ids: &[u16]) -> ScoringData {
         ScoringData {
             non_scoring_played_cards: scoring_cards(played_ids),
@@ -27,6 +72,41 @@ impl ScoringData {
             ..ScoringData::default()
         }
     }
+}
+
+pub(crate) fn score_played_hand(
+    hand: &Hand,
+    selected_indices: &[usize],
+) -> Option<(PokerHand, ScoringData)> {
+    ScoringData::from_played_hand(hand, selected_indices)
+}
+
+pub(crate) fn calculate_score(
+    state: &mut GameState,
+    hand: &Hand,
+    selected_indices: &[usize],
+) -> Option<ScoreResult> {
+    let (hand_type, mut scoring_data) = score_played_hand(hand, selected_indices)?;
+    let played_cards = selected_indices
+        .iter()
+        .map(|&index| hand.card(index).cloned())
+        .collect::<Option<Vec<_>>>()?;
+    let held_cards = hand
+        .cards()
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !selected_indices.contains(index))
+        .map(|(_, card)| card.clone())
+        .collect::<Vec<_>>();
+    scoring_data.scoring_held_cards = scoring_cards(&card_ids(&held_cards));
+    Some(calculate_score_impl(
+        state,
+        &played_cards,
+        &held_cards,
+        selected_indices,
+        hand_type,
+        scoring_data,
+    ))
 }
 
 fn scoring_cards(ids: &[u16]) -> Vec<ScoringCard> {

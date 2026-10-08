@@ -37,14 +37,22 @@ impl Hand {
         self.cards.push(card);
     }
 
-    pub fn select_cards(mut self, mut positions: Vec<u8>) -> Vec<Card> {
-        let mut cards = Vec::new();
-        positions.sort_unstable_by(|a, b| b.cmp(a));
+    pub fn select_cards(&mut self, mut positions: Vec<u8>) -> Vec<Card> {
+        positions.sort_unstable();
 
-        for position in positions {
-            cards.push(self.cards.remove(position as usize));
+        if positions.windows(2).any(|pair| pair[0] == pair[1])
+            || positions
+                .iter()
+                .any(|&position| position as usize >= self.cards.len())
+        {
+            return Vec::new();
         }
 
-        cards
+        let mut selected = Vec::with_capacity(positions.len());
+        for &position in positions.iter().rev() {
+            selected.push(self.cards.remove(position as usize));
+        }
+        selected.reverse();
+        selected
     }
 }

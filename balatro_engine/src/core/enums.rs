@@ -396,6 +396,25 @@ impl PokerHand {
 }
 
 impl Rank {
+    pub(crate) fn from_card_id(card_id: u16) -> Rank {
+        match ((card_id >> 9) & 0x0f) as u8 {
+            2 => Rank::Two,
+            3 => Rank::Three,
+            4 => Rank::Four,
+            5 => Rank::Five,
+            6 => Rank::Six,
+            7 => Rank::Seven,
+            8 => Rank::Eight,
+            9 => Rank::Nine,
+            10 => Rank::Ten,
+            11 => Rank::Jack,
+            12 => Rank::Queen,
+            13 => Rank::King,
+            14 => Rank::Ace,
+            _ => unreachable!("card IDs must contain a valid rank"),
+        }
+    }
+
     pub fn base_chips(&self) -> u8 {
         match self {
             Rank::King | Rank::Queen | Rank::Jack => 10,

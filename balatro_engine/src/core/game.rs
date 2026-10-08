@@ -1,7 +1,7 @@
 use crate::core::blind::{BlindKind, BlindState};
 use crate::core::consumable::{
     ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_PRICE, DEFAULT_CONSUMABLE_SLOTS,
-    OwnedConsumable, PokerHandLevel, PokerHandLevels,
+    OwnedConsumable,
 };
 use crate::core::deck::Deck;
 use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
@@ -13,6 +13,39 @@ use crate::core::voucher::VoucherError;
 use rand::SeedableRng;
 use rand::prelude::IndexedRandom;
 use rand::rngs::StdRng;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HandScore {
+    pub(crate) chips: u16,
+    pub(crate) mult: u16,
+}
+
+pub(crate) const BASE_HAND_SCORES: [HandScore; 12] = [
+    HandScore { chips: 5, mult: 1 },
+    HandScore { chips: 10, mult: 2 },
+    HandScore { chips: 30, mult: 3 },
+    HandScore { chips: 60, mult: 7 },
+    HandScore {
+        chips: 120,
+        mult: 12,
+    },
+    HandScore { chips: 20, mult: 2 },
+    HandScore { chips: 30, mult: 4 },
+    HandScore { chips: 35, mult: 4 },
+    HandScore { chips: 40, mult: 4 },
+    HandScore {
+        chips: 100,
+        mult: 8,
+    },
+    HandScore {
+        chips: 140,
+        mult: 14,
+    },
+    HandScore {
+        chips: 160,
+        mult: 16,
+    },
+];
 
 /// Counters that persist across blind transitions and shop phases.
 pub(crate) struct GameCounters {
@@ -60,7 +93,7 @@ pub struct GameState {
     pub(crate) vouchers: Vec<Vouchers>,
     pub(crate) consumables: Vec<OwnedConsumable>,
     pub(crate) last_consumable: Option<OwnedConsumable>,
-    pub(crate) hand_levels: PokerHandLevels,
+    pub(crate) hand_scores: Vec<HandScore>,
     pub(crate) counters: GameCounters,
     pub(crate) most_played_hand: Option<PokerHand>,
     pub(crate) ante_voucher: Option<Vouchers>,
@@ -94,7 +127,7 @@ impl GameState {
             vouchers: Vec::new(),
             consumables: Vec::new(),
             last_consumable: None,
-            hand_levels: PokerHandLevels::new(),
+            hand_scores: BASE_HAND_SCORES.to_vec(),
             counters: GameCounters::new(),
             most_played_hand: None,
             ante_voucher: None,
@@ -252,8 +285,34 @@ impl GameState {
         self.deck.rank_count(Rank::Nine)
     }
 
-    pub(crate) fn hand_level(&self, hand: PokerHand) -> PokerHandLevel {
-        self.hand_levels.get(hand)
+    pub(crate) fn hand_score(&self, hand: PokerHand) -> HandScore {
+        self.hand_scores[hand as usize - 1]
+    }
+
+    pub(crate) fn upgrade_hand_score(&mut self, hand: PokerHand, chips: u16, mult: u16) {
+        let score = &mut self.hand_scores[hand as usize - 1];
+        score.chips = score.chips.saturating_add(chips);
+        score.mult = score.mult.saturating_add(mult);
+    }
+
+    pub(crate) fn upgrade_all_hand_scores(&mut self) {
+        for hand in [
+            PokerHand::HighCard,
+            PokerHand::Pair,
+            PokerHand::ThreeOfAKind,
+            PokerHand::FourOfAKind,
+            PokerHand::FiveOfAKind,
+            PokerHand::TwoPair,
+            PokerHand::Straight,
+            PokerHand::Flush,
+            PokerHand::FullHouse,
+            PokerHand::StraightFlush,
+            PokerHand::FlushHouse,
+            PokerHand::FlushFive,
+        ] {
+            let (chips, mult) = crate::core::consumable::planet_upgrade_values(hand);
+            self.upgrade_hand_score(hand, chips, mult);
+        }
     }
 
     pub(crate) fn add_consumable(
