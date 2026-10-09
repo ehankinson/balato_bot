@@ -362,6 +362,10 @@ impl Jokers {
         })
     }
 
+    pub(crate) fn before_played_indices(&self) -> impl Iterator<Item = usize> + '_ {
+        self.before_played.iter().copied()
+    }
+
     pub(crate) fn on_held_scoring_indices(&self) -> impl Iterator<Item = usize> + '_ {
         self.on_held.iter().copied().filter(|&index| {
             matches!(

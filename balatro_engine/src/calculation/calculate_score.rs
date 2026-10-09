@@ -33,6 +33,22 @@ pub(crate) fn calculate_score(
     let mut chips = hand_score.chips as u64;
     let mut mult = hand_score.mult as f32;
 
+    let before_played_event = TriggerEvent::BeforePlayedCards {
+        played_cards,
+        held_cards,
+    };
+    let before_played_jokers = jokers.before_played_indices().collect::<Vec<_>>();
+    for joker_index in before_played_jokers {
+        let effect = jokers
+            .get_mut(joker_index)
+            .expect("before-played Joker index must remain valid")
+            .trigger(&before_played_event, state, joker_count);
+        chips = apply_chip_effect(chips, effect.chips);
+        mult += effect.add_mult as f32;
+        mult *= effect.x_mult;
+        Jokers::apply_effect(&effect, state);
+    }
+
     for (card_index, (hand_index, card)) in hand_indices.iter().zip(played_cards).enumerate() {
         if !scoring_data
             .scoring_played_cards
