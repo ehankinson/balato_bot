@@ -364,3 +364,34 @@ fn shop_consumable_prices_match_their_card_types() {
     assert_eq!(planet.price(), 3);
     assert_eq!(spectral.price(), SPECTRAL_CONSUMABLE_PRICE);
 }
+
+#[test]
+fn shop_jokers_do_not_duplicate_owned_jokers_without_showman() {
+    let mut state = GameState::new(15);
+    state.jokers.add(Joker::create_joker(JokerKind::Joker));
+
+    for _ in 0..32 {
+        let ShopItem::Joker { joker, .. } = random_base_item(ShopOfferKind::Joker, &mut state)
+        else {
+            panic!("joker offer should create a Joker item");
+        };
+        assert_ne!(joker.kind(), JokerKind::Joker);
+    }
+}
+
+#[test]
+fn shop_consumables_do_not_duplicate_owned_consumables() {
+    let mut state = GameState::new(16);
+    state
+        .add_consumable(Consumable::Tarot(Tarot::Magician))
+        .unwrap();
+
+    for _ in 0..32 {
+        let ShopItem::Consumable { consumable, .. } =
+            random_base_item(ShopOfferKind::Tarot, &mut state)
+        else {
+            panic!("tarot offer should create a consumable item");
+        };
+        assert_ne!(consumable, Consumable::Tarot(Tarot::Magician));
+    }
+}
