@@ -244,7 +244,12 @@ impl GameState {
         self.roll_ante_voucher();
     }
 
-    pub(crate) fn finish_blind(&mut self) -> BlindPayout {
+    pub(crate) fn finish_blind(&mut self) -> Option<BlindPayout> {
+        if self.blind.finished || !self.blind.has_beaten_target() {
+            return None;
+        }
+
+        self.blind.finished = true;
         let blind_reward = self.blind.reward();
         let interest = (self.money.max(0) / 5).min(self.interest_cap);
         let total = i16::from(blind_reward) + interest;
@@ -254,11 +259,11 @@ impl GameState {
         });
         self.deck.clear_debuffs();
         self.pillar_card_ids.clear();
-        BlindPayout {
+        Some(BlindPayout {
             blind_reward,
             interest,
             total,
-        }
+        })
     }
 
     fn roll_ante_voucher(&mut self) {
@@ -572,6 +577,13 @@ impl GameState {
         self.deck.discard_cards(played_cards);
         self.apply_hook_discard(hand);
         self.deal_cards(hand);
+        self.blind.chips_scored = self
+            .blind
+            .chips_scored
+            .saturating_add(score.score.max(0.0) as u64);
+        if self.blind.has_beaten_target() {
+            self.finish_blind();
+        }
         Some(score)
     }
 

@@ -209,14 +209,30 @@ fn play_hand_runs_hook_discard_and_refills_the_hand() {
 }
 
 #[test]
+fn play_hand_finishes_and_pays_when_the_target_is_reached() {
+    let mut state = GameState::new(20);
+    state.begin_blind_as(BlindKind::Small);
+    state.blind.score_requirement = 1;
+    let mut hand = Hand::new();
+    state.deal_cards(&mut hand);
+
+    state.play_hand(&mut hand, vec![0]).unwrap();
+
+    assert!(state.blind.finished);
+    assert!(state.blind.has_beaten_target());
+    assert_eq!(state.money, 3);
+}
+
+#[test]
 fn completing_a_boss_pays_its_reward_and_clears_pillar_marks() {
     let mut state = GameState::new(20);
     state.begin_blind_as(BlindKind::Boss(BossBlinds::Hook));
     state.money = 10;
     state.pillar_card_ids.push(123);
+    state.blind.chips_scored = state.blind.score_requirement;
 
     assert_eq!(
-        state.finish_blind(),
+        state.finish_blind().unwrap(),
         crate::core::game::BlindPayout {
             blind_reward: 5,
             interest: 2,
@@ -232,8 +248,9 @@ fn finish_blind_pays_small_and_big_blinds_with_capped_interest() {
     let mut small = GameState::new(22);
     small.money = 20;
     small.begin_blind_as(BlindKind::Small);
+    small.blind.chips_scored = small.blind.score_requirement;
     assert_eq!(
-        small.finish_blind(),
+        small.finish_blind().unwrap(),
         crate::core::game::BlindPayout {
             blind_reward: 3,
             interest: 4,
@@ -247,8 +264,9 @@ fn finish_blind_pays_small_and_big_blinds_with_capped_interest() {
     big.redeem_voucher(crate::core::enums::Vouchers::SeedMoney)
         .unwrap();
     big.begin_blind_as(BlindKind::Big);
+    big.blind.chips_scored = big.blind.score_requirement;
     assert_eq!(
-        big.finish_blind(),
+        big.finish_blind().unwrap(),
         crate::core::game::BlindPayout {
             blind_reward: 4,
             interest: 10,

@@ -184,6 +184,7 @@ pub(crate) struct BlindState {
     pub(crate) hands_played: u32,
     pub(crate) chips_scored: u64,
     pub(crate) score_requirement: u64,
+    pub(crate) finished: bool,
     pub(crate) boss_ability_disabled: bool,
     pub(crate) prevent_death: bool,
     pub(crate) current_hand: Option<PokerHand>,
@@ -212,6 +213,7 @@ impl BlindState {
             hands_played: 0,
             chips_scored: 0,
             score_requirement: 0,
+            finished: false,
             boss_ability_disabled: false,
             prevent_death: false,
             current_hand: None,
@@ -232,6 +234,7 @@ impl BlindState {
         self.kind = kind;
         self.ante = ante.max(1);
         self.score_requirement = kind.score_requirement(self.stake, self.ante, false);
+        self.finished = false;
         self.hands_remaining = self.hands_per_blind;
         self.discards_remaining = self.discards_per_blind;
         self.discards_used = 0;
@@ -286,6 +289,10 @@ impl BlindState {
 
     pub(crate) fn adjust_discards_per_blind(&mut self, amount: i8) {
         self.discards_per_blind = adjust_per_blind_amount(self.discards_per_blind, amount);
+    }
+
+    pub(crate) fn has_beaten_target(&self) -> bool {
+        self.chips_scored >= self.score_requirement
     }
 }
 
