@@ -1,4 +1,5 @@
-use rand::prelude::{IndexedRandom, IteratorRandom, RngExt};
+use rand::prelude::{IndexedRandom, IteratorRandom, RngExt, SliceRandom};
+use rand::rngs::StdRng;
 
 use crate::core::card::Card;
 use crate::core::enums::{ALL_RANKS, ALL_SUITS, Enhancement, PokerHand, Rank, Suit};
@@ -469,6 +470,26 @@ impl Jokers {
         true
     }
 
+    pub(crate) fn shuffle(&mut self, rng: &mut StdRng) {
+        self.jokers.shuffle(rng);
+        self.rebuild_categories();
+    }
+
+    pub(crate) fn disable_random(&mut self, rng: &mut StdRng) -> Option<usize> {
+        for joker in &mut self.jokers {
+            joker.set_debuffed(false);
+        }
+        let index = (0..self.jokers.len()).choose(rng)?;
+        self.jokers[index].set_debuffed(true);
+        Some(index)
+    }
+
+    pub(crate) fn clear_debuffs(&mut self) {
+        for joker in &mut self.jokers {
+            joker.set_debuffed(false);
+        }
+    }
+
     pub(crate) fn total_sell_value(&self) -> u16 {
         self.jokers
             .iter()
@@ -556,6 +577,7 @@ impl Jokers {
         let effect = self.update(UpdateEvent::JokerSold { kind }, game_state);
         self.jokers.remove(index);
         self.rebuild_categories();
+        game_state.blind.on_joker_sold();
         game_state.counters.cards_sold = game_state.counters.cards_sold.saturating_add(1);
         effect
     }
@@ -565,7 +587,11 @@ fn apply_game_effect(effect: &JokerEffect, game_state: &mut GameState) {
     game_state.money += effect.economy().money;
     let game_state_effect = effect.game_state();
     game_state.counters.life += game_state_effect.life;
-    game_state.blind.boss_ability_disabled |= game_state_effect.disable_boss_blind;
+    if game_state_effect.disable_boss_blind {
+        game_state.blind.disable_boss_ability();
+        game_state.jokers.clear_debuffs();
+        game_state.deck.clear_debuffs();
+    }
     game_state.blind.prevent_death |= game_state_effect.prevent_death;
     game_state
         .deck
@@ -712,6 +738,10 @@ impl Joker {
             return JokerScoringEffect::default();
         };
 
+        if card.is_debuffed() {
+            return JokerScoringEffect::default();
+        }
+
         let JokerStructure::Normal(JokerData::Scoring(data)) = &self.structure else {
             return JokerScoringEffect::default();
         };
@@ -799,6 +829,10 @@ impl Joker {
         else {
             return JokerScoringEffect::default();
         };
+
+        if card.is_debuffed() {
+            return JokerScoringEffect::default();
+        }
 
         let JokerStructure::Normal(JokerData::Scoring(data)) = &self.structure else {
             return JokerScoringEffect::default();

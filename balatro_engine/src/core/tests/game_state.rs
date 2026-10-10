@@ -8,6 +8,10 @@ use crate::core::joker::Joker;
 use crate::core::joker::TriggerEvent;
 use crate::core::joker_types::JokerKind;
 
+fn card(rank: Rank, suit: Suit, enhancement: Enhancement, edition: Edition, seal: Seal) -> Card {
+    Card::new(rank, suit, enhancement, edition, seal)
+}
+
 #[test]
 fn game_state_owns_the_run_collections_and_deck_counts() {
     let state = GameState::new(1);
@@ -60,6 +64,234 @@ fn blind_score_requirement_uses_endless_scaling_after_ante_eight() {
 
     let expected = crate::consts::ante_scores::endless_ante_stakes(Stakes::Gold, 9)[0] as u64;
     assert_eq!(state.blind.score_requirement, expected);
+}
+
+#[test]
+fn boss_blind_start_applies_target_and_resource_rules() {
+    let mut state = GameState::new(11);
+    state.counters.ante = 2;
+
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Wall));
+    assert_eq!(state.blind.score_requirement, 3_200);
+
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Water));
+    assert_eq!(state.blind.discards_remaining, 0);
+
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Manacle));
+    assert_eq!(state.hand_size(), 7);
+
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Needle));
+    assert_eq!(state.blind.hands_remaining, 1);
+    assert_eq!(state.blind.score_requirement, 800);
+}
+
+#[test]
+fn suit_boss_debuffs_cards_without_changing_hand_detection() {
+    let mut state = GameState::new(12);
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Club));
+    let mut hand = Hand::new();
+    hand.add_card(card(
+        Rank::Ace,
+        Suit::Clubs,
+        Enhancement::None,
+        Edition::None,
+        Seal::None,
+    ));
+
+    let result = calculate_score(&mut state, &hand, &[0]).unwrap();
+
+    assert_eq!(result.hand, PokerHand::HighCard);
+    assert_eq!(result.chips, 5);
+}
+
+#[test]
+fn psychic_rejects_a_play_with_fewer_than_five_cards() {
+    let mut state = GameState::new(13);
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Psychich));
+    let mut hand = Hand::new();
+    for rank in [Rank::Two, Rank::Three, Rank::Four, Rank::Five] {
+        hand.add_card(card(
+            rank,
+            Suit::Spades,
+            Enhancement::None,
+            Edition::None,
+            Seal::None,
+        ));
+    }
+
+    assert!(calculate_score(&mut state, &hand, &[0, 1, 2, 3]).is_none());
+}
+
+#[test]
+fn eye_rejects_repeating_a_hand_type() {
+    let mut state = GameState::new(14);
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Eye));
+    let mut hand = Hand::new();
+    hand.add_card(card(
+        Rank::Ace,
+        Suit::Spades,
+        Enhancement::None,
+        Edition::None,
+        Seal::None,
+    ));
+
+    assert!(calculate_score(&mut state, &hand, &[0]).is_some());
+    assert!(calculate_score(&mut state, &hand, &[0]).is_none());
+}
+
+#[test]
+fn house_and_wheel_draws_mark_cards_face_down() {
+    let mut house = GameState::new(15);
+    house.begin_blind_as(BlindKind::Boss(BossBlinds::House));
+    let mut house_hand = Hand::new();
+    house.deal_cards(&mut house_hand);
+    assert!(house_hand.cards().iter().all(Card::is_face_down));
+
+    let mut wheel = GameState::new(16);
+    wheel.begin_blind_as(BlindKind::Boss(BossBlinds::Wheel));
+    let mut wheel_hand = Hand::new();
+    wheel.deal_cards(&mut wheel_hand);
+    let mut saw_face_down = wheel_hand.cards().iter().any(Card::is_face_down);
+    for _ in 0..32 {
+        let mut card = card(
+            Rank::Ace,
+            Suit::Spades,
+            Enhancement::None,
+            Edition::None,
+            Seal::None,
+        );
+        wheel.blind.prepare_drawn_card(&mut card, &mut wheel.rng);
+        saw_face_down |= card.is_face_down();
+    }
+    assert!(saw_face_down);
+}
+
+#[test]
+fn boss_pool_unlocks_by_ante_and_uses_showdowns_at_ante_eight() {
+    let mut state = GameState::new(17);
+    state.counters.ante = 1;
+    assert!(!BossBlinds::Wall.available_at_ante(1));
+    assert!(!BossBlinds::Ox.available_at_ante(5));
+    let ordinary = state.random_boss_blind();
+    assert!(ordinary.available_at_ante(1));
+
+    state.counters.ante = 8;
+    let showdown = state.random_boss_blind();
+    assert!(BossBlinds::SHOWDOWN.contains(&showdown));
+}
+
+#[test]
+fn disabling_a_boss_restores_its_normal_target() {
+    let mut state = GameState::new(18);
+    state.counters.ante = 2;
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Wall));
+    assert_eq!(state.blind.score_requirement, 3_200);
+
+    state.blind.disable_boss_ability();
+
+    assert_eq!(state.blind.score_requirement, 1_600);
+}
+
+#[test]
+fn play_hand_runs_hook_discard_and_refills_the_hand() {
+    let mut state = GameState::new(19);
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Hook));
+    let mut hand = Hand::new();
+    state.deal_cards(&mut hand);
+    let starting_deck_size = state.deck_size();
+
+    let score = state.play_hand(&mut hand, vec![0]).unwrap();
+
+    assert_eq!(score.hand, PokerHand::HighCard);
+    assert_eq!(hand.hand_size(), 8);
+    assert_eq!(state.blind.hands_remaining, 3);
+    assert_eq!(state.deck_size(), starting_deck_size - 3);
+}
+
+#[test]
+fn completing_a_boss_pays_its_reward_and_clears_pillar_marks() {
+    let mut state = GameState::new(20);
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::Hook));
+    state.money = 10;
+    state.pillar_card_ids.push(123);
+
+    assert_eq!(
+        state.finish_blind(),
+        crate::core::game::BlindPayout {
+            blind_reward: 5,
+            interest: 2,
+            total: 7,
+        }
+    );
+    assert_eq!(state.money, 17);
+    assert!(state.pillar_card_ids.is_empty());
+}
+
+#[test]
+fn finish_blind_pays_small_and_big_blinds_with_capped_interest() {
+    let mut small = GameState::new(22);
+    small.money = 20;
+    small.begin_blind_as(BlindKind::Small);
+    assert_eq!(
+        small.finish_blind(),
+        crate::core::game::BlindPayout {
+            blind_reward: 3,
+            interest: 4,
+            total: 7,
+        }
+    );
+    assert_eq!(small.money, 27);
+
+    let mut big = GameState::new(23);
+    big.money = 100;
+    big.redeem_voucher(crate::core::enums::Vouchers::SeedMoney)
+        .unwrap();
+    big.begin_blind_as(BlindKind::Big);
+    assert_eq!(
+        big.finish_blind(),
+        crate::core::game::BlindPayout {
+            blind_reward: 4,
+            interest: 10,
+            total: 14,
+        }
+    );
+    assert_eq!(big.money, 114);
+}
+
+#[test]
+fn crimson_heart_debuffs_a_joker_at_start_and_after_play() {
+    let mut state = GameState::new(21);
+    state.jokers.add(Joker::create_joker(JokerKind::Joker));
+    state.jokers.add(Joker::create_joker(JokerKind::Greedy));
+    state.begin_blind_as(BlindKind::Boss(BossBlinds::CrimsonHeart));
+    assert_eq!(
+        state
+            .jokers
+            .as_slice()
+            .iter()
+            .filter(|joker| joker.is_debuffed())
+            .count(),
+        1
+    );
+
+    let mut hand = Hand::new();
+    hand.add_card(card(
+        Rank::Ace,
+        Suit::Spades,
+        Enhancement::None,
+        Edition::None,
+        Seal::None,
+    ));
+    calculate_score(&mut state, &hand, &[0]).unwrap();
+    assert_eq!(
+        state
+            .jokers
+            .as_slice()
+            .iter()
+            .filter(|joker| joker.is_debuffed())
+            .count(),
+        1
+    );
 }
 
 #[test]

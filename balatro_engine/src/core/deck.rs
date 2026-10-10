@@ -96,6 +96,15 @@ impl Deck {
         self.cards.get_mut(index)
     }
 
+    pub(crate) fn clear_debuffs(&mut self) {
+        for card in &mut self.cards {
+            card.set_debuffed(false);
+        }
+        for card in &mut self.discarded_cards {
+            card.set_debuffed(false);
+        }
+    }
+
     pub(crate) fn size(&self) -> u16 {
         self.cards.len() as u16
     }

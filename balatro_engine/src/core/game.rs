@@ -1,23 +1,31 @@
-use crate::core::blind::{BlindKind, BlindState};
+use crate::core::blind::{BlindKind, BlindState, ScoreResult};
+use crate::core::card::Card;
 use crate::core::consumable::{
     ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_PRICE, DEFAULT_CONSUMABLE_SLOTS,
     OwnedConsumable,
 };
 use crate::core::deck::Deck;
-use crate::core::enums::{Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
+use crate::core::enums::{BossBlinds, Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
 use crate::core::pack::PackError;
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::voucher::VoucherError;
 use rand::SeedableRng;
-use rand::prelude::IndexedRandom;
+use rand::prelude::{IndexedRandom, SliceRandom};
 use rand::rngs::StdRng;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HandScore {
     pub(crate) chips: u16,
     pub(crate) mult: u16,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct BlindPayout {
+    pub(crate) blind_reward: u8,
+    pub(crate) interest: i16,
+    pub(crate) total: i16,
 }
 
 pub(crate) const BASE_HAND_SCORES: [HandScore; 12] = [
@@ -97,6 +105,8 @@ pub struct GameState {
     pub(crate) counters: GameCounters,
     pub(crate) most_played_hand: Option<PokerHand>,
     pub(crate) ante_voucher: Option<Vouchers>,
+    pub(crate) pillar_card_ids: Vec<u16>,
+    boss_blind_appearances: [u16; 28],
     pub(crate) rng: StdRng,
 }
 
@@ -131,6 +141,8 @@ impl GameState {
             counters: GameCounters::new(),
             most_played_hand: None,
             ante_voucher: None,
+            pillar_card_ids: Vec::new(),
+            boss_blind_appearances: [0; 28],
             rng,
         };
         state.roll_ante_voucher();
@@ -138,7 +150,7 @@ impl GameState {
     }
 
     pub(crate) fn hand_size(&self) -> i8 {
-        self.deck.hand_size()
+        self.deck.hand_size() + self.blind.hand_size_modifier
     }
 
     pub(crate) fn consumable_capacity(&self) -> usize {
@@ -174,13 +186,79 @@ impl GameState {
         self.begin_blind_as(BlindKind::Small);
     }
 
+    pub(crate) fn begin_random_boss_blind(&mut self) -> BossBlinds {
+        let boss = self.random_boss_blind();
+        self.begin_blind_as(BlindKind::Boss(boss));
+        boss
+    }
+
+    pub(crate) fn random_boss_blind(&mut self) -> BossBlinds {
+        let candidates: Vec<BossBlinds> = if self.counters.ante >= 8 && self.counters.ante % 8 == 0
+        {
+            BossBlinds::SHOWDOWN.to_vec()
+        } else {
+            BossBlinds::ALL
+                .into_iter()
+                .filter(|boss| boss.available_at_ante(self.counters.ante))
+                .collect()
+        };
+        let minimum = candidates
+            .iter()
+            .map(|boss| self.boss_blind_appearances[*boss as usize - 1])
+            .min()
+            .expect("the boss blind pool must not be empty");
+        let least_seen = candidates
+            .into_iter()
+            .filter(|boss| self.boss_blind_appearances[*boss as usize - 1] == minimum)
+            .collect::<Vec<_>>();
+        let boss = *least_seen
+            .choose(&mut self.rng)
+            .expect("the least-seen boss blind pool must not be empty");
+        self.boss_blind_appearances[boss as usize - 1] =
+            self.boss_blind_appearances[boss as usize - 1].saturating_add(1);
+        boss
+    }
+
     pub(crate) fn begin_blind_as(&mut self, kind: BlindKind) {
+        self.deck.clear_debuffs();
+        self.jokers.clear_debuffs();
         self.blind.begin(kind, self.counters.ante);
+        if let BlindKind::Boss(boss) = kind {
+            match boss {
+                crate::core::enums::BossBlinds::AmberAcorn if !self.blind.boss_ability_disabled => {
+                    self.jokers.shuffle(&mut self.rng);
+                }
+                crate::core::enums::BossBlinds::CrimsonHeart
+                    if !self.blind.boss_ability_disabled =>
+                {
+                    self.jokers.disable_random(&mut self.rng);
+                }
+                _ => {}
+            }
+        }
     }
 
     pub(crate) fn begin_next_ante(&mut self) {
         self.counters.ante = self.counters.ante.saturating_add(1);
+        self.pillar_card_ids.clear();
         self.roll_ante_voucher();
+    }
+
+    pub(crate) fn finish_blind(&mut self) -> BlindPayout {
+        let blind_reward = self.blind.reward();
+        let interest = (self.money.max(0) / 5).min(self.interest_cap);
+        let total = i16::from(blind_reward) + interest;
+        self.money += total;
+        self.update_jokers(UpdateEvent::BlindCompleted {
+            is_boss: self.blind.kind.is_boss(),
+        });
+        self.deck.clear_debuffs();
+        self.pillar_card_ids.clear();
+        BlindPayout {
+            blind_reward,
+            interest,
+            total,
+        }
     }
 
     fn roll_ante_voucher(&mut self) {
@@ -295,6 +373,13 @@ impl GameState {
         score.mult = score.mult.saturating_add(mult);
     }
 
+    pub(crate) fn downgrade_hand_score(&mut self, hand: PokerHand) {
+        let score = &mut self.hand_scores[hand as usize - 1];
+        let (chips, mult) = crate::core::consumable::planet_upgrade_values(hand);
+        score.chips = score.chips.saturating_sub(chips).max(1);
+        score.mult = score.mult.saturating_sub(mult).max(1);
+    }
+
     pub(crate) fn upgrade_all_hand_scores(&mut self) {
         for hand in [
             PokerHand::HighCard,
@@ -406,8 +491,88 @@ impl GameState {
     }
 
     pub(crate) fn deal_cards(&mut self, hand: &mut Hand) {
-        let hand_size = self.hand_size().max(0) as u8;
+        let hand_size = self
+            .blind
+            .draw_amount(self.hand_size().max(0) as usize)
+            .min(u8::MAX as usize) as u8;
         self.deck.deal_cards(hand, hand_size, &mut self.rng);
+        for card in hand.cards_mut() {
+            self.blind.prepare_drawn_card(card, &mut self.rng);
+        }
+        self.blind
+            .choose_forced_card(hand.hand_size() as usize, &mut self.rng);
+    }
+
+    pub(crate) fn discard_selected_cards(
+        &mut self,
+        hand: &mut Hand,
+        positions: Vec<u8>,
+    ) -> Option<Vec<Card>> {
+        self.discard_selected_cards_with_action(hand, positions, true)
+    }
+
+    fn discard_selected_cards_with_action(
+        &mut self,
+        hand: &mut Hand,
+        positions: Vec<u8>,
+        counts_as_discard: bool,
+    ) -> Option<Vec<Card>> {
+        let discarded = hand.select_cards(positions);
+        if discarded.is_empty() {
+            return None;
+        }
+
+        self.deck.discard_cards(discarded.clone());
+        self.update_jokers(UpdateEvent::CardsDiscarded { cards: &discarded });
+        self.update_jokers(UpdateEvent::DiscardActionCompleted);
+        if counts_as_discard {
+            self.blind.record_discard();
+        }
+        Some(discarded)
+    }
+
+    pub(crate) fn apply_hook_discard(&mut self, hand: &mut Hand) -> Vec<Card> {
+        let amount = self
+            .blind
+            .forced_discard_count()
+            .min(hand.hand_size() as usize);
+        if amount == 0 {
+            return Vec::new();
+        }
+
+        let mut positions = (0..hand.hand_size() as usize).collect::<Vec<_>>();
+        positions.shuffle(&mut self.rng);
+        positions.truncate(amount);
+        positions.sort_unstable();
+        self.discard_selected_cards_with_action(
+            hand,
+            positions
+                .into_iter()
+                .map(|position| position as u8)
+                .collect(),
+            false,
+        )
+        .unwrap_or_default()
+    }
+
+    pub(crate) fn play_hand(
+        &mut self,
+        hand: &mut Hand,
+        selected_positions: Vec<u8>,
+    ) -> Option<ScoreResult> {
+        let selected_indices = selected_positions
+            .iter()
+            .map(|&position| position as usize)
+            .collect::<Vec<_>>();
+        let score = crate::core::blind::calculate_score(self, hand, &selected_indices)?;
+        let played_cards = hand.select_cards(selected_positions);
+        if played_cards.is_empty() {
+            return None;
+        }
+        self.deck.discard_cards(played_cards);
+        self.apply_hook_discard(hand);
+        self.deal_cards(hand);
+        Some(score)
     }
 
     pub(crate) fn trigger_jokers(&mut self, event: TriggerEvent<'_>) -> JokerEffect {

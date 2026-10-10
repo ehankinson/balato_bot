@@ -25,6 +25,7 @@ pub struct Card {
     seal: Seal,
     edition: Edition,
     debuffed: bool,
+    face_down: bool,
     scoring_values: ScoringValues,
     id: u16,
 }
@@ -46,6 +47,7 @@ impl Card {
             edition: edition,
             seal: seal,
             debuffed: false,
+            face_down: false,
             scoring_values: ScoringValues::default(),
             id: id,
         }
@@ -85,7 +87,27 @@ impl Card {
         self.edition
     }
 
+    pub(crate) fn is_debuffed(&self) -> bool {
+        self.debuffed
+    }
+
+    pub(crate) fn set_debuffed(&mut self, debuffed: bool) {
+        self.debuffed = debuffed;
+    }
+
+    pub(crate) fn is_face_down(&self) -> bool {
+        self.face_down
+    }
+
+    pub(crate) fn set_face_down(&mut self, face_down: bool) {
+        self.face_down = face_down;
+    }
+
     pub(crate) fn scoring_values(&self) -> ScoringValues {
+        if self.debuffed {
+            return ScoringValues::default();
+        }
+
         let mut values = self.scoring_values;
         values.chips += self.rank.base_chips() as i32;
 

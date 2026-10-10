@@ -22,7 +22,12 @@ pub(crate) fn calculate_score(
     hand_type: PokerHand,
     scoring_data: ScoringData,
 ) -> ScoreResult {
-    let hand_score = state.hand_score(hand_type);
+    let mut hand_score = state.hand_score(hand_type);
+    if state.blind.flint_active() {
+        hand_score.chips = hand_score.chips.saturating_add(1) / 2;
+        hand_score.mult = hand_score.mult.saturating_add(1) / 2;
+        hand_score.mult = hand_score.mult.max(1);
+    }
     let mut jokers = std::mem::replace(&mut state.jokers, Jokers::new());
     let on_played_scoring_jokers = jokers.on_played_scoring_indices().collect::<Vec<_>>();
     let on_held_scoring_jokers = jokers.on_held_scoring_indices().collect::<Vec<_>>();

@@ -83,6 +83,14 @@ impl Joker {
         self.rarity
     }
 
+    pub(crate) fn is_debuffed(&self) -> bool {
+        self.debuffed
+    }
+
+    pub(crate) fn set_debuffed(&mut self, debuffed: bool) {
+        self.debuffed = debuffed;
+    }
+
     pub(crate) fn sell_value(&self) -> u8 {
         (self.current_price.saturating_div(2).min(u8::MAX as u16) as u8)
             .saturating_add(self.sell_value_bonus)
