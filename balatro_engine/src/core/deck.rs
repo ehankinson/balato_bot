@@ -117,6 +117,13 @@ impl Deck {
         BASE_HAND_SIZE + self.hand_size_modifier
     }
 
+    pub(crate) fn discard_modifier(&self) -> i8 {
+        match self.deck_type {
+            Decks::Red => 1,
+            _ => 0,
+        }
+    }
+
     pub(crate) fn adjust_hand_size(&mut self, amount: i8) {
         if amount >= 0 {
             self.hand_size_modifier = self.hand_size_modifier.saturating_add(amount);

@@ -29,6 +29,17 @@ fn game_state_owns_the_run_collections_and_deck_counts() {
 }
 
 #[test]
+fn red_deck_adds_one_discard_to_the_white_stake_default() {
+    let red = GameState::with_deck(101, Decks::Red);
+    let blue = GameState::with_deck(102, Decks::Blue);
+
+    assert_eq!(red.hands_per_blind(), 4);
+    assert_eq!(red.discards_per_blind(), 4);
+    assert_eq!(blue.hands_per_blind(), 4);
+    assert_eq!(blue.discards_per_blind(), 3);
+}
+
+#[test]
 fn blind_state_owns_the_active_blind_counters_and_kind() {
     let mut state = GameState::new(8);
 

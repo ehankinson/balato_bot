@@ -163,6 +163,11 @@ pub(crate) enum BlindKind {
     Boss(BossBlinds),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum BlindSkipError {
+    BossBlindCannotBeSkipped,
+}
+
 impl BlindKind {
     pub(crate) const fn is_boss(self) -> bool {
         matches!(self, BlindKind::Boss(_))
@@ -206,9 +211,9 @@ impl BlindState {
             kind: BlindKind::Small,
             stake: Stakes::White,
             hands_per_blind: 4,
-            discards_per_blind: 4,
+            discards_per_blind: 3,
             hands_remaining: 4,
-            discards_remaining: 4,
+            discards_remaining: 3,
             discards_used: 0,
             hands_played: 0,
             chips_scored: 0,

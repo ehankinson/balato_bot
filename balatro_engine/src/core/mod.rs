@@ -11,4 +11,5 @@ pub(crate) mod joker;
 pub(crate) mod joker_types;
 pub(crate) mod pack;
 pub(crate) mod shop;
+pub(crate) mod tag;
 pub(crate) mod voucher;

@@ -109,6 +109,7 @@ impl ShopItem {
 
 pub(crate) struct ShopState {
     pub(crate) voucher: Option<ShopVoucher>,
+    pub(crate) extra_vouchers: Vec<ShopVoucher>,
     pub(crate) packs: Vec<ShopPack>,
     pub(crate) items: Vec<ShopItem>,
     pub(crate) number_of_shop_items: usize,
@@ -124,6 +125,7 @@ impl ShopState {
     pub(crate) fn new() -> ShopState {
         ShopState {
             voucher: None,
+            extra_vouchers: Vec::new(),
             packs: Vec::with_capacity(SHOP_PACK_SLOTS),
             items: Vec::new(),
             number_of_shop_items: 2,
@@ -149,6 +151,7 @@ impl ShopState {
 
     pub(crate) fn begin_shop(&mut self) {
         self.voucher = None;
+        self.extra_vouchers.clear();
         self.packs.clear();
         self.items.clear();
         self.reroll_cost = self.initial_reroll_cost;

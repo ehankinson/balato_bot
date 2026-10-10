@@ -1,4 +1,4 @@
-use crate::core::blind::{BlindKind, BlindState, ScoreResult};
+use crate::core::blind::{BlindKind, BlindSkipError, BlindState, ScoreResult};
 use crate::core::blind_selector::BlindSelector;
 use crate::core::boss_blind::{FinisherBossBlindHistory, RegularBossBlindHistory};
 use crate::core::card::Card;
@@ -12,6 +12,7 @@ use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
 use crate::core::pack::PackError;
 use crate::core::shop::{ShopError, ShopState};
+use crate::core::tag::TagState;
 use crate::core::voucher::VoucherError;
 use rand::SeedableRng;
 use rand::prelude::{IndexedRandom, SliceRandom};
@@ -108,6 +109,8 @@ pub struct GameState {
     pub(crate) counters: GameCounters,
     pub(crate) most_played_hand: Option<PokerHand>,
     pub(crate) ante_voucher: Option<Vouchers>,
+    pub(crate) tags: TagState,
+    pub(crate) tag_pack_openings: Vec<crate::core::pack::PackOpening>,
     pub(crate) pillar_card_ids: Vec<u16>,
     regular_boss_blinds: RegularBossBlindHistory,
     finisher_boss_blinds: FinisherBossBlindHistory,
@@ -146,11 +149,17 @@ impl GameState {
             counters: GameCounters::new(),
             most_played_hand: None,
             ante_voucher: None,
+            tags: TagState::new(),
+            tag_pack_openings: Vec::new(),
             pillar_card_ids: Vec::new(),
             regular_boss_blinds: RegularBossBlindHistory::new(),
             finisher_boss_blinds: FinisherBossBlindHistory::new(),
             rng,
         };
+        state
+            .blind
+            .adjust_discards_per_blind(state.deck.discard_modifier());
+        state.blind.discards_remaining = state.blind.discards_per_blind;
         state.regenerate_blind_selector();
         state.roll_ante_voucher();
         state
@@ -245,6 +254,7 @@ impl GameState {
         self.deck.clear_debuffs();
         self.jokers.clear_debuffs();
         self.blind.begin(kind, self.counters.ante);
+        self.blind.hand_size_modifier += self.tags.take_juggle_hand_size();
         if let BlindKind::Boss(boss) = kind {
             match boss {
                 crate::core::enums::BossBlinds::AmberAcorn if !self.blind.boss_ability_disabled => {
@@ -271,6 +281,44 @@ impl GameState {
         self.blind_selector = BlindSelector::generate(self);
     }
 
+    pub(crate) fn skip_blind(
+        &mut self,
+        kind: BlindKind,
+    ) -> Result<crate::core::enums::SkipTag, BlindSkipError> {
+        if kind.is_boss() {
+            return Err(BlindSkipError::BossBlindCannotBeSkipped);
+        }
+
+        let tag = match kind {
+            BlindKind::Small => self.blind_selector.small().skip_tag,
+            BlindKind::Big => self.blind_selector.big().skip_tag,
+            BlindKind::Boss(_) => unreachable!("boss blind skips are rejected above"),
+        };
+        self.counters.blinds_skipped = self.counters.blinds_skipped.saturating_add(1);
+        let mut tags = std::mem::take(&mut self.tags);
+        tags.gain(tag, self);
+        let openings = tags.open_free_packs(self);
+        self.tag_pack_openings.extend(openings);
+        self.tags = tags;
+        Ok(tag)
+    }
+
+    pub(crate) fn tag_pack_openings(&self) -> &[crate::core::pack::PackOpening] {
+        &self.tag_pack_openings
+    }
+
+    pub(crate) fn choose_tag_pack(
+        &mut self,
+        index: usize,
+        selections: &[usize],
+    ) -> Result<(), PackError> {
+        if index >= self.tag_pack_openings.len() {
+            return Err(PackError::InvalidSelection);
+        }
+        let opening = self.tag_pack_openings.remove(index);
+        opening.choose(selections, self)
+    }
+
     pub(crate) fn finish_blind(&mut self) -> Option<BlindPayout> {
         if self.blind.finished || !self.blind.has_beaten_target() {
             return None;
@@ -279,7 +327,15 @@ impl GameState {
         self.blind.finished = true;
         let blind_reward = self.blind.reward();
         let interest = (self.money.max(0) / 5).min(self.interest_cap);
-        let total = i16::from(blind_reward) + interest;
+        let investment = if self.blind.kind.is_boss() {
+            let mut tags = std::mem::take(&mut self.tags);
+            let reward = i16::from(tags.take_investment()).saturating_mul(25);
+            self.tags = tags;
+            reward
+        } else {
+            0
+        };
+        let total = i16::from(blind_reward) + interest + investment;
         self.money += total;
         self.update_jokers(UpdateEvent::BlindCompleted {
             is_boss: self.blind.kind.is_boss(),
@@ -364,6 +420,29 @@ impl GameState {
             shop.refill_base_items(self);
             self.shop = shop;
         }
+        Ok(())
+    }
+
+    pub(crate) fn buy_extra_shop_voucher(&mut self, index: usize) -> Result<(), ShopError> {
+        let offer = self
+            .shop
+            .extra_vouchers
+            .get(index)
+            .ok_or(ShopError::InvalidOffer)?;
+        if self.vouchers.contains(&offer.voucher) {
+            return Err(ShopError::VoucherAlreadyOwned);
+        }
+        let price = self.shop_price(offer.price);
+        if self.money < price as i16 {
+            return Err(ShopError::InsufficientFunds);
+        }
+        let voucher = offer.voucher;
+        self.redeem_voucher(voucher).map_err(|error| match error {
+            VoucherError::AlreadyOwned => ShopError::VoucherAlreadyOwned,
+            VoucherError::PrerequisiteMissing => ShopError::VoucherPrerequisiteMissing,
+        })?;
+        self.shop.extra_vouchers.remove(index);
+        self.money -= price as i16;
         Ok(())
     }
 
@@ -653,6 +732,9 @@ impl Game {
         shop.refresh_base_items(&mut self.state);
         shop.refresh_packs(&mut self.state);
         shop.refresh_voucher(&mut self.state);
+        let mut tags = std::mem::take(&mut self.state.tags);
+        tags.prepare_shop(&mut self.state, &mut shop);
+        self.state.tags = tags;
         self.state.shop = shop;
         self.shop_active = true;
         Ok(())
@@ -696,3 +778,7 @@ mod pack_tests;
 #[cfg(test)]
 #[path = "tests/voucher.rs"]
 mod voucher_tests;
+
+#[cfg(test)]
+#[path = "tests/tag.rs"]
+mod tag_tests;
