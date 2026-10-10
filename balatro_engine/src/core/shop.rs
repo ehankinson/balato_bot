@@ -256,20 +256,6 @@ impl ShopState {
         Ok(())
     }
 
-    pub(crate) fn buy_pack(
-        &mut self,
-        index: usize,
-        state: &mut GameState,
-    ) -> Result<ShopPack, ShopError> {
-        let pack = self.packs.get(index).ok_or(ShopError::InvalidOffer)?;
-        let price = state.shop_price(pack.price);
-        require_funds(state, price)?;
-
-        let pack = self.packs.remove(index);
-        state.money -= price as i16;
-        Ok(pack)
-    }
-
     pub(crate) fn buy_and_open_pack(
         &mut self,
         index: usize,

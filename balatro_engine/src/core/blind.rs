@@ -269,6 +269,9 @@ impl BlindState {
         if self.hands_remaining == 0 {
             return Err(BlindPlayError::NoHandsRemaining);
         }
+        if selected_indices.len() > 5 {
+            return Err(BlindPlayError::TooManyCards);
+        }
 
         self.validate_boss_play(selected_indices, hand_type)?;
         Ok(())
@@ -285,6 +288,7 @@ impl BlindState {
 
     pub(crate) fn record_discard(&mut self) {
         self.first_action_taken = true;
+        self.discards_remaining = self.discards_remaining.saturating_sub(1);
         self.record_boss_discard();
     }
 

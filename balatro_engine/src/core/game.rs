@@ -10,7 +10,7 @@ use crate::core::deck::Deck;
 use crate::core::enums::{BossBlinds, Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
-use crate::core::pack::PackError;
+use crate::core::pack::{PackError, PackOpening};
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::tag::TagState;
 use crate::core::voucher::VoucherError;
@@ -115,6 +115,83 @@ pub struct GameState {
     regular_boss_blinds: RegularBossBlindHistory,
     finisher_boss_blinds: FinisherBossBlindHistory,
     pub(crate) rng: StdRng,
+}
+
+/// The point where the game is waiting for the next player or model decision.
+///
+/// These discriminants are part of the Python control contract. Keep them
+/// stable when adding a new decision point; the Python API returns the numeric
+/// code instead of a phase name.
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub(crate) enum DecisionPoint {
+    BlindSelection = 0,
+    PlayingHand = 1,
+    Shop = 2,
+    PackSelection = 3,
+    ConsumableSelection = 4,
+    RunComplete = 5,
+}
+
+impl DecisionPoint {
+    pub(crate) const fn code(self) -> u8 {
+        self as u8
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum DecisionError {
+    InvalidPhase,
+    InvalidBlindChoice,
+}
+
+/// Action names shared by the Rust flow and the Python control layer.
+#[pyo3::pyclass(name = "Action", from_py_object)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub(crate) enum ActionKind {
+    SelectBlind,
+    SkipBlind,
+    PlayCards,
+    DiscardCards,
+    BuyShopItem,
+    BuyVoucher,
+    RerollShop,
+    BuyPack,
+    SelectPackOptions,
+    UseConsumable,
+    SellJoker,
+    SellConsumable,
+    LeaveShop,
+}
+
+pub(crate) enum GameAction {
+    SelectBlind(BlindKind),
+    SkipBlind(BlindKind),
+    PlayCards(Vec<u8>),
+    DiscardCards(Vec<u8>),
+    BuyShopItem(usize),
+    BuyVoucher(usize),
+    RerollShop,
+    BuyPack(usize),
+    SelectPackOptions(Vec<usize>),
+    UseConsumable {
+        index: usize,
+        target: ConsumableTarget,
+    },
+    SellJoker(usize),
+    SellConsumable(usize),
+    LeaveShop,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ActionError {
+    InvalidPhase,
+    InvalidAction,
+    Decision(DecisionError),
+    BlindSkip(BlindSkipError),
+    Shop(ShopError),
+    Pack(PackError),
+    Consumable(ConsumableUseError),
 }
 
 impl GameState {
@@ -290,8 +367,16 @@ impl GameState {
         }
 
         let tag = match kind {
-            BlindKind::Small => self.blind_selector.small().skip_tag,
-            BlindKind::Big => self.blind_selector.big().skip_tag,
+            BlindKind::Small => self
+                .blind_selector
+                .small()
+                .skip_tag
+                .expect("small blinds have skip tags"),
+            BlindKind::Big => self
+                .blind_selector
+                .big()
+                .skip_tag
+                .expect("big blinds have skip tags"),
             BlindKind::Boss(_) => unreachable!("boss blind skips are rejected above"),
         };
         self.counters.blinds_skipped = self.counters.blinds_skipped.saturating_add(1);
@@ -395,9 +480,16 @@ impl GameState {
         crate::core::voucher::redeem(self, voucher)
     }
 
-    pub(crate) fn buy_shop_voucher(&mut self) -> Result<(), ShopError> {
-        let (voucher, price) = {
+    pub(crate) fn buy_voucher(&mut self, index: usize) -> Result<(), ShopError> {
+        let (voucher, price) = if index == 0 {
             let offer = self.shop.voucher.as_ref().ok_or(ShopError::InvalidOffer)?;
+            (offer.voucher, offer.price)
+        } else {
+            let offer = self
+                .shop
+                .extra_vouchers
+                .get(index - 1)
+                .ok_or(ShopError::InvalidOffer)?;
             (offer.voucher, offer.price)
         };
         if self.vouchers.contains(&voucher) {
@@ -412,7 +504,11 @@ impl GameState {
             VoucherError::AlreadyOwned => ShopError::VoucherAlreadyOwned,
             VoucherError::PrerequisiteMissing => ShopError::VoucherPrerequisiteMissing,
         })?;
-        self.shop.voucher.take();
+        if index == 0 {
+            self.shop.voucher.take();
+        } else {
+            self.shop.extra_vouchers.remove(index - 1);
+        }
         self.money -= price as i16;
 
         if matches!(voucher, Vouchers::Overstock | Vouchers::OverstockPlus) {
@@ -423,34 +519,11 @@ impl GameState {
         Ok(())
     }
 
-    pub(crate) fn buy_extra_shop_voucher(&mut self, index: usize) -> Result<(), ShopError> {
-        let offer = self
-            .shop
-            .extra_vouchers
-            .get(index)
-            .ok_or(ShopError::InvalidOffer)?;
-        if self.vouchers.contains(&offer.voucher) {
-            return Err(ShopError::VoucherAlreadyOwned);
-        }
-        let price = self.shop_price(offer.price);
-        if self.money < price as i16 {
-            return Err(ShopError::InsufficientFunds);
-        }
-        let voucher = offer.voucher;
-        self.redeem_voucher(voucher).map_err(|error| match error {
-            VoucherError::AlreadyOwned => ShopError::VoucherAlreadyOwned,
-            VoucherError::PrerequisiteMissing => ShopError::VoucherPrerequisiteMissing,
-        })?;
-        self.shop.extra_vouchers.remove(index);
-        self.money -= price as i16;
-        Ok(())
-    }
-
     pub(crate) fn can_redeem_voucher(&self, voucher: Vouchers) -> bool {
         crate::core::voucher::can_redeem(self, voucher)
     }
 
-    pub(crate) fn choose_pack(
+    pub(crate) fn select_pack_options(
         &mut self,
         opening: crate::core::pack::PackOpening,
         selections: &[usize],
@@ -553,6 +626,25 @@ impl GameState {
         Ok(())
     }
 
+    pub(crate) fn sell_joker(&mut self, index: usize) -> Option<u16> {
+        let sell_value = self.jokers.get(index)?.sell_value();
+        let mut jokers = std::mem::replace(&mut self.jokers, Jokers::new());
+        jokers.sell(index, self);
+        self.jokers = jokers;
+        self.money += sell_value as i16;
+        self.update_jokers(UpdateEvent::AfterCardSold);
+        Some(sell_value as u16)
+    }
+
+    pub(crate) fn sell_consumable(&mut self, index: usize) -> Option<u16> {
+        let consumable = self.consumables.get(index).copied()?;
+        let sell_value = consumable.sell_value();
+        self.consumables.remove(index);
+        self.money += sell_value as i16;
+        self.update_jokers(UpdateEvent::AfterCardSold);
+        Some(sell_value)
+    }
+
     pub(crate) fn use_consumable(
         &mut self,
         index: usize,
@@ -619,6 +711,9 @@ impl GameState {
         hand: &mut Hand,
         positions: Vec<u8>,
     ) -> Option<Vec<Card>> {
+        if self.blind.discards_remaining == 0 || positions.len() > 5 {
+            return None;
+        }
         self.discard_selected_cards_with_action(hand, positions, true)
     }
 
@@ -711,15 +806,212 @@ impl GameState {
 /// The runtime object that will coordinate phase transitions.
 pub struct Game {
     pub(crate) state: GameState,
+    pub(crate) hand: Hand,
+    decision_point: DecisionPoint,
     shop_active: bool,
+    pending_pack: Option<PendingPack>,
+}
+
+enum PackReturn {
+    Shop,
+    BlindSelection,
+}
+
+struct PendingPack {
+    opening: PackOpening,
+    return_point: PackReturn,
 }
 
 impl Game {
     pub fn new(seed: u64) -> Game {
         Game {
             state: GameState::new(seed),
+            hand: Hand::new(),
+            decision_point: DecisionPoint::BlindSelection,
             shop_active: false,
+            pending_pack: None,
         }
+    }
+
+    pub(crate) fn decision_point(&self) -> DecisionPoint {
+        self.decision_point
+    }
+
+    pub(crate) fn state(&self) -> &GameState {
+        &self.state
+    }
+
+    pub(crate) fn hand(&self) -> &Hand {
+        &self.hand
+    }
+
+    /// Advance automatic game work until the current decision boundary.
+    ///
+    /// The initial setup is completed by `Game::new`, so the first call
+    /// reaches the blind-selection decision immediately. Later transitions
+    /// will perform their automatic work here before returning the next
+    /// decision point.
+    pub(crate) fn next_step(&mut self) -> DecisionPoint {
+        if self.decision_point == DecisionPoint::BlindSelection {
+            self.open_next_tag_pack();
+        }
+        self.decision_point
+    }
+
+    fn open_next_tag_pack(&mut self) {
+        if self.pending_pack.is_none() && !self.state.tag_pack_openings.is_empty() {
+            let opening = self.state.tag_pack_openings.remove(0);
+            self.pending_pack = Some(PendingPack {
+                opening,
+                return_point: PackReturn::BlindSelection,
+            });
+        }
+
+        if self.pending_pack.is_some() {
+            self.decision_point = DecisionPoint::PackSelection;
+        }
+    }
+
+    pub(crate) fn apply_action(
+        &mut self,
+        action: GameAction,
+    ) -> Result<DecisionPoint, ActionError> {
+        match action {
+            GameAction::SelectBlind(kind) => {
+                self.select_blind(kind).map_err(ActionError::Decision)?;
+            }
+            GameAction::SkipBlind(kind) => {
+                if self.decision_point != DecisionPoint::BlindSelection {
+                    return Err(ActionError::InvalidPhase);
+                }
+                self.state
+                    .skip_blind(kind)
+                    .map_err(ActionError::BlindSkip)?;
+                self.open_next_tag_pack();
+            }
+            GameAction::PlayCards(positions) => {
+                if self.decision_point != DecisionPoint::PlayingHand {
+                    return Err(ActionError::InvalidPhase);
+                }
+                self.state
+                    .play_hand(&mut self.hand, positions)
+                    .ok_or(ActionError::InvalidAction)?;
+                if self.state.blind.finished {
+                    self.enter_shop().map_err(ActionError::Shop)?;
+                } else if self.state.blind.hands_remaining == 0 {
+                    self.decision_point = DecisionPoint::RunComplete;
+                }
+            }
+            GameAction::DiscardCards(positions) => {
+                if self.decision_point != DecisionPoint::PlayingHand {
+                    return Err(ActionError::InvalidPhase);
+                }
+                self.state
+                    .discard_selected_cards(&mut self.hand, positions)
+                    .ok_or(ActionError::InvalidAction)?;
+            }
+            GameAction::BuyShopItem(index) => {
+                self.require_shop()?;
+                let mut shop = std::mem::replace(&mut self.state.shop, ShopState::new());
+                let result = shop.buy_item(index, &mut self.state);
+                self.state.shop = shop;
+                result.map_err(ActionError::Shop)?;
+            }
+            GameAction::BuyVoucher(index) => {
+                self.require_shop()?;
+                self.state.buy_voucher(index).map_err(ActionError::Shop)?;
+            }
+            GameAction::RerollShop => {
+                self.require_shop()?;
+                let reroll_cost = self.state.shop.reroll_cost;
+                if self.state.money < reroll_cost as i16 {
+                    return Err(ActionError::Shop(ShopError::InsufficientFunds));
+                }
+                let mut shop = std::mem::replace(&mut self.state.shop, ShopState::new());
+                let result = shop.reroll(&mut self.state);
+                self.state.shop = shop;
+                result.map_err(ActionError::Shop)?;
+            }
+            GameAction::BuyPack(index) => {
+                self.require_shop()?;
+                let mut shop = std::mem::replace(&mut self.state.shop, ShopState::new());
+                let result = shop.buy_and_open_pack(index, &mut self.state);
+                self.state.shop = shop;
+                self.pending_pack = Some(PendingPack {
+                    opening: result.map_err(ActionError::Shop)?,
+                    return_point: PackReturn::Shop,
+                });
+                self.decision_point = DecisionPoint::PackSelection;
+            }
+            GameAction::SelectPackOptions(selections) => {
+                if self.decision_point != DecisionPoint::PackSelection {
+                    return Err(ActionError::InvalidPhase);
+                }
+                let pending = self.pending_pack.take().ok_or(ActionError::InvalidAction)?;
+                self.state
+                    .select_pack_options(pending.opening, &selections)
+                    .map_err(ActionError::Pack)?;
+                self.decision_point = match pending.return_point {
+                    PackReturn::Shop => DecisionPoint::Shop,
+                    PackReturn::BlindSelection => DecisionPoint::BlindSelection,
+                };
+                self.open_next_tag_pack();
+            }
+            GameAction::UseConsumable { index, target } => {
+                self.require_shop()?;
+                self.state
+                    .use_consumable(index, &mut self.hand, target)
+                    .map_err(ActionError::Consumable)?;
+            }
+            GameAction::SellJoker(index) => {
+                self.require_shop()?;
+                self.state
+                    .sell_joker(index)
+                    .ok_or(ActionError::InvalidAction)?;
+            }
+            GameAction::SellConsumable(index) => {
+                self.require_shop()?;
+                self.state
+                    .sell_consumable(index)
+                    .ok_or(ActionError::InvalidAction)?;
+            }
+            GameAction::LeaveShop => {
+                self.leave_shop().ok_or(ActionError::InvalidPhase)?;
+            }
+        }
+
+        Ok(self.decision_point)
+    }
+
+    fn require_shop(&self) -> Result<(), ActionError> {
+        if self.decision_point == DecisionPoint::Shop && self.shop_active {
+            Ok(())
+        } else {
+            Err(ActionError::InvalidPhase)
+        }
+    }
+
+    pub(crate) fn select_blind(&mut self, kind: BlindKind) -> Result<(), DecisionError> {
+        if self.decision_point != DecisionPoint::BlindSelection {
+            return Err(DecisionError::InvalidPhase);
+        }
+
+        let selector = self.state.blind_selector;
+        if ![
+            selector.small().kind,
+            selector.big().kind,
+            selector.boss().kind,
+        ]
+        .contains(&kind)
+        {
+            return Err(DecisionError::InvalidBlindChoice);
+        }
+
+        self.state.begin_blind_as(kind);
+        self.hand = Hand::new();
+        self.state.deal_cards(&mut self.hand);
+        self.decision_point = DecisionPoint::PlayingHand;
+        Ok(())
     }
 
     pub(crate) fn enter_shop(&mut self) -> Result<(), ShopError> {
@@ -737,6 +1029,7 @@ impl Game {
         self.state.tags = tags;
         self.state.shop = shop;
         self.shop_active = true;
+        self.decision_point = DecisionPoint::Shop;
         Ok(())
     }
 
@@ -751,6 +1044,7 @@ impl Game {
     pub(crate) fn leave_shop(&mut self) -> Option<()> {
         self.shop_active.then_some(()).inspect(|_| {
             self.shop_active = false;
+            self.decision_point = DecisionPoint::BlindSelection;
         })
     }
 }
@@ -782,3 +1076,7 @@ mod voucher_tests;
 #[cfg(test)]
 #[path = "tests/tag.rs"]
 mod tag_tests;
+
+#[cfg(test)]
+#[path = "tests/game_flow.rs"]
+mod game_flow_tests;

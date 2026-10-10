@@ -109,9 +109,9 @@ fn double_and_ethereal_skips_open_packs_without_leaving_blind_selection() {
         .map(GameState::new)
         .find_map(|state| {
             let selector = state.blind_selector;
-            (selector.small().skip_tag == SkipTag::Double
-                && state.blind_selector.big().skip_tag == SkipTag::Ethereal)
-                .then_some((state, selector))
+            (selector.small().skip_tag == Some(SkipTag::Double)
+                && state.blind_selector.big().skip_tag == Some(SkipTag::Ethereal))
+            .then_some((state, selector))
         })
         .expect("a deterministic seed should produce the required tag pair");
 

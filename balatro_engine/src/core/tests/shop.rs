@@ -130,10 +130,10 @@ fn vouchers_and_packs_are_single_shop_offers_with_atomic_purchases() {
     })
     .unwrap();
 
-    state.buy_shop_voucher().unwrap();
-    let bought_pack = shop.buy_pack(0, &mut state).unwrap();
+    state.buy_voucher(0).unwrap();
+    let opening = shop.buy_and_open_pack(0, &mut state).unwrap();
 
-    assert_eq!(bought_pack.kind, BoosterPackKind::Arcana);
+    assert_eq!(opening.options().len(), 3);
     assert_eq!(state.vouchers, vec![Vouchers::Overstock]);
     assert_eq!(shop.packs.len(), 1);
     assert_eq!(state.money, 6);
@@ -142,10 +142,7 @@ fn vouchers_and_packs_are_single_shop_offers_with_atomic_purchases() {
         voucher: Vouchers::Overstock,
         price: 1,
     });
-    assert_eq!(
-        state.buy_shop_voucher(),
-        Err(ShopError::VoucherAlreadyOwned)
-    );
+    assert_eq!(state.buy_voucher(0), Err(ShopError::VoucherAlreadyOwned));
     assert_eq!(state.money, 6);
     assert!(state.shop.voucher.is_some());
 }
@@ -345,7 +342,7 @@ fn buying_overstock_replenishes_the_new_shop_slot() {
         price: 5,
     });
 
-    state.buy_shop_voucher().unwrap();
+    state.buy_voucher(0).unwrap();
 
     assert_eq!(state.shop.number_of_shop_items, 3);
     assert_eq!(state.shop.items.len(), 3);

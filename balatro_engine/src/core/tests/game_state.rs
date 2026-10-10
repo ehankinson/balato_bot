@@ -2,9 +2,7 @@ use super::*;
 
 use crate::core::blind::{BlindKind, calculate_score, score_played_hand};
 use crate::core::card::Card;
-use crate::core::enums::{
-    BossBlinds, Decks, Edition, Enhancement, Rank, Seal, SkipTag, Stakes, Suit,
-};
+use crate::core::enums::{BossBlinds, Decks, Edition, Enhancement, Rank, Seal, Stakes, Suit};
 use crate::core::hand::Hand;
 use crate::core::joker::Joker;
 use crate::core::joker::TriggerEvent;
@@ -201,9 +199,9 @@ fn blind_selector_contains_the_three_blind_choices_and_regenerates_by_ante() {
     assert_eq!(initial.small().kind, BlindKind::Small);
     assert_eq!(initial.big().kind, BlindKind::Big);
     assert!(matches!(initial.boss().kind, BlindKind::Boss(_)));
-    assert!(SkipTag::ALL.contains(&initial.small().skip_tag));
-    assert!(SkipTag::ALL.contains(&initial.big().skip_tag));
-    assert!(SkipTag::ALL.contains(&initial.boss().skip_tag));
+    assert!(initial.small().skip_tag.is_some());
+    assert!(initial.big().skip_tag.is_some());
+    assert_eq!(initial.boss().skip_tag, None);
 
     state.begin_next_ante();
     assert_eq!(state.counters.ante, 2);

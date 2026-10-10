@@ -6,7 +6,7 @@ use rand::prelude::IndexedRandom;
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) struct BlindChoice {
     pub(crate) kind: BlindKind,
-    pub(crate) skip_tag: SkipTag,
+    pub(crate) skip_tag: Option<SkipTag>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -21,15 +21,15 @@ impl BlindSelector {
         BlindSelector {
             small: BlindChoice {
                 kind: BlindKind::Small,
-                skip_tag: SkipTag::Standard,
+                skip_tag: Some(SkipTag::Standard),
             },
             big: BlindChoice {
                 kind: BlindKind::Big,
-                skip_tag: SkipTag::Standard,
+                skip_tag: Some(SkipTag::Standard),
             },
             boss: BlindChoice {
                 kind: BlindKind::Boss(BossBlinds::Hook),
-                skip_tag: SkipTag::Boss,
+                skip_tag: None,
             },
         }
     }
@@ -41,23 +41,20 @@ impl BlindSelector {
         let big_tag = *SkipTag::ALL
             .choose(&mut state.rng)
             .expect("the skip tag table must not be empty");
-        let boss_tag = *SkipTag::ALL
-            .choose(&mut state.rng)
-            .expect("the skip tag table must not be empty");
         let boss = state.random_boss_blind();
 
         BlindSelector {
             small: BlindChoice {
                 kind: BlindKind::Small,
-                skip_tag: small_tag,
+                skip_tag: Some(small_tag),
             },
             big: BlindChoice {
                 kind: BlindKind::Big,
-                skip_tag: big_tag,
+                skip_tag: Some(big_tag),
             },
             boss: BlindChoice {
                 kind: BlindKind::Boss(boss),
-                skip_tag: boss_tag,
+                skip_tag: None,
             },
         }
     }
@@ -72,5 +69,10 @@ impl BlindSelector {
 
     pub(crate) fn boss(&self) -> BlindChoice {
         self.boss
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_small_skip_tag(&mut self, tag: SkipTag) {
+        self.small.skip_tag = Some(tag);
     }
 }

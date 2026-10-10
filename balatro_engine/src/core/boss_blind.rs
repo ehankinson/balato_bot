@@ -68,6 +68,7 @@ pub(crate) struct BossBlindRule {
 pub(crate) enum BlindPlayError {
     NoHandsRemaining,
     TooFewCards,
+    TooManyCards,
     HandTypeNotAllowed,
     ForcedCardNotSelected,
 }

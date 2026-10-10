@@ -29,7 +29,7 @@ fn opening_and_choosing_a_standard_pack_adds_a_card_to_the_deck() {
 
     assert_eq!(opening.options().len(), 3);
     assert!(matches!(opening.options()[0], PackOption::PlayingCard(_)));
-    state.choose_pack(opening, &[0]).unwrap();
+    state.select_pack_options(opening, &[0]).unwrap();
 
     assert_eq!(state.deck_size(), starting_size + 1);
 }
@@ -41,7 +41,7 @@ fn pack_selection_is_atomic_when_the_selection_is_invalid() {
     let opening = pack.open(&mut state);
 
     assert_eq!(
-        state.choose_pack(opening, &[0]),
+        state.select_pack_options(opening, &[0]),
         Err(PackError::InvalidSelection)
     );
     assert!(state.jokers.as_slice().is_empty());
