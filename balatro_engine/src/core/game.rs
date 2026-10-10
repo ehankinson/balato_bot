@@ -1,4 +1,6 @@
 use crate::core::blind::{BlindKind, BlindState, ScoreResult};
+use crate::core::blind_selector::BlindSelector;
+use crate::core::boss_blind::{FinisherBossBlindHistory, RegularBossBlindHistory};
 use crate::core::card::Card;
 use crate::core::consumable::{
     ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_PRICE, DEFAULT_CONSUMABLE_SLOTS,
@@ -88,6 +90,7 @@ impl GameCounters {
 
 pub struct GameState {
     pub(crate) blind: BlindState,
+    pub(crate) blind_selector: BlindSelector,
     pub(crate) deck: Deck,
     pub(crate) jokers: Jokers,
     pub(crate) money: i16,
@@ -106,7 +109,8 @@ pub struct GameState {
     pub(crate) most_played_hand: Option<PokerHand>,
     pub(crate) ante_voucher: Option<Vouchers>,
     pub(crate) pillar_card_ids: Vec<u16>,
-    boss_blind_appearances: [u16; 28],
+    regular_boss_blinds: RegularBossBlindHistory,
+    finisher_boss_blinds: FinisherBossBlindHistory,
     pub(crate) rng: StdRng,
 }
 
@@ -124,6 +128,7 @@ impl GameState {
 
         let mut state = GameState {
             blind: BlindState::new(),
+            blind_selector: BlindSelector::empty(),
             deck,
             jokers: Jokers::new(),
             money: 0,
@@ -142,9 +147,11 @@ impl GameState {
             most_played_hand: None,
             ante_voucher: None,
             pillar_card_ids: Vec::new(),
-            boss_blind_appearances: [0; 28],
+            regular_boss_blinds: RegularBossBlindHistory::new(),
+            finisher_boss_blinds: FinisherBossBlindHistory::new(),
             rng,
         };
+        state.regenerate_blind_selector();
         state.roll_ante_voucher();
         state
     }
@@ -204,19 +211,34 @@ impl GameState {
         };
         let minimum = candidates
             .iter()
-            .map(|boss| self.boss_blind_appearances[*boss as usize - 1])
+            .map(|boss| self.boss_appearances(*boss))
             .min()
             .expect("the boss blind pool must not be empty");
         let least_seen = candidates
             .into_iter()
-            .filter(|boss| self.boss_blind_appearances[*boss as usize - 1] == minimum)
+            .filter(|boss| self.boss_appearances(*boss) == minimum)
             .collect::<Vec<_>>();
         let boss = *least_seen
             .choose(&mut self.rng)
             .expect("the least-seen boss blind pool must not be empty");
-        self.boss_blind_appearances[boss as usize - 1] =
-            self.boss_blind_appearances[boss as usize - 1].saturating_add(1);
+        self.increment_boss_appearances(boss);
         boss
+    }
+
+    fn boss_appearances(&self, boss: BossBlinds) -> u16 {
+        if boss.is_showdown() {
+            self.finisher_boss_blinds.count(boss)
+        } else {
+            self.regular_boss_blinds.count(boss)
+        }
+    }
+
+    fn increment_boss_appearances(&mut self, boss: BossBlinds) {
+        if boss.is_showdown() {
+            self.finisher_boss_blinds.record(boss);
+        } else {
+            self.regular_boss_blinds.record(boss);
+        }
     }
 
     pub(crate) fn begin_blind_as(&mut self, kind: BlindKind) {
@@ -241,7 +263,12 @@ impl GameState {
     pub(crate) fn begin_next_ante(&mut self) {
         self.counters.ante = self.counters.ante.saturating_add(1);
         self.pillar_card_ids.clear();
+        self.regenerate_blind_selector();
         self.roll_ante_voucher();
+    }
+
+    pub(crate) fn regenerate_blind_selector(&mut self) {
+        self.blind_selector = BlindSelector::generate(self);
     }
 
     pub(crate) fn finish_blind(&mut self) -> Option<BlindPayout> {

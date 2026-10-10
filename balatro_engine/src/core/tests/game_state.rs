@@ -2,7 +2,9 @@ use super::*;
 
 use crate::core::blind::{BlindKind, calculate_score, score_played_hand};
 use crate::core::card::Card;
-use crate::core::enums::{BossBlinds, Decks, Edition, Enhancement, Rank, Seal, Stakes, Suit};
+use crate::core::enums::{
+    BossBlinds, Decks, Edition, Enhancement, Rank, Seal, SkipTag, Stakes, Suit,
+};
 use crate::core::hand::Hand;
 use crate::core::joker::Joker;
 use crate::core::joker::TriggerEvent;
@@ -178,6 +180,45 @@ fn boss_pool_unlocks_by_ante_and_uses_showdowns_at_ante_eight() {
     state.counters.ante = 8;
     let showdown = state.random_boss_blind();
     assert!(BossBlinds::SHOWDOWN.contains(&showdown));
+}
+
+#[test]
+fn blind_selector_contains_the_three_blind_choices_and_regenerates_by_ante() {
+    let mut state = GameState::new(24);
+    let initial = state.blind_selector;
+
+    assert_eq!(initial.small().kind, BlindKind::Small);
+    assert_eq!(initial.big().kind, BlindKind::Big);
+    assert!(matches!(initial.boss().kind, BlindKind::Boss(_)));
+    assert!(SkipTag::ALL.contains(&initial.small().skip_tag));
+    assert!(SkipTag::ALL.contains(&initial.big().skip_tag));
+    assert!(SkipTag::ALL.contains(&initial.boss().skip_tag));
+
+    state.begin_next_ante();
+    assert_eq!(state.counters.ante, 2);
+    assert_eq!(state.blind_selector.small().kind, BlindKind::Small);
+    assert_eq!(state.blind_selector.big().kind, BlindKind::Big);
+
+    state.counters.ante = 7;
+    state.begin_next_ante();
+    assert_eq!(state.counters.ante, 8);
+    let boss = match state.blind_selector.boss().kind {
+        BlindKind::Boss(boss) => boss,
+        _ => panic!("selector boss choice must be a boss blind"),
+    };
+    assert!(BossBlinds::SHOWDOWN.contains(&boss));
+}
+
+#[test]
+fn regular_and_finisher_boss_encounters_use_separate_histories() {
+    let mut state = GameState::new(25);
+    let regular_before = state.regular_boss_blinds.total();
+
+    state.counters.ante = 7;
+    state.begin_next_ante();
+
+    assert_eq!(state.regular_boss_blinds.total(), regular_before);
+    assert_eq!(state.finisher_boss_blinds.total(), 1);
 }
 
 #[test]

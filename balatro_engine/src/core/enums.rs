@@ -133,6 +133,7 @@ pub(crate) enum BossBlinds {
     CeruleanBell = 28,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum SkipTag {
     Uncommon = 1,
     Rare = 2,
@@ -158,6 +159,35 @@ pub(crate) enum SkipTag {
     Speed = 22,
     Orbital = 23,
     Economy = 24,
+}
+
+impl SkipTag {
+    pub(crate) const ALL: [SkipTag; 24] = [
+        SkipTag::Uncommon,
+        SkipTag::Rare,
+        SkipTag::Negative,
+        SkipTag::Foil,
+        SkipTag::Holographic,
+        SkipTag::Polychrome,
+        SkipTag::Investment,
+        SkipTag::Voucher,
+        SkipTag::Boss,
+        SkipTag::Standard,
+        SkipTag::Charm,
+        SkipTag::Meteor,
+        SkipTag::Buffoon,
+        SkipTag::Handy,
+        SkipTag::Garbage,
+        SkipTag::Ethereal,
+        SkipTag::Coupon,
+        SkipTag::Double,
+        SkipTag::Juggle,
+        SkipTag::D6,
+        SkipTag::TopUp,
+        SkipTag::Speed,
+        SkipTag::Orbital,
+        SkipTag::Economy,
+    ];
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

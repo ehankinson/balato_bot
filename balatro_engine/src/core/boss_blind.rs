@@ -6,6 +6,58 @@ use rand::prelude::RngExt;
 use rand::rngs::StdRng;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RegularBossBlindHistory {
+    appearances: [u16; 23],
+}
+
+impl RegularBossBlindHistory {
+    pub(crate) const fn new() -> RegularBossBlindHistory {
+        RegularBossBlindHistory {
+            appearances: [0; 23],
+        }
+    }
+
+    pub(crate) fn count(&self, boss: BossBlinds) -> u16 {
+        self.appearances[boss as usize - 1]
+    }
+
+    pub(crate) fn record(&mut self, boss: BossBlinds) {
+        let count = &mut self.appearances[boss as usize - 1];
+        *count = count.saturating_add(1);
+    }
+
+    pub(crate) fn total(&self) -> u16 {
+        self.appearances.iter().sum()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FinisherBossBlindHistory {
+    appearances: [u16; 5],
+}
+
+impl FinisherBossBlindHistory {
+    pub(crate) const fn new() -> FinisherBossBlindHistory {
+        FinisherBossBlindHistory {
+            appearances: [0; 5],
+        }
+    }
+
+    pub(crate) fn count(&self, boss: BossBlinds) -> u16 {
+        self.appearances[boss as usize - BossBlinds::AmberAcorn as usize]
+    }
+
+    pub(crate) fn record(&mut self, boss: BossBlinds) {
+        let count = &mut self.appearances[boss as usize - BossBlinds::AmberAcorn as usize];
+        *count = count.saturating_add(1);
+    }
+
+    pub(crate) fn total(&self) -> u16 {
+        self.appearances.iter().sum()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BossBlindRule {
     pub(crate) minimum_ante: u8,
     pub(crate) target_multiplier: u8,

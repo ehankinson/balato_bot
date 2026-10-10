@@ -1,4 +1,5 @@
 pub(crate) mod blind;
+pub(crate) mod blind_selector;
 pub(crate) mod boss_blind;
 pub(crate) mod card;
 pub(crate) mod consumable;
