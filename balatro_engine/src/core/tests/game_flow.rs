@@ -227,6 +227,10 @@ fn skipped_tag_packs_use_the_same_selection_with_a_blind_return_point() {
         game.apply_action(GameAction::SkipBlind(BlindKind::Small)),
         Ok(DecisionPoint::PackSelection)
     );
+    assert_eq!(
+        game.pending_pack.as_ref().unwrap().previous_state,
+        DecisionPoint::BlindSelection
+    );
     assert_eq!(game.next_step(), DecisionPoint::PackSelection);
 
     assert_eq!(
@@ -234,6 +238,36 @@ fn skipped_tag_packs_use_the_same_selection_with_a_blind_return_point() {
         Ok(DecisionPoint::BlindSelection)
     );
     assert!(game.state.tag_pack_openings.is_empty());
+}
+
+#[test]
+fn shop_packs_store_shop_as_the_previous_state() {
+    let mut game = Game::new(38);
+    game.state.money = 100;
+    game.enter_shop().unwrap();
+    game.shop_mut().unwrap().packs.clear();
+    game.shop_mut()
+        .unwrap()
+        .add_pack(ShopPack::new(
+            BoosterPackKind::Standard,
+            BoosterPackSize::Normal,
+            1,
+        ))
+        .unwrap();
+
+    assert_eq!(
+        game.apply_action(GameAction::BuyPack(0)),
+        Ok(DecisionPoint::PackSelection)
+    );
+    assert_eq!(
+        game.pending_pack.as_ref().unwrap().previous_state,
+        DecisionPoint::Shop
+    );
+
+    assert_eq!(
+        game.apply_action(GameAction::SelectPackOptions(vec![0])),
+        Ok(DecisionPoint::Shop)
+    );
 }
 
 #[test]
@@ -322,6 +356,27 @@ fn action_dispatch_covers_shop_and_pack_decisions() {
         game.apply_action(GameAction::LeaveShop),
         Ok(DecisionPoint::BlindSelection)
     );
+}
+
+#[test]
+fn leaving_the_shop_materializes_perkeos_negative_consumable_copy() {
+    let mut game = Game::new(27);
+    game.state
+        .add_consumable(Consumable::Tarot(Tarot::Hermit))
+        .unwrap();
+    game.state
+        .jokers
+        .add(Joker::create_joker(JokerKind::Perkeo));
+    game.enter_shop().unwrap();
+
+    assert_eq!(
+        game.apply_action(GameAction::LeaveShop),
+        Ok(DecisionPoint::BlindSelection)
+    );
+    assert_eq!(game.state.consumables.len(), 2);
+    assert!(game.state.consumables.iter().any(|consumable| {
+        consumable.negative && consumable.consumable == Consumable::Tarot(Tarot::Hermit)
+    }));
 }
 
 #[test]

@@ -44,10 +44,7 @@ pub(crate) fn calculate_score(
     };
     let before_played_jokers = jokers.before_played_indices().collect::<Vec<_>>();
     for joker_index in before_played_jokers {
-        let effect = jokers
-            .get_mut(joker_index)
-            .expect("before-played Joker index must remain valid")
-            .trigger(&before_played_event, state, joker_count);
+        let effect = jokers.trigger_at(joker_index, &before_played_event, state, joker_count);
         chips = apply_chip_effect(chips, effect.chips);
         mult += effect.add_mult as f32;
         mult *= effect.x_mult;
@@ -74,10 +71,7 @@ pub(crate) fn calculate_score(
 
         let mut trigger_count = 1u8;
         for &joker_index in &played_retrigger_jokers {
-            let effect = jokers
-                .get_mut(joker_index)
-                .expect("retrigger Joker index must remain valid")
-                .trigger_retrigger(&event, state);
+            let effect = jokers.trigger_retrigger_at(joker_index, &event, state);
             trigger_count = trigger_count.saturating_add(effect.retriggers);
         }
 
@@ -88,10 +82,7 @@ pub(crate) fn calculate_score(
             mult *= card_values.x_mult;
 
             for &joker_index in &on_played_scoring_jokers {
-                let effect = jokers
-                    .get_mut(joker_index)
-                    .expect("scoring Joker index must remain valid")
-                    .trigger_scoring(&event, state, joker_count);
+                let effect = jokers.trigger_scoring_at(joker_index, &event, state, joker_count);
                 chips = apply_chip_effect(chips, effect.chips);
                 mult += effect.add_mult as f32;
                 mult *= effect.x_mult;
@@ -119,10 +110,7 @@ pub(crate) fn calculate_score(
             }
 
             for &joker_index in &on_held_scoring_jokers {
-                let effect = jokers
-                    .get_mut(joker_index)
-                    .expect("held scoring Joker index must remain valid")
-                    .trigger_held_scoring(&event, state);
+                let effect = jokers.trigger_held_scoring_at(joker_index, &event, state);
                 chips = apply_chip_effect(chips, effect.chips);
                 mult += effect.add_mult as f32;
                 mult *= effect.x_mult;
@@ -139,10 +127,12 @@ pub(crate) fn calculate_score(
         joker_count,
     };
     for &joker_index in &after_hand_scoring_jokers {
-        let effect = jokers
-            .get_mut(joker_index)
-            .expect("after-hand scoring Joker index must remain valid")
-            .trigger_after_hand_scoring(&after_hand_event, state, joker_count);
+        let effect = jokers.trigger_after_hand_scoring_at(
+            joker_index,
+            &after_hand_event,
+            state,
+            joker_count,
+        );
         chips = apply_chip_effect(chips, effect.chips);
         mult += effect.add_mult as f32;
         mult *= effect.x_mult;

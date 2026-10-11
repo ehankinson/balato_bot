@@ -1,7 +1,7 @@
 use super::*;
 
 use crate::core::card::Card;
-use crate::core::enums::{Edition, Enhancement, PokerHand, Rank, Seal, Suit};
+use crate::core::enums::{Consumable, Edition, Enhancement, PokerHand, Rank, Seal, Suit, Tarot};
 use crate::core::game::GameState;
 use crate::core::joker_types::{GenerateType, JokerKind};
 
@@ -223,6 +223,74 @@ fn perkeo_updates_at_shop_close_and_invisible_waits_two_rounds() {
     assert_eq!(
         invisible.sell(0, &mut state).generated_type,
         Some(GenerateType::Joker)
+    );
+}
+
+#[test]
+fn blueprint_and_brainstorm_delegate_economy_state_retrigger_and_generation_effects() {
+    let gold = card(Rank::Ace, Enhancement::Gold);
+    let mut economy = Jokers::new();
+    economy.add(Joker::create_joker(JokerKind::Blueprint));
+    economy.add(Joker::create_joker(JokerKind::GoldenTicket));
+    let mut state = GameState::new(32);
+    economy.trigger(
+        TriggerEvent::PlayedCard {
+            card: &gold,
+            played_cards: std::slice::from_ref(&gold),
+            held_cards: &[],
+            card_index: 0,
+            hand_type: Some(PokerHand::HighCard),
+            hands_remaining: 4,
+        },
+        &mut state,
+    );
+    assert_eq!(state.money, 8);
+
+    let mut game_state_copy = Jokers::new();
+    game_state_copy.add(Joker::create_joker(JokerKind::Blueprint));
+    game_state_copy.add(Joker::create_joker(JokerKind::Burglar));
+    let mut state = GameState::new(34);
+    let effect = game_state_copy.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
+    assert_eq!(effect.hands, 6);
+    assert_eq!(effect.discards, -8);
+    assert_eq!(state.blind.hands_remaining, 10);
+    assert_eq!(state.blind.discards_remaining, 0);
+
+    let held = card(Rank::Queen, Enhancement::None);
+    let mut retriggers = Jokers::new();
+    retriggers.add(Joker::create_joker(JokerKind::Blueprint));
+    retriggers.add(Joker::create_joker(JokerKind::Mime));
+    let mut state = GameState::new(35);
+    let effect = retriggers.trigger(
+        TriggerEvent::HeldCard {
+            card: &held,
+            held_cards: std::slice::from_ref(&held),
+            card_index: 0,
+        },
+        &mut state,
+    );
+    assert_eq!(effect.retriggers, 2);
+    assert_eq!(retriggers.mime_count(), 2);
+
+    let mut generated = Jokers::new();
+    generated.add(Joker::create_joker(JokerKind::Blueprint));
+    generated.add(Joker::create_joker(JokerKind::Perkeo));
+    let mut state = GameState::new(36);
+    state.consumable_capacity = 4;
+    state
+        .add_consumable(Consumable::Tarot(Tarot::Hermit))
+        .unwrap();
+    state.jokers = generated;
+    let effect = state.update_jokers(UpdateEvent::ShopClosed);
+    assert_eq!(effect.generated, 2);
+    assert_eq!(state.consumables.len(), 3);
+    assert_eq!(
+        state
+            .consumables
+            .iter()
+            .filter(|item| item.negative)
+            .count(),
+        2
     );
 }
 

@@ -7,7 +7,7 @@ use crate::core::game::GameState;
 use crate::core::joker::{Joker, JokerData, JokerStructure};
 use crate::core::joker_types::JokerUpdate::*;
 use crate::core::joker_types::{
-    GenerateType, JokerKind, JokerTrigger, JokerUpdate, RetriggerTarget,
+    CopyType, GenerateType, JokerKind, JokerTrigger, JokerUpdate, RetriggerTarget,
 };
 
 /// One-shot events. All payloads borrow the current game objects so dispatch
@@ -332,7 +332,12 @@ impl Jokers {
         self.after_hand.clear();
         self.played_retriggers.clear();
 
-        for (index, joker) in self.jokers.iter().enumerate() {
+        for index in 0..self.jokers.len() {
+            let Some(effective_index) = self.effective_index(index) else {
+                continue;
+            };
+            let joker = &self.jokers[effective_index];
+
             if let JokerStructure::Normal(JokerData::Retrigger(data)) = &joker.structure {
                 if !matches!(data.target, RetriggerTarget::HeldCards) {
                     self.played_retriggers.push(index);
@@ -350,16 +355,116 @@ impl Jokers {
         }
     }
 
+    fn effective_index(&self, index: usize) -> Option<usize> {
+        if index >= self.jokers.len() {
+            return None;
+        }
+
+        let mut current = index;
+        for _ in 0..self.jokers.len() {
+            let next = match &self.jokers[current].structure {
+                JokerStructure::Copy(CopyType::Right) => current.checked_add(1),
+                JokerStructure::Copy(CopyType::LeftMost) => (current > 0).then_some(0),
+                JokerStructure::Normal(_) => return Some(current),
+            }?;
+            if next >= self.jokers.len() || next == current {
+                return None;
+            }
+            current = next;
+        }
+        None
+    }
+
+    pub(crate) fn trigger_at(
+        &mut self,
+        index: usize,
+        event: &TriggerEvent<'_>,
+        game_state: &mut GameState,
+        joker_count: u8,
+    ) -> JokerEffect {
+        let Some(effective_index) = self.effective_index(index) else {
+            return JokerEffect::default();
+        };
+        if self.jokers[index].debuffed {
+            return JokerEffect::default();
+        }
+        self.jokers[effective_index].trigger(event, game_state, joker_count)
+    }
+
+    pub(crate) fn trigger_scoring_at(
+        &mut self,
+        index: usize,
+        event: &TriggerEvent<'_>,
+        game_state: &mut GameState,
+        joker_count: u8,
+    ) -> JokerScoringEffect {
+        let Some(effective_index) = self.effective_index(index) else {
+            return JokerScoringEffect::default();
+        };
+        if self.jokers[index].debuffed {
+            return JokerScoringEffect::default();
+        }
+        self.jokers[effective_index].trigger_scoring(event, game_state, joker_count)
+    }
+
+    pub(crate) fn trigger_held_scoring_at(
+        &mut self,
+        index: usize,
+        event: &TriggerEvent<'_>,
+        game_state: &mut GameState,
+    ) -> JokerScoringEffect {
+        let Some(effective_index) = self.effective_index(index) else {
+            return JokerScoringEffect::default();
+        };
+        if self.jokers[index].debuffed {
+            return JokerScoringEffect::default();
+        }
+        self.jokers[effective_index].trigger_held_scoring(event, game_state)
+    }
+
+    pub(crate) fn trigger_after_hand_scoring_at(
+        &mut self,
+        index: usize,
+        event: &TriggerEvent<'_>,
+        game_state: &mut GameState,
+        joker_count: u8,
+    ) -> JokerScoringEffect {
+        let Some(effective_index) = self.effective_index(index) else {
+            return JokerScoringEffect::default();
+        };
+        if self.jokers[index].debuffed {
+            return JokerScoringEffect::default();
+        }
+        self.jokers[effective_index].trigger_after_hand_scoring(event, game_state, joker_count)
+    }
+
+    pub(crate) fn trigger_retrigger_at(
+        &mut self,
+        index: usize,
+        event: &TriggerEvent<'_>,
+        game_state: &mut GameState,
+    ) -> JokerRetriggerEffect {
+        let Some(effective_index) = self.effective_index(index) else {
+            return JokerRetriggerEffect::default();
+        };
+        if self.jokers[index].debuffed {
+            return JokerRetriggerEffect::default();
+        }
+        self.jokers[effective_index].trigger_retrigger(event, game_state)
+    }
+
     pub(crate) fn on_played_jokers(&self) -> impl Iterator<Item = &Joker> {
         self.on_played.iter().map(|&index| &self.jokers[index])
     }
 
     pub(crate) fn on_played_scoring_indices(&self) -> impl Iterator<Item = usize> + '_ {
         self.on_played.iter().copied().filter(|&index| {
-            matches!(
-                self.jokers[index].structure,
-                JokerStructure::Normal(JokerData::Scoring(_))
-            )
+            self.effective_index(index).is_some_and(|effective_index| {
+                matches!(
+                    self.jokers[effective_index].structure,
+                    JokerStructure::Normal(JokerData::Scoring(_))
+                )
+            })
         })
     }
 
@@ -369,20 +474,24 @@ impl Jokers {
 
     pub(crate) fn on_held_scoring_indices(&self) -> impl Iterator<Item = usize> + '_ {
         self.on_held.iter().copied().filter(|&index| {
-            matches!(
-                self.jokers[index].structure,
-                JokerStructure::Normal(JokerData::Scoring(_))
-            )
+            self.effective_index(index).is_some_and(|effective_index| {
+                matches!(
+                    self.jokers[effective_index].structure,
+                    JokerStructure::Normal(JokerData::Scoring(_))
+                )
+            })
         })
     }
 
     pub(crate) fn after_hand_scoring_indices(&self) -> impl Iterator<Item = usize> + '_ {
         self.jokers.iter().enumerate().filter_map(|(index, joker)| {
             let is_after_hand_scoring = self.after_hand.contains(&index)
-                && matches!(
-                    joker.structure,
-                    JokerStructure::Normal(JokerData::Scoring(_))
-                );
+                && self.effective_index(index).is_some_and(|effective_index| {
+                    matches!(
+                        self.jokers[effective_index].structure,
+                        JokerStructure::Normal(JokerData::Scoring(_))
+                    )
+                });
             if is_after_hand_scoring || joker.has_scoring_edition() {
                 Some(index)
             } else {
@@ -392,9 +501,12 @@ impl Jokers {
     }
 
     pub(crate) fn mime_count(&self) -> usize {
-        self.jokers
-            .iter()
-            .filter(|joker| joker.kind() == JokerKind::Mime)
+        (0..self.jokers.len())
+            .filter(|&index| {
+                self.effective_index(index).is_some_and(|effective_index| {
+                    self.jokers[effective_index].kind() == JokerKind::Mime
+                })
+            })
             .count()
     }
 
@@ -518,8 +630,8 @@ impl Jokers {
     pub fn trigger(&mut self, event: TriggerEvent<'_>, game_state: &mut GameState) -> JokerEffect {
         let mut effect = JokerEffect::default();
         let joker_count = self.jokers.len() as u8;
-        for joker in &mut self.jokers {
-            effect.merge(joker.trigger(&event, game_state, joker_count));
+        for index in 0..self.jokers.len() {
+            effect.merge(self.trigger_at(index, &event, game_state, joker_count));
         }
         apply_game_effect(&effect, game_state);
         effect
@@ -530,11 +642,19 @@ impl Jokers {
         let mut effect = JokerEffect::default();
         let mut remove_self = Vec::new();
 
-        for (index, joker) in self.jokers.iter_mut().enumerate() {
-            if joker.update_mask & event_kind.mask() == 0 {
+        for index in 0..self.jokers.len() {
+            let update_mask = self
+                .effective_index(index)
+                .and_then(|effective_index| self.jokers.get(effective_index))
+                .map(|joker| joker.update_mask)
+                .unwrap_or_default();
+            if update_mask & event_kind.mask() == 0 {
                 continue;
             }
-            let joker_effect = joker.update(&event, game_state);
+            let Some(effective_index) = self.effective_index(index) else {
+                continue;
+            };
+            let joker_effect = self.jokers[effective_index].update(&event, game_state);
             if joker_effect.remove_self {
                 remove_self.push(index);
             }

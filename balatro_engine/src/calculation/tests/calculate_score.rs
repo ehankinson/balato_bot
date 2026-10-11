@@ -204,6 +204,65 @@ fn joker_editions_are_applied_in_the_after_hand_phase() {
     assert_eq!(result.score, 37.0);
 }
 
+#[test]
+fn blueprint_and_brainstorm_copy_scoring_jokers() {
+    let played = card(Rank::Four, Suit::Clubs);
+
+    let blueprint_score = score_scenario(
+        std::slice::from_ref(&played),
+        &[],
+        &[
+            Joker::create_joker(JokerKind::Blueprint),
+            Joker::create_joker(JokerKind::OnyxAgate),
+        ],
+    );
+    assert_eq!(blueprint_score, 135.0);
+
+    let brainstorm_score = score_scenario(
+        std::slice::from_ref(&played),
+        &[],
+        &[
+            Joker::create_joker(JokerKind::OnyxAgate),
+            Joker::create_joker(JokerKind::Brainstorm),
+        ],
+    );
+    assert_eq!(brainstorm_score, 135.0);
+}
+
+#[test]
+fn copy_jokers_delegate_without_replacing_their_collection_entries() {
+    let played = card(Rank::Four, Suit::Clubs);
+    let (hand_type, scoring_data) = scoring_data_for(std::slice::from_ref(&played), &[]);
+    let mut state = GameState::new(6);
+    state.jokers.add(Joker::create_joker(JokerKind::Blueprint));
+    state.jokers.add(Joker::create_joker(JokerKind::OnyxAgate));
+
+    let before = state
+        .jokers
+        .as_slice()
+        .iter()
+        .map(Joker::kind)
+        .collect::<Vec<_>>();
+    let hand_indices = vec![0];
+
+    calculate_score(
+        &mut state,
+        std::slice::from_ref(&played),
+        &[],
+        &hand_indices,
+        hand_type,
+        scoring_data,
+    );
+
+    let after = state
+        .jokers
+        .as_slice()
+        .iter()
+        .map(Joker::kind)
+        .collect::<Vec<_>>();
+    assert_eq!(after, before);
+}
+
 fn scoring_data_for(played: &[Card], held: &[Card]) -> (PokerHand, ScoringData) {
     let played_ids = played.iter().map(Card::id).collect::<Vec<_>>();
     let detected = determine_poker_hand(&played_ids).expect("test hand should be valid");

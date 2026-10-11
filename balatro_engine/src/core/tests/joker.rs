@@ -154,14 +154,19 @@ fn joker_categories_track_ordered_indices_for_each_behavior() {
         jokers.add(Joker::create_joker(kind));
     }
 
-    assert_eq!(jokers.on_played, vec![0, 2, 5]);
+    assert_eq!(jokers.on_played, vec![0, 2, 4, 5]);
     assert_eq!(jokers.on_held, vec![1]);
-    assert_eq!(jokers.played_retriggers, vec![2, 5]);
+    assert_eq!(jokers.played_retriggers, vec![2, 4, 5]);
     assert_eq!(
         jokers
             .on_played_jokers()
             .map(Joker::kind)
             .collect::<Vec<_>>(),
-        vec![JokerKind::Greedy, JokerKind::Hack, JokerKind::Dusk]
+        vec![
+            JokerKind::Greedy,
+            JokerKind::Hack,
+            JokerKind::Blueprint,
+            JokerKind::Dusk,
+        ]
     );
 }

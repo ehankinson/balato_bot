@@ -10,6 +10,7 @@ use crate::core::deck::Deck;
 use crate::core::enums::{BossBlinds, Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
+use crate::core::joker_types::GenerateType;
 use crate::core::pack::{PackError, PackOpening};
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::tag::TagState;
@@ -799,6 +800,17 @@ impl GameState {
         let mut jokers = std::mem::replace(&mut self.jokers, Jokers::new());
         let effect = jokers.update(event, self);
         self.jokers = jokers;
+        if effect.generated_type == Some(GenerateType::NegativeConsumable) {
+            for _ in 0..effect.generated {
+                let Some(consumable) = self.consumables.choose(&mut self.rng).copied() else {
+                    break;
+                };
+                let _ = self.add_owned_consumable(OwnedConsumable::negative(
+                    consumable.consumable,
+                    consumable.original_price,
+                ));
+            }
+        }
         effect
     }
 }
@@ -812,14 +824,9 @@ pub struct Game {
     pending_pack: Option<PendingPack>,
 }
 
-enum PackReturn {
-    Shop,
-    BlindSelection,
-}
-
 struct PendingPack {
     opening: PackOpening,
-    return_point: PackReturn,
+    previous_state: DecisionPoint,
 }
 
 impl Game {
@@ -863,7 +870,7 @@ impl Game {
             let opening = self.state.tag_pack_openings.remove(0);
             self.pending_pack = Some(PendingPack {
                 opening,
-                return_point: PackReturn::BlindSelection,
+                previous_state: DecisionPoint::BlindSelection,
             });
         }
 
@@ -939,7 +946,7 @@ impl Game {
                 self.state.shop = shop;
                 self.pending_pack = Some(PendingPack {
                     opening: result.map_err(ActionError::Shop)?,
-                    return_point: PackReturn::Shop,
+                    previous_state: DecisionPoint::Shop,
                 });
                 self.decision_point = DecisionPoint::PackSelection;
             }
@@ -951,10 +958,7 @@ impl Game {
                 self.state
                     .select_pack_options(pending.opening, &selections)
                     .map_err(ActionError::Pack)?;
-                self.decision_point = match pending.return_point {
-                    PackReturn::Shop => DecisionPoint::Shop,
-                    PackReturn::BlindSelection => DecisionPoint::BlindSelection,
-                };
+                self.decision_point = pending.previous_state;
                 self.open_next_tag_pack();
             }
             GameAction::UseConsumable { index, target } => {
@@ -1042,10 +1046,13 @@ impl Game {
     }
 
     pub(crate) fn leave_shop(&mut self) -> Option<()> {
-        self.shop_active.then_some(()).inspect(|_| {
-            self.shop_active = false;
-            self.decision_point = DecisionPoint::BlindSelection;
-        })
+        if !self.shop_active {
+            return None;
+        }
+        self.state.update_jokers(UpdateEvent::ShopClosed);
+        self.shop_active = false;
+        self.decision_point = DecisionPoint::BlindSelection;
+        Some(())
     }
 }
 
