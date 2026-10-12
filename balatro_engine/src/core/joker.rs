@@ -8,10 +8,8 @@ use rand::rngs::StdRng;
 
 #[path = "joker_events.rs"]
 mod events;
-pub use events::{
-    JokerEconomyEffect, JokerEffect, JokerGameStateEffect, JokerGenerateEffect,
-    JokerRetriggerEffect, JokerScoringEffect, Jokers, TriggerEvent, UpdateEvent,
-};
+pub(crate) use events::{GeneratedConsumable, JokerContext, JokerOperation};
+pub use events::{JokerEffect, JokerScoringEffect, Jokers, TriggerEvent, UpdateEvent};
 
 #[derive(Clone)]
 pub struct Joker {
@@ -62,6 +60,9 @@ impl Joker {
     }
 
     pub(crate) fn edition_scoring_effect(&self) -> JokerScoringEffect {
+        if self.debuffed {
+            return JokerScoringEffect::default();
+        }
         match self.edition {
             JokerEdition::Foil => JokerScoringEffect {
                 chips: 50,
@@ -851,7 +852,7 @@ impl Joker {
                 (
                     8,
                     JokerRarity::Rare,
-                    JokerTrigger::OnPlayedCard,
+                    JokerTrigger::OnHandPlayed,
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
@@ -890,7 +891,7 @@ impl Joker {
                 (
                     6,
                     JokerRarity::Uncommon,
-                    JokerTrigger::OnPlayedCard,
+                    JokerTrigger::OnHandPlayed,
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
@@ -964,14 +965,14 @@ impl Joker {
             }
             JokerKind::ToDoList => {
                 let data = JokerEcon {
-                    money: 5,
+                    money: 4,
                     ..JokerEcon::default()
                 };
 
                 (
                     4,
                     JokerRarity::Common,
-                    JokerTrigger::AfterHand,
+                    JokerTrigger::OnHandPlayed,
                     JokerStructure::Normal(JokerData::Econ(data)),
                 )
             }
@@ -1126,7 +1127,7 @@ impl Joker {
                 (
                     8,
                     JokerRarity::Rare,
-                    JokerTrigger::OnPlayedCard,
+                    JokerTrigger::OnHeldCard,
                     JokerStructure::Normal(JokerData::Scoring(data)),
                 )
             }
@@ -1176,7 +1177,7 @@ impl Joker {
                 (
                     7,
                     JokerRarity::Uncommon,
-                    JokerTrigger::OnPlayedCard,
+                    JokerTrigger::OnHandPlayed,
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
@@ -2057,7 +2058,7 @@ impl Joker {
                 (
                     8,
                     JokerRarity::Rare,
-                    JokerTrigger::AfterHand,
+                    JokerTrigger::OnDiscard,
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
@@ -2163,7 +2164,7 @@ impl Joker {
 #[derive(Clone)]
 pub struct JokerScoring {
     chips: u16,
-    add_mult: u8,
+    add_mult: u32,
     req_count: u8,
     hand_size: i8,
     x_mult: f32,

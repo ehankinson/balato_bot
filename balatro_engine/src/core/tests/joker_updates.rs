@@ -3,7 +3,22 @@ use super::*;
 use crate::core::card::Card;
 use crate::core::enums::{Consumable, Edition, Enhancement, PokerHand, Rank, Seal, Suit, Tarot};
 use crate::core::game::GameState;
-use crate::core::joker_types::{GenerateType, JokerKind};
+use crate::core::joker_types::JokerKind;
+
+fn operation_count(operation: &crate::core::joker::JokerOperation) -> u8 {
+    use crate::core::joker::JokerOperation::*;
+    match operation {
+        CopyPlayedCard { count, .. }
+        | GenerateJoker { count, .. }
+        | CopyRandomOwnedJoker { count }
+        | GenerateConsumable { count, .. }
+        | GenerateStoneCard { count }
+        | GenerateSealedCard { count }
+        | CopyNegativeConsumable { count }
+        | AddDoubleTag { count } => *count,
+        EnhancePlayedCard { .. } | UpgradeHand { .. } => 1,
+    }
+}
 
 fn card(rank: Rank, enhancement: Enhancement) -> Card {
     Card::new(rank, Suit::Spades, enhancement, Edition::None, Seal::None)
@@ -83,8 +98,35 @@ fn update_events_preserve_left_to_right_collection_order_when_removing() {
 
     let effect = jokers.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
 
-    assert_eq!(effect.add_mult, 2);
+    assert_eq!(effect.add_mult, 0);
     assert_eq!(jokers.as_slice().len(), 1);
+}
+
+#[test]
+fn todo_pays_four_before_bootstraps_scores_in_both_joker_orders() {
+    let mut outcomes = Vec::new();
+    for todo_first in [true, false] {
+        let mut state = GameState::new(809);
+        state.begin_blind_as(crate::core::blind::BlindKind::Small);
+        state.money = 4;
+        let mut todo = Joker::create_joker(JokerKind::ToDoList);
+        if let JokerStructure::Normal(JokerData::Econ(data)) = &mut todo.structure {
+            data.poker_hand = Some(PokerHand::HighCard);
+        }
+        let bootstraps = Joker::create_joker(JokerKind::Bootstraps);
+        if todo_first {
+            state.jokers.add(todo);
+            state.jokers.add(bootstraps);
+        } else {
+            state.jokers.add(bootstraps);
+            state.jokers.add(todo);
+        }
+        let mut hand = crate::core::hand::Hand::new();
+        hand.add_card(card(Rank::Two, Enhancement::None));
+        let result = state.play_hand(&mut hand, vec![0]).unwrap();
+        outcomes.push((state.money, result.mult));
+    }
+    assert_eq!(outcomes, vec![(8, 3.0), (8, 3.0)]);
 }
 
 #[test]
@@ -97,8 +139,11 @@ fn lifecycle_updates_use_the_correct_boundaries() {
         certificate.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
     let round_start = certificate.update(UpdateEvent::RoundStarted, &mut state);
 
-    assert_eq!(before_round.generated, 0);
-    assert_eq!(round_start.generated_type, Some(GenerateType::SealCard));
+    assert!(before_round.operations.is_empty());
+    assert_eq!(
+        round_start.operations[0],
+        crate::core::joker::JokerOperation::GenerateSealedCard { count: 1 }
+    );
 
     let mut rocket = Jokers::new();
     rocket.add(Joker::create_joker(JokerKind::Rocket));
@@ -133,6 +178,7 @@ fn seltzer_retrigger_expires_after_ten_hands() {
                         played_cards: std::slice::from_ref(&played),
                         held_cards: &[],
                         card_index: 0,
+                        scoring_card_indices: &[0],
                         hand_type: Some(PokerHand::HighCard),
                         hands_remaining: 4,
                     },
@@ -167,6 +213,7 @@ fn seltzer_retrigger_expires_after_ten_hands() {
                     played_cards: std::slice::from_ref(&played),
                     held_cards: &[],
                     card_index: 0,
+                    scoring_card_indices: &[0],
                     hand_type: Some(PokerHand::HighCard),
                     hands_remaining: 2,
                 },
@@ -207,22 +254,22 @@ fn perkeo_updates_at_shop_close_and_invisible_waits_two_rounds() {
     let mut state = GameState::new(24);
     let effect = perkeo.update(UpdateEvent::ShopClosed, &mut state);
     assert_eq!(
-        effect.generated_type,
-        Some(GenerateType::NegativeConsumable)
+        effect.operations[0],
+        crate::core::joker::JokerOperation::CopyNegativeConsumable { count: 1 }
     );
 
     let mut invisible = Jokers::new();
     invisible.add(Joker::create_joker(JokerKind::Invisible));
     invisible.update(UpdateEvent::RoundCompleted, &mut state);
-    assert_eq!(invisible.sell(0, &mut state).generated, 0);
+    assert!(invisible.sell(0, &mut state).operations.is_empty());
 
     let mut invisible = Jokers::new();
     invisible.add(Joker::create_joker(JokerKind::Invisible));
     invisible.update(UpdateEvent::RoundCompleted, &mut state);
     invisible.update(UpdateEvent::RoundCompleted, &mut state);
     assert_eq!(
-        invisible.sell(0, &mut state).generated_type,
-        Some(GenerateType::Joker)
+        invisible.sell(0, &mut state).operations[0],
+        crate::core::joker::JokerOperation::CopyRandomOwnedJoker { count: 1 }
     );
 }
 
@@ -239,6 +286,7 @@ fn blueprint_and_brainstorm_delegate_economy_state_retrigger_and_generation_effe
             played_cards: std::slice::from_ref(&gold),
             held_cards: &[],
             card_index: 0,
+            scoring_card_indices: &[0],
             hand_type: Some(PokerHand::HighCard),
             hands_remaining: 4,
         },
@@ -282,7 +330,7 @@ fn blueprint_and_brainstorm_delegate_economy_state_retrigger_and_generation_effe
         .unwrap();
     state.jokers = generated;
     let effect = state.update_jokers(UpdateEvent::ShopClosed);
-    assert_eq!(effect.generated, 2);
+    assert_eq!(effect.operations.iter().map(operation_count).sum::<u8>(), 2);
     assert_eq!(state.consumables.len(), 3);
     assert_eq!(
         state
@@ -314,14 +362,21 @@ fn generation_updates_emit_the_expected_kind_and_amount() {
     marble.add(Joker::create_joker(JokerKind::Marble));
     let mut state = GameState::new(26);
     let effect = marble.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
-    assert_eq!(effect.generated, 1);
-    assert_eq!(effect.generated_type, Some(GenerateType::StoneCard));
+    assert_eq!(
+        effect.operations[0],
+        crate::core::joker::JokerOperation::GenerateStoneCard { count: 1 }
+    );
 
     let mut riff_raff = Jokers::new();
     riff_raff.add(Joker::create_joker(JokerKind::RiffRaff));
     let effect = riff_raff.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
-    assert_eq!(effect.generated, 2);
-    assert_eq!(effect.generated_type, Some(GenerateType::Joker));
+    assert_eq!(
+        effect.operations[0],
+        crate::core::joker::JokerOperation::GenerateJoker {
+            rarity: crate::core::joker_types::JokerRarity::Common,
+            count: 2,
+        }
+    );
 
     let mut vagabond = Jokers::new();
     vagabond.add(Joker::create_joker(JokerKind::Vagabond));
@@ -338,8 +393,13 @@ fn generation_updates_emit_the_expected_kind_and_amount() {
         },
         &mut state,
     );
-    assert_eq!(effect.generated, 1);
-    assert_eq!(effect.generated_type, Some(GenerateType::Tarot));
+    assert_eq!(
+        effect.operations[0],
+        crate::core::joker::JokerOperation::GenerateConsumable {
+            kind: crate::core::joker::GeneratedConsumable::Tarot,
+            count: 1,
+        }
+    );
 }
 
 #[test]
@@ -805,8 +865,8 @@ fn lifecycle_edges_are_safe_for_singletons_floors_and_expiration() {
     dagger.add(Joker::create_joker(JokerKind::CeremonialDagger));
     let mut state = GameState::new(36);
     let effect = dagger.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
-    assert_eq!(effect.add_mult, 2);
-    assert!(effect.remove_rightmost_joker);
+    assert_eq!(effect.add_mult, 0);
+    assert!(effect.remove_right_joker);
     assert_eq!(dagger.as_slice().len(), 1);
 
     let mut burglar = Jokers::new();
@@ -891,7 +951,10 @@ fn probability_and_removal_lifecycle_events_are_seeded_and_bounded() {
         let mut hallucination_state = GameState::new(seed);
         if hallucination
             .update(UpdateEvent::BoosterPackOpened, &mut hallucination_state)
-            .generated
+            .operations
+            .iter()
+            .map(operation_count)
+            .sum::<u8>()
             > 0
         {
             saw_hallucination = true;
@@ -973,4 +1036,31 @@ fn yorick_levels_only_after_reaching_the_discard_threshold() {
             .x_mult,
         1.0
     );
+}
+
+#[test]
+fn independent_todo_pays_four_before_bootstraps_in_both_orders() {
+    let mut outcomes = Vec::new();
+    for todo_first in [true, false] {
+        let mut state = GameState::new(809);
+        state.begin_blind_as(crate::core::blind::BlindKind::Small);
+        state.money = 4;
+        let mut todo = Joker::create_joker(JokerKind::ToDoList);
+        if let JokerStructure::Normal(JokerData::Econ(data)) = &mut todo.structure {
+            data.poker_hand = Some(PokerHand::HighCard);
+        }
+        let bootstraps = Joker::create_joker(JokerKind::Bootstraps);
+        if todo_first {
+            state.jokers.add(todo);
+            state.jokers.add(bootstraps);
+        } else {
+            state.jokers.add(bootstraps);
+            state.jokers.add(todo);
+        }
+        let mut hand = crate::core::hand::Hand::new();
+        hand.add_card(card(Rank::Two, Enhancement::None));
+        let result = state.play_hand(&mut hand, vec![0]).unwrap();
+        outcomes.push((state.money, result.mult));
+    }
+    assert_eq!(outcomes, vec![(8, 3.0), (8, 3.0)]);
 }

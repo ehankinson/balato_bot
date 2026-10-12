@@ -19,6 +19,7 @@ fn played_effect(kind: JokerKind, card: &Card, hand_type: Option<PokerHand>) -> 
             played_cards: std::slice::from_ref(card),
             held_cards: &[],
             card_index: 0,
+            scoring_card_indices: &[0],
             hand_type,
             hands_remaining: 4,
         },
@@ -203,7 +204,7 @@ fn held_card_scoring_uses_the_held_cards_collection() {
     );
     assert_eq!(
         played_effect(JokerKind::Baron, &baron_card, None).x_mult,
-        1.5
+        1.0
     );
 }
 
@@ -580,6 +581,7 @@ fn direct_rank_and_suit_scoring_jokers_have_matching_and_negative_cases() {
                     played_cards: &face_pair,
                     held_cards: &[],
                     card_index: 1,
+                    scoring_card_indices: &[0, 1],
                     hand_type: None,
                     hands_remaining: 4,
                 },
@@ -728,6 +730,7 @@ fn initialized_target_jokers_match_both_parts_of_their_target() {
                 played_cards: std::slice::from_ref(&matching),
                 held_cards: &[],
                 card_index: 0,
+                scoring_card_indices: &[0],
                 hand_type: None,
                 hands_remaining: 4,
             },
@@ -743,6 +746,7 @@ fn initialized_target_jokers_match_both_parts_of_their_target() {
                 played_cards: std::slice::from_ref(&wrong_suit),
                 held_cards: &[],
                 card_index: 0,
+                scoring_card_indices: &[0],
                 hand_type: None,
                 hands_remaining: 4,
             },
@@ -769,6 +773,7 @@ fn initialized_target_jokers_match_both_parts_of_their_target() {
                     played_cards: std::slice::from_ref(&matching),
                     held_cards: &[],
                     card_index: 0,
+                    scoring_card_indices: &[0],
                     hand_type: None,
                     hands_remaining: 4,
                 },
@@ -793,6 +798,7 @@ fn initialized_target_jokers_match_both_parts_of_their_target() {
                     played_cards: std::slice::from_ref(&wrong_suit),
                     held_cards: &[],
                     card_index: 0,
+                    scoring_card_indices: &[0],
                     hand_type: None,
                     hands_remaining: 4,
                 },
@@ -850,6 +856,7 @@ fn bloodstone_requires_a_heart_and_a_successful_probability_roll() {
                 played_cards: std::slice::from_ref(&heart),
                 held_cards: &[],
                 card_index: 0,
+                scoring_card_indices: &[0],
                 hand_type: None,
                 hands_remaining: 4,
             },
@@ -874,6 +881,7 @@ fn bloodstone_requires_a_heart_and_a_successful_probability_roll() {
                     played_cards: std::slice::from_ref(&club),
                     held_cards: &[],
                     card_index: 0,
+                    scoring_card_indices: &[0],
                     hand_type: None,
                     hands_remaining: 4,
                 },

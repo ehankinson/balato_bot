@@ -3,7 +3,7 @@ use super::*;
 use crate::core::card::Card;
 use crate::core::enums::{Edition, Enhancement, PokerHand, Rank, Seal, Suit};
 use crate::core::game::GameState;
-use crate::core::joker_types::{GenerateType, JokerEdition, JokerKind};
+use crate::core::joker_types::{JokerEdition, JokerKind};
 
 fn card(rank: Rank, suit: Suit, enhancement: Enhancement) -> Card {
     Card::new(rank, suit, enhancement, Edition::None, Seal::None)
@@ -45,6 +45,7 @@ fn golden_ticket_pays_for_gold_played_cards() {
             played_cards: std::slice::from_ref(&gold),
             held_cards: &[],
             card_index: 0,
+            scoring_card_indices: &[0],
             hand_type: None,
             hands_remaining: 4,
         },
@@ -57,6 +58,7 @@ fn golden_ticket_pays_for_gold_played_cards() {
             played_cards: std::slice::from_ref(&plain),
             held_cards: &[],
             card_index: 0,
+            scoring_card_indices: &[0],
             hand_type: None,
             hands_remaining: 4,
         },
@@ -235,18 +237,15 @@ fn todo_list_pays_for_the_selected_hand_only() {
     let played = card(Rank::Seven, Suit::Spades, Enhancement::None);
 
     let paid = jokers.trigger(
-        TriggerEvent::AfterHand {
+        TriggerEvent::HandPlayed {
             played_cards: std::slice::from_ref(&played),
-            held_cards: &[],
-            hand_type: Some(target),
-            hands_remaining: 3,
-            discards_remaining: 4,
-            joker_count: 1,
+            scoring_card_indices: &[0],
+            hand_type: target,
         },
         &mut state,
     );
-    assert_eq!(paid.money, 5);
-    assert_eq!(state.money, 5);
+    assert_eq!(paid.money, 4);
+    assert_eq!(state.money, 4);
 
     let wrong_hand = if target == PokerHand::Pair {
         PokerHand::Flush
@@ -256,13 +255,10 @@ fn todo_list_pays_for_the_selected_hand_only() {
     assert_eq!(
         jokers
             .trigger(
-                TriggerEvent::AfterHand {
+                TriggerEvent::HandPlayed {
                     played_cards: std::slice::from_ref(&played),
-                    held_cards: &[],
-                    hand_type: Some(wrong_hand),
-                    hands_remaining: 2,
-                    discards_remaining: 4,
-                    joker_count: 1,
+                    scoring_card_indices: &[0],
+                    hand_type: wrong_hand,
                 },
                 &mut state,
             )
@@ -277,8 +273,10 @@ fn sold_jokers_apply_their_own_sale_effect_and_respect_debuffs() {
     diet_cola.add(Joker::create_joker(JokerKind::DietCola));
     let mut state = GameState::new(25);
     let effect = diet_cola.sell(0, &mut state);
-    assert_eq!(effect.generated, 1);
-    assert_eq!(effect.generated_type, Some(GenerateType::DoubleTag));
+    assert_eq!(
+        effect.operations,
+        vec![crate::core::joker::JokerOperation::AddDoubleTag { count: 1 }]
+    );
     assert!(diet_cola.as_slice().is_empty());
 
     let mut debuffed_diet_cola = Jokers::new();

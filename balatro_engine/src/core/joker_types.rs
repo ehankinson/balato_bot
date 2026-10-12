@@ -155,6 +155,43 @@ pub(crate) enum JokerKind {
 }
 
 impl JokerKind {
+    /// Blueprint/Brainstorm compatibility for the 150-Joker ruleset.
+    /// Source: https://balatrogame.fandom.com/wiki/Blueprint#Incompatible_Jokers
+    pub(crate) fn copy_compatible(self) -> bool {
+        !matches!(
+            self,
+            Self::Astronomer
+                | Self::ChaosTheClown
+                | Self::Chicot
+                | Self::Cloud9
+                | Self::CreditCard
+                | Self::DelayedGratification
+                | Self::Drunkard
+                | Self::Egg
+                | Self::FourFingers
+                | Self::GiftCard
+                | Self::Golden
+                | Self::Invisible
+                | Self::Juggler
+                | Self::MerryAndy
+                | Self::MidasMask
+                | Self::MrBones
+                | Self::OopsAll6s
+                | Self::Pareidolia
+                | Self::Rocket
+                | Self::Satellite
+                | Self::Shortcut
+                | Self::Showman
+                | Self::SixthSense
+                | Self::Smeared
+                | Self::Splash
+                | Self::ToTheMoon
+                | Self::TradingCard
+                | Self::Troubadour
+                | Self::TurtleBean
+        )
+    }
+
     pub(crate) const ALL: [JokerKind; 150] = [
         JokerKind::Joker,
         JokerKind::Greedy,
@@ -325,6 +362,7 @@ pub(crate) enum JokerTrigger {
     OnHeldCard = 3,
     BeforePlayedCards = 4,
     None = 5,
+    OnHandPlayed = 6,
     OnDiscard = 8,
     OnBossBlindAbility = 9,
 }
@@ -365,7 +403,6 @@ pub(crate) enum GenerateType {
     Gold = 7,
     PlanetLevel = 8,
     NegativeConsumable = 9,
-    DoubleTag = 10,
 }
 
 #[derive(Clone)]

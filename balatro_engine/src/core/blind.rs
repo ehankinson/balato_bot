@@ -1,5 +1,5 @@
-pub(crate) use crate::calculation::calculate_score::ScoreResult;
-use crate::calculation::calculate_score::calculate_score as calculate_score_impl;
+pub(crate) use crate::calculation::execute_hand::ScoreResult;
+use crate::calculation::execute_hand::execute_hand as execute_hand_impl;
 use crate::calculation::poker::determine_poker_hand;
 pub(crate) use crate::core::boss_blind::BlindPlayError;
 use crate::core::card::Card;
@@ -81,10 +81,11 @@ pub(crate) fn score_played_hand(
     ScoringData::from_played_hand(hand, selected_indices)
 }
 
-pub(crate) fn calculate_score(
+pub(crate) fn execute_hand(
     state: &mut GameState,
-    hand: &Hand,
+    hand: &mut Hand,
     selected_indices: &[usize],
+    played_cards_out: &mut Vec<Card>,
 ) -> Option<ScoreResult> {
     let (hand_type, mut scoring_data) = score_played_hand(hand, selected_indices)?;
     state
@@ -102,32 +103,21 @@ pub(crate) fn calculate_score(
         state.money = state.money.saturating_sub(selected_indices.len() as i16);
     }
 
-    let played_cards = selected_indices
-        .iter()
-        .map(|&index| hand.card(index).cloned())
-        .collect::<Option<Vec<_>>>()?;
-    let held_cards = hand
-        .cards()
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| !selected_indices.contains(index))
-        .map(|(_, card)| card.clone())
-        .collect::<Vec<_>>();
-    let mut played_cards = played_cards;
+    let mut played_cards =
+        hand.select_cards(selected_indices.iter().map(|&index| index as u8).collect());
     for card in &mut played_cards {
         let pillar_debuffed = matches!(state.blind.kind, BlindKind::Boss(BossBlinds::Pillar))
             && state.pillar_card_ids.contains(&card.id());
         card.set_debuffed(state.blind.card_is_debuffed(card) || pillar_debuffed);
     }
-    let mut held_cards = held_cards;
-    for card in &mut held_cards {
+    for card in hand.cards_mut() {
         card.set_debuffed(state.blind.card_is_debuffed(card));
     }
-    scoring_data.scoring_held_cards = scoring_cards(&card_ids(&held_cards));
-    let result = calculate_score_impl(
+    scoring_data.scoring_held_cards = scoring_cards(&card_ids(hand.cards()));
+    let result = execute_hand_impl(
         state,
-        &played_cards,
-        &held_cards,
+        &mut played_cards,
+        hand,
         selected_indices,
         hand_type,
         scoring_data,
@@ -141,6 +131,7 @@ pub(crate) fn calculate_score(
     {
         state.jokers.disable_random(&mut state.rng);
     }
+    *played_cards_out = played_cards;
     Some(result)
 }
 

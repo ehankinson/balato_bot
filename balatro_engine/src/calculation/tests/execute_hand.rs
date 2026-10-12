@@ -1,14 +1,23 @@
-use crate::calculation::calculate_score::calculate_score;
+use crate::calculation::execute_hand::execute_hand;
 use crate::calculation::poker::determine_poker_hand;
 use crate::core::blind::{ScoringCard, ScoringData};
 use crate::core::card::Card;
 use crate::core::enums::{Edition, Enhancement, PokerHand, Rank, Seal, Suit};
 use crate::core::game::GameState;
+use crate::core::hand::Hand;
 use crate::core::joker::Joker;
 use crate::core::joker_types::{JokerEdition, JokerKind};
 
 fn card(rank: Rank, suit: Suit) -> Card {
     Card::new(rank, suit, Enhancement::None, Edition::None, Seal::None)
+}
+
+fn hand_from_cards(cards: &[Card]) -> Hand {
+    let mut hand = Hand::new();
+    for card in cards {
+        hand.add_card(card.clone());
+    }
+    hand
 }
 
 #[test]
@@ -32,10 +41,10 @@ fn played_card_retriggers_repeat_card_scoring() {
         }],
         ..ScoringData::default()
     };
-    let result = calculate_score(
+    let result = execute_hand(
         &mut state,
-        std::slice::from_ref(&card),
-        &[],
+        &mut [card.clone()],
+        &mut Hand::new(),
         &[0],
         PokerHand::HighCard,
         scoring_data,
@@ -79,10 +88,10 @@ fn mime_retriggers_all_held_scoring_jokers() {
         }],
         ..ScoringData::default()
     };
-    let result = calculate_score(
+    let result = execute_hand(
         &mut state,
-        std::slice::from_ref(&played),
-        std::slice::from_ref(&held),
+        &mut [played.clone()],
+        &mut hand_from_cards(std::slice::from_ref(&held)),
         &[0],
         PokerHand::HighCard,
         scoring_data,
@@ -122,10 +131,10 @@ fn steel_is_the_only_held_card_score_without_joker_intervention() {
         ..ScoringData::default()
     };
 
-    let result = calculate_score(
+    let result = execute_hand(
         &mut state,
-        std::slice::from_ref(&played),
-        std::slice::from_ref(&held),
+        &mut [played.clone()],
+        &mut hand_from_cards(std::slice::from_ref(&held)),
         &[0],
         PokerHand::HighCard,
         scoring_data,
@@ -155,10 +164,10 @@ fn after_hand_scoring_jokers_apply_after_held_cards() {
         }],
         ..ScoringData::default()
     };
-    let result = calculate_score(
+    let result = execute_hand(
         &mut state,
-        std::slice::from_ref(&played),
-        &[],
+        &mut [played.clone()],
+        &mut Hand::new(),
         &[0],
         PokerHand::HighCard,
         scoring_data,
@@ -190,10 +199,10 @@ fn joker_editions_are_applied_in_the_after_hand_phase() {
         }],
         ..ScoringData::default()
     };
-    let result = calculate_score(
+    let result = execute_hand(
         &mut state,
-        std::slice::from_ref(&played),
-        &[],
+        &mut [played.clone()],
+        &mut Hand::new(),
         &[0],
         PokerHand::HighCard,
         scoring_data,
@@ -209,7 +218,7 @@ fn blueprint_and_brainstorm_copy_scoring_jokers() {
     let played = card(Rank::Four, Suit::Clubs);
 
     let blueprint_score = score_scenario(
-        std::slice::from_ref(&played),
+        &mut [played.clone()],
         &[],
         &[
             Joker::create_joker(JokerKind::Blueprint),
@@ -219,7 +228,7 @@ fn blueprint_and_brainstorm_copy_scoring_jokers() {
     assert_eq!(blueprint_score, 135.0);
 
     let brainstorm_score = score_scenario(
-        std::slice::from_ref(&played),
+        &mut [played.clone()],
         &[],
         &[
             Joker::create_joker(JokerKind::OnyxAgate),
@@ -232,7 +241,7 @@ fn blueprint_and_brainstorm_copy_scoring_jokers() {
 #[test]
 fn copy_jokers_delegate_without_replacing_their_collection_entries() {
     let played = card(Rank::Four, Suit::Clubs);
-    let (hand_type, scoring_data) = scoring_data_for(std::slice::from_ref(&played), &[]);
+    let (hand_type, scoring_data) = scoring_data_for(&mut [played.clone()], &[]);
     let mut state = GameState::new(6);
     state.jokers.add(Joker::create_joker(JokerKind::Blueprint));
     state.jokers.add(Joker::create_joker(JokerKind::OnyxAgate));
@@ -245,10 +254,10 @@ fn copy_jokers_delegate_without_replacing_their_collection_entries() {
         .collect::<Vec<_>>();
     let hand_indices = vec![0];
 
-    calculate_score(
+    execute_hand(
         &mut state,
-        std::slice::from_ref(&played),
-        &[],
+        &mut [played.clone()],
+        &mut Hand::new(),
         &hand_indices,
         hand_type,
         scoring_data,
@@ -300,10 +309,10 @@ fn score_scenario(played: &[Card], held: &[Card], jokers: &[Joker]) -> f32 {
         state.jokers.add(joker.clone());
     }
     let hand_indices = (0..played.len()).collect::<Vec<_>>();
-    calculate_score(
+    execute_hand(
         &mut state,
-        played,
-        held,
+        &mut played.to_vec(),
+        &mut hand_from_cards(held),
         &hand_indices,
         hand_type,
         scoring_data,

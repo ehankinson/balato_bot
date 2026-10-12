@@ -7,10 +7,16 @@ use crate::core::consumable::{
     OwnedConsumable,
 };
 use crate::core::deck::Deck;
-use crate::core::enums::{BossBlinds, Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
+use crate::core::enums::{
+    ALL_RANKS, ALL_SUITS, BossBlinds, Consumable, Decks, Edition, Enhancement, Planet, PokerHand,
+    Seal, SkipTag, Spectral, Tarot, Vouchers,
+};
 use crate::core::hand::Hand;
-use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
-use crate::core::joker_types::{GenerateType, JokerKind};
+use crate::core::joker::{
+    GeneratedConsumable, Joker, JokerContext, JokerEffect, JokerOperation, Jokers, TriggerEvent,
+    UpdateEvent,
+};
+use crate::core::joker_types::JokerKind;
 use crate::core::pack::{PackError, PackOpening};
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::tag::TagState;
@@ -260,10 +266,6 @@ impl GameState {
             .saturating_sub(self.jokers.as_slice().len())
     }
 
-    pub(crate) fn unique_planet_cards_used(&self) -> u32 {
-        self.counters.used_planets.count_ones()
-    }
-
     pub(crate) fn has_showman(&self) -> bool {
         self.jokers
             .as_slice()
@@ -353,6 +355,9 @@ impl GameState {
                 _ => {}
             }
         }
+        self.update_jokers(UpdateEvent::BlindSelected {
+            is_boss: kind.is_boss(),
+        });
     }
 
     pub(crate) fn begin_next_ante(&mut self) {
@@ -418,6 +423,12 @@ impl GameState {
         }
 
         self.blind.finished = true;
+        let is_boss = self.blind.kind.is_boss();
+        self.update_jokers(UpdateEvent::BlindCompleted { is_boss });
+        if is_boss {
+            self.update_jokers(UpdateEvent::BossBlindCompleted);
+        }
+        self.update_jokers(UpdateEvent::RoundCompleted);
         let blind_reward = self.blind.reward();
         let interest = (self.money.max(0) / 5).min(self.interest_cap);
         let investment = if self.blind.kind.is_boss() {
@@ -430,9 +441,6 @@ impl GameState {
         };
         let total = i16::from(blind_reward) + interest + investment;
         self.money += total;
-        self.update_jokers(UpdateEvent::BlindCompleted {
-            is_boss: self.blind.kind.is_boss(),
-        });
         self.deck.clear_debuffs();
         self.pillar_card_ids.clear();
         Some(BlindPayout {
@@ -547,14 +555,6 @@ impl GameState {
         self.deck.starting_size()
     }
 
-    pub(crate) fn enhanced_cards(&self) -> u16 {
-        self.deck.enhanced_count()
-    }
-
-    pub(crate) fn nines_in_deck(&self) -> u16 {
-        self.deck.rank_count(Rank::Nine)
-    }
-
     pub(crate) fn hand_score(&self, hand: PokerHand) -> HandScore {
         self.hand_scores[hand as usize - 1]
     }
@@ -621,6 +621,251 @@ impl GameState {
         Ok(())
     }
 
+    pub(crate) fn materialize_generated_effects(
+        &mut self,
+        operations: &[JokerOperation],
+        played_cards: &mut [Card],
+        mut held_hand: Option<&mut Hand>,
+    ) {
+        for operation in operations {
+            match *operation {
+                JokerOperation::CopyPlayedCard { index, count } => {
+                    for _ in 0..count {
+                        if let Some(card) = played_cards.get(index) {
+                            held_hand
+                                .as_deref_mut()
+                                .expect("a played-card copy requires the current hand")
+                                .add_card(card.clone());
+                            self.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
+                        }
+                    }
+                }
+                JokerOperation::GenerateJoker { rarity, count } => {
+                    for _ in 0..count {
+                        if self.joker_has_room() {
+                            if let Some(joker) = Joker::random_with_rarity(rarity, &mut self.rng) {
+                                self.jokers.add(joker);
+                            }
+                        }
+                    }
+                }
+                JokerOperation::CopyRandomOwnedJoker { count } => {
+                    for _ in 0..count {
+                        if self.joker_has_room() {
+                            if let Some(joker) =
+                                self.jokers.as_slice().choose(&mut self.rng).cloned()
+                            {
+                                self.jokers.add(joker);
+                            }
+                        }
+                    }
+                }
+                JokerOperation::GenerateConsumable { kind, count } => {
+                    for _ in 0..count {
+                        if !self.has_consumable_room() {
+                            break;
+                        }
+                        let consumable = match kind {
+                            GeneratedConsumable::Tarot => Consumable::Tarot(
+                                *Tarot::ALL
+                                    .choose(&mut self.rng)
+                                    .expect("tarot choices are non-empty"),
+                            ),
+                            GeneratedConsumable::Planet => Consumable::Planet(
+                                *Planet::ALL
+                                    .choose(&mut self.rng)
+                                    .expect("planet choices are non-empty"),
+                            ),
+                            GeneratedConsumable::Spectral => Consumable::Spectral(
+                                *Spectral::ALL
+                                    .choose(&mut self.rng)
+                                    .expect("spectral choices are non-empty"),
+                            ),
+                        };
+                        self.add_generated_consumable(consumable);
+                    }
+                }
+                JokerOperation::GenerateStoneCard { count } => {
+                    for _ in 0..count {
+                        let rank = *ALL_RANKS
+                            .choose(&mut self.rng)
+                            .expect("ranks are non-empty");
+                        let suit = *ALL_SUITS
+                            .choose(&mut self.rng)
+                            .expect("suits are non-empty");
+                        self.add_generated_card(Card::new(
+                            rank,
+                            suit,
+                            Enhancement::Stone,
+                            Edition::None,
+                            Seal::None,
+                        ));
+                    }
+                }
+                JokerOperation::GenerateSealedCard { count } => {
+                    for _ in 0..count {
+                        let rank = *ALL_RANKS
+                            .choose(&mut self.rng)
+                            .expect("ranks are non-empty");
+                        let suit = *ALL_SUITS
+                            .choose(&mut self.rng)
+                            .expect("suits are non-empty");
+                        let seal = *[Seal::Gold, Seal::Purple, Seal::Blue, Seal::Red]
+                            .choose(&mut self.rng)
+                            .expect("seals are non-empty");
+                        let mut card =
+                            Card::new(rank, suit, Enhancement::None, Edition::None, Seal::None);
+                        card.set_seal(seal);
+                        self.add_generated_card(card);
+                    }
+                }
+                JokerOperation::EnhancePlayedCard { index, enhancement } => {
+                    if let Some(card) = played_cards.get_mut(index) {
+                        card.set_enhancement(enhancement);
+                        self.update_jokers(UpdateEvent::CardEnhancementAdded { card });
+                    }
+                }
+                JokerOperation::UpgradeHand { hand, levels } => {
+                    let (chips, mult) = crate::core::consumable::planet_upgrade_values(hand);
+                    for _ in 0..levels {
+                        self.upgrade_hand_score(hand, chips, mult);
+                    }
+                }
+                JokerOperation::CopyNegativeConsumable { count } => {
+                    for _ in 0..count {
+                        if self.consumables.len() < self.consumable_capacity() {
+                            if let Some(consumable) =
+                                self.consumables.choose(&mut self.rng).copied()
+                            {
+                                let negative = OwnedConsumable::negative(
+                                    consumable.consumable,
+                                    consumable.original_price,
+                                );
+                                let _ = self.add_owned_consumable(negative);
+                            }
+                        }
+                    }
+                }
+                JokerOperation::AddDoubleTag { count } => {
+                    for _ in 0..count {
+                        let mut tags = std::mem::take(&mut self.tags);
+                        tags.gain(SkipTag::Double, self);
+                        self.tags = tags;
+                    }
+                }
+            }
+        }
+    }
+
+    pub(crate) fn trigger_joker_at(
+        &mut self,
+        index: usize,
+        event: &TriggerEvent<'_>,
+        joker_count: u8,
+    ) -> crate::core::joker::JokerEffect {
+        let joker_capacity = self.jokers.capacity();
+        let GameState {
+            blind,
+            deck,
+            jokers,
+            money,
+            counters,
+            most_played_hand,
+            rng,
+            ..
+        } = self;
+        let mut context = JokerContext::from_parts(
+            blind,
+            deck,
+            money,
+            counters,
+            *most_played_hand,
+            rng,
+            usize::from(joker_count),
+            joker_capacity,
+        );
+        jokers.trigger_at(index, event, &mut context, joker_count)
+    }
+
+    pub(crate) fn trigger_retrigger_joker_at(
+        &mut self,
+        index: usize,
+        event: &TriggerEvent<'_>,
+    ) -> u8 {
+        let joker_capacity = self.jokers.capacity();
+        let joker_count = self.jokers.as_slice().len();
+        let GameState {
+            blind,
+            deck,
+            jokers,
+            money,
+            counters,
+            most_played_hand,
+            rng,
+            ..
+        } = self;
+        let mut context = JokerContext::from_parts(
+            blind,
+            deck,
+            money,
+            counters,
+            *most_played_hand,
+            rng,
+            joker_count,
+            joker_capacity,
+        );
+        jokers
+            .trigger_retrigger_at(index, event, &mut context)
+            .retriggers
+    }
+
+    pub(crate) fn apply_scoring_joker_effect(
+        &mut self,
+        effect: &crate::core::joker::JokerEffect,
+        played_cards: &mut [Card],
+        held_hand: &mut Hand,
+    ) {
+        let joker_capacity = self.jokers.capacity();
+        let joker_count = self.jokers.as_slice().len();
+        {
+            let GameState {
+                blind,
+                deck,
+                jokers,
+                money,
+                counters,
+                most_played_hand,
+                rng,
+                ..
+            } = self;
+            let mut context = JokerContext::from_parts(
+                blind,
+                deck,
+                money,
+                counters,
+                *most_played_hand,
+                rng,
+                joker_count,
+                joker_capacity,
+            );
+            Jokers::apply_effect_in_context(effect, &mut context, jokers);
+        }
+        self.materialize_generated_effects(&effect.operations, played_cards, Some(held_hand));
+    }
+
+    fn add_generated_consumable(&mut self, consumable: Consumable) {
+        let _ = self.add_consumable(consumable);
+    }
+
+    fn has_consumable_room(&self) -> bool {
+        self.consumables.len() < self.consumable_capacity()
+    }
+
+    fn add_generated_card(&mut self, card: Card) {
+        self.deck.add_card_to_deck(card);
+        self.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
+    }
+
     pub(crate) fn add_consumable_during_use(
         &mut self,
         consumable: Consumable,
@@ -636,9 +881,7 @@ impl GameState {
 
     pub(crate) fn sell_joker(&mut self, index: usize) -> Option<u16> {
         let sell_value = self.jokers.get(index)?.sell_value();
-        let mut jokers = std::mem::replace(&mut self.jokers, Jokers::new());
-        jokers.sell(index, self);
-        self.jokers = jokers;
+        Jokers::dispatch_sale(self, index);
         self.money += sell_value as i16;
         self.update_jokers(UpdateEvent::AfterCardSold);
         Some(sell_value as u16)
@@ -738,9 +981,11 @@ impl GameState {
 
         self.deck.discard_cards(discarded.clone());
         self.update_jokers(UpdateEvent::CardsDiscarded { cards: &discarded });
+        self.trigger_jokers(TriggerEvent::Discard { cards: &discarded });
         self.update_jokers(UpdateEvent::DiscardActionCompleted);
         if counts_as_discard {
             self.blind.record_discard();
+            self.deal_cards(hand);
         }
         Some(discarded)
     }
@@ -772,17 +1017,24 @@ impl GameState {
     pub(crate) fn play_hand(
         &mut self,
         hand: &mut Hand,
-        selected_positions: Vec<u8>,
+        mut selected_positions: Vec<u8>,
     ) -> Option<ScoreResult> {
+        selected_positions.sort_unstable();
         let selected_indices = selected_positions
             .iter()
             .map(|&position| position as usize)
             .collect::<Vec<_>>();
-        let score = crate::core::blind::calculate_score(self, hand, &selected_indices)?;
-        let played_cards = hand.select_cards(selected_positions);
+        let mut played_cards = Vec::new();
+        let score =
+            crate::core::blind::execute_hand(self, hand, &selected_indices, &mut played_cards)?;
         if played_cards.is_empty() {
             return None;
         }
+        self.update_jokers(UpdateEvent::HandCompleted {
+            played_cards: &played_cards,
+            hand_type: Some(score.hand),
+            hands_remaining: self.blind.hands_remaining,
+        });
         self.deck.discard_cards(played_cards);
         self.apply_hook_discard(hand);
         self.deal_cards(hand);
@@ -797,28 +1049,37 @@ impl GameState {
     }
 
     pub(crate) fn trigger_jokers(&mut self, event: TriggerEvent<'_>) -> JokerEffect {
-        let mut jokers = std::mem::replace(&mut self.jokers, Jokers::new());
-        let effect = jokers.trigger(event, self);
-        self.jokers = jokers;
+        let joker_count = self.jokers.as_slice().len();
+        let joker_capacity = self.jokers.capacity();
+        let effect = {
+            let GameState {
+                blind,
+                deck,
+                jokers,
+                money,
+                counters,
+                most_played_hand,
+                rng,
+                ..
+            } = self;
+            let mut context = JokerContext::from_parts(
+                blind,
+                deck,
+                money,
+                counters,
+                *most_played_hand,
+                rng,
+                joker_count,
+                joker_capacity,
+            );
+            jokers.trigger_in_context(event, &mut context)
+        };
+        self.materialize_generated_effects(&effect.operations, &mut [], None);
         effect
     }
 
     pub(crate) fn update_jokers(&mut self, event: UpdateEvent<'_>) -> JokerEffect {
-        let mut jokers = std::mem::replace(&mut self.jokers, Jokers::new());
-        let effect = jokers.update(event, self);
-        self.jokers = jokers;
-        if effect.generated_type == Some(GenerateType::NegativeConsumable) {
-            for _ in 0..effect.generated {
-                let Some(consumable) = self.consumables.choose(&mut self.rng).copied() else {
-                    break;
-                };
-                let _ = self.add_owned_consumable(OwnedConsumable::negative(
-                    consumable.consumable,
-                    consumable.original_price,
-                ));
-            }
-        }
-        effect
+        Jokers::dispatch_updates(self, event)
     }
 }
 
