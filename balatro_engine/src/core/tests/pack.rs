@@ -1,10 +1,13 @@
 use super::*;
 
-use crate::core::enums::{Consumable, Planet, PokerHand};
+use crate::core::enums::{Consumable, Planet, PokerHand, Spectral, Tarot};
+use crate::core::joker::Joker;
+use crate::core::joker_types::JokerKind;
 use crate::core::pack::{
-    BoosterPackKind, BoosterPackSize, PackError, PackOption, SHOP_PACK_WEIGHTS, ShopPack,
+    BoosterPackKind, BoosterPackSize, PackError, PackOption, SHOP_PACK_WEIGHTS,
+    SOUL_PACK_ROLL_DENOMINATOR, ShopPack, consumable_available_in_pack, soul_pack_roll_succeeds,
 };
-use crate::core::shop::ShopState;
+use crate::core::shop::{ShopItem, ShopState};
 
 #[test]
 fn pack_size_controls_option_and_selection_counts() {
@@ -86,6 +89,7 @@ fn shop_pack_weights_match_the_configured_distribution() {
 #[test]
 fn telescope_uses_the_most_played_hand_for_celestial_pack_planets() {
     let mut state = GameState::new(28);
+    state.jokers.add(Joker::create_joker(JokerKind::Showman));
     state.most_played_hand = Some(PokerHand::Pair);
     state.shop.most_played_planet_in_pack = true;
 
@@ -96,4 +100,125 @@ fn telescope_uses_the_most_played_hand_for_celestial_pack_planets() {
         option,
         PackOption::Consumable(Consumable::Planet(Planet::Mercury))
     )));
+}
+
+#[test]
+fn arcana_and_spectral_packs_exclude_shop_and_owned_cards_without_showman() {
+    let mut state = GameState::new(29);
+    state.shop.add_item(ShopItem::Consumable {
+        consumable: Consumable::Tarot(Tarot::Fool),
+        price: 3,
+    });
+    state
+        .add_consumable(Consumable::Tarot(Tarot::Magician))
+        .unwrap();
+
+    let arcana = ShopPack::new(BoosterPackKind::Arcana, BoosterPackSize::Mega, 8).open(&mut state);
+    assert!(arcana.options().iter().all(|option| {
+        !matches!(
+            option,
+            PackOption::Consumable(Consumable::Tarot(Tarot::Fool | Tarot::Magician))
+        )
+    }));
+
+    assert!(!consumable_available_in_pack(
+        &state,
+        Consumable::Tarot(Tarot::Fool),
+        &[]
+    ));
+    assert!(!consumable_available_in_pack(
+        &state,
+        Consumable::Tarot(Tarot::Magician),
+        &[]
+    ));
+}
+
+#[test]
+fn celestial_packs_exclude_shop_and_owned_planets_without_showman() {
+    let mut state = GameState::new(32);
+    state.shop.add_item(ShopItem::Consumable {
+        consumable: Consumable::Planet(Planet::Mercury),
+        price: 3,
+    });
+    state
+        .add_consumable(Consumable::Planet(Planet::Venus))
+        .unwrap();
+
+    let opening =
+        ShopPack::new(BoosterPackKind::Celestial, BoosterPackSize::Mega, 8).open(&mut state);
+
+    assert!(opening.options().iter().all(|option| {
+        !matches!(
+            option,
+            PackOption::Consumable(Consumable::Planet(Planet::Mercury | Planet::Venus))
+        )
+    }));
+}
+
+#[test]
+fn showman_allows_pack_duplicates_and_cards_seen_elsewhere() {
+    let mut state = GameState::new(30);
+    state.jokers.add(Joker::create_joker(
+        crate::core::joker_types::JokerKind::Showman,
+    ));
+    state.shop.add_item(ShopItem::Consumable {
+        consumable: Consumable::Tarot(Tarot::Fool),
+        price: 3,
+    });
+    state
+        .add_consumable(Consumable::Tarot(Tarot::Magician))
+        .unwrap();
+
+    assert!(consumable_available_in_pack(
+        &state,
+        Consumable::Tarot(Tarot::Fool),
+        &[Consumable::Tarot(Tarot::Fool)]
+    ));
+    assert!(consumable_available_in_pack(
+        &state,
+        Consumable::Tarot(Tarot::Magician),
+        &[Consumable::Tarot(Tarot::Magician)]
+    ));
+    assert!(consumable_available_in_pack(
+        &state,
+        Consumable::Planet(Planet::Mercury),
+        &[Consumable::Planet(Planet::Mercury)]
+    ));
+}
+
+#[test]
+fn packs_do_not_repeat_consumables_without_showman() {
+    let state = GameState::new(31);
+    let card = Consumable::Spectral(Spectral::Aura);
+
+    assert!(!consumable_available_in_pack(&state, card, &[card]));
+}
+
+#[test]
+fn buffoon_packs_do_not_repeat_owned_or_visible_jokers_without_showman() {
+    let mut state = GameState::new(33);
+    state.jokers.add(Joker::create_joker(JokerKind::Joker));
+    state.shop.add_item(ShopItem::Joker {
+        joker: Joker::create_joker(JokerKind::Greedy),
+        price: 4,
+    });
+
+    let opening =
+        ShopPack::new(BoosterPackKind::Buffoon, BoosterPackSize::Mega, 8).open(&mut state);
+
+    assert!(opening.options().iter().all(|option| {
+        !matches!(
+            option,
+            PackOption::Joker(joker)
+                if matches!(joker.kind(), JokerKind::Joker | JokerKind::Greedy)
+        )
+    }));
+}
+
+#[test]
+fn soul_pack_probability_uses_the_0_3_percent_boundary() {
+    assert!(soul_pack_roll_succeeds(0));
+    assert!(soul_pack_roll_succeeds(2));
+    assert!(!soul_pack_roll_succeeds(3));
+    assert!(!soul_pack_roll_succeeds(SOUL_PACK_ROLL_DENOMINATOR - 1));
 }

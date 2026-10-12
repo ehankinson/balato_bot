@@ -10,7 +10,7 @@ use crate::core::deck::Deck;
 use crate::core::enums::{BossBlinds, Consumable, Decks, PokerHand, Rank, Tarot, Vouchers};
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerEffect, Jokers, TriggerEvent, UpdateEvent};
-use crate::core::joker_types::GenerateType;
+use crate::core::joker_types::{GenerateType, JokerKind};
 use crate::core::pack::{PackError, PackOpening};
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::tag::TagState;
@@ -262,6 +262,13 @@ impl GameState {
 
     pub(crate) fn unique_planet_cards_used(&self) -> u32 {
         self.counters.used_planets.count_ones()
+    }
+
+    pub(crate) fn has_showman(&self) -> bool {
+        self.jokers
+            .as_slice()
+            .iter()
+            .any(|joker| joker.kind() == JokerKind::Showman)
     }
 
     pub(crate) fn joker_has_room(&self) -> bool {

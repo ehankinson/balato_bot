@@ -5,8 +5,13 @@ use crate::core::enums::{
 };
 use crate::core::game::GameState;
 use crate::core::joker::{Joker, UpdateEvent};
+use crate::core::joker_types::{JokerKind, JokerRarity};
+use crate::core::shop::ShopItem;
 use crate::core::voucher::{random_shop_joker_edition, random_standard_pack_edition};
-use rand::prelude::{IndexedRandom, RngExt};
+use rand::prelude::{IndexedRandom, IteratorRandom, RngExt};
+
+pub(crate) const SOUL_PACK_ROLL_DENOMINATOR: u16 = 1_000;
+pub(crate) const SOUL_PACK_ROLL_THRESHOLD: u16 = 3;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum BoosterPackKind {
@@ -61,9 +66,18 @@ impl ShopPack {
     }
 
     pub(crate) fn open(&self, state: &mut GameState) -> PackOpening {
-        let options = (0..self.option_count())
-            .map(|_| random_option(self.kind, state))
-            .collect();
+        let mut generated_consumables = Vec::with_capacity(self.option_count());
+        let mut generated_jokers = Vec::with_capacity(self.option_count());
+        let mut options = Vec::with_capacity(self.option_count());
+        for _ in 0..self.option_count() {
+            let option = random_option(self.kind, state, &generated_consumables, &generated_jokers);
+            match &option {
+                PackOption::Consumable(consumable) => generated_consumables.push(*consumable),
+                PackOption::Joker(joker) => generated_jokers.push(joker.kind()),
+                PackOption::PlayingCard(_) => {}
+            }
+            options.push(option);
+        }
         PackOpening {
             options,
             choices: self.choices(),
@@ -192,18 +206,44 @@ pub(crate) fn random_shop_pack(state: &mut GameState) -> ShopPack {
     unreachable!()
 }
 
-fn random_option(kind: BoosterPackKind, state: &mut GameState) -> PackOption {
+fn random_option(
+    kind: BoosterPackKind,
+    state: &mut GameState,
+    generated_consumables: &[Consumable],
+    generated_jokers: &[JokerKind],
+) -> PackOption {
     match kind {
         BoosterPackKind::Standard => PackOption::PlayingCard(random_playing_card(state)),
-        BoosterPackKind::Arcana => PackOption::Consumable(random_arcana_card(state)),
-        BoosterPackKind::Celestial => PackOption::Consumable(random_planet_card(state)),
+        BoosterPackKind::Arcana => {
+            PackOption::Consumable(random_arcana_card(state, generated_consumables))
+        }
+        BoosterPackKind::Celestial => {
+            PackOption::Consumable(random_planet_card(state, generated_consumables))
+        }
         BoosterPackKind::Buffoon => {
-            let mut joker = Joker::random_shop_joker(&mut state.rng);
+            let mut joker = random_pack_joker(state, generated_jokers);
             joker.set_edition(random_shop_joker_edition(state));
             PackOption::Joker(joker)
         }
-        BoosterPackKind::Spectral => PackOption::Consumable(random_spectral_card(state)),
+        BoosterPackKind::Spectral => {
+            PackOption::Consumable(random_spectral_card(state, generated_consumables))
+        }
     }
+}
+
+fn random_pack_joker(state: &mut GameState, generated_jokers: &[JokerKind]) -> Joker {
+    let eligible = JokerKind::ALL
+        .iter()
+        .copied()
+        .filter(|kind| Joker::create_joker(*kind).rarity() != JokerRarity::Legendary)
+        .filter(|kind| joker_available_in_pack(state, *kind, generated_jokers))
+        .collect::<Vec<_>>();
+    let kind = eligible
+        .choose(&mut state.rng)
+        .copied()
+        .unwrap_or_else(|| Joker::random_shop_joker(&mut state.rng).kind());
+
+    Joker::create_joker(kind)
 }
 
 pub(crate) fn random_playing_card(state: &mut GameState) -> Card {
@@ -287,29 +327,46 @@ pub(crate) fn random_shop_playing_card(state: &mut GameState) -> Card {
     )
 }
 
-fn random_arcana_card(state: &mut GameState) -> Consumable {
+fn random_arcana_card(state: &mut GameState, generated_consumables: &[Consumable]) -> Consumable {
+    let soul = Consumable::Spectral(Spectral::Soul);
+    let soul_roll = state.rng.random_range(0..SOUL_PACK_ROLL_DENOMINATOR);
+    if consumable_available_in_pack(state, soul, generated_consumables)
+        && soul_pack_roll_succeeds(soul_roll)
+    {
+        return soul;
+    }
+
     if state.has_voucher(crate::core::enums::Vouchers::OmenGlobe)
         && state.rng.random_range(0..5u8) == 0
     {
-        random_spectral_card(state)
+        random_spectral_card(state, generated_consumables)
     } else {
-        let tarot = Tarot::ALL
+        let tarot = available_tarot_cards(state, generated_consumables)
             .choose(&mut state.rng)
             .copied()
+            .or_else(|| Tarot::ALL.choose(&mut state.rng).copied())
             .expect("tarot choices are non-empty");
         Consumable::Tarot(tarot)
     }
 }
 
-fn random_planet_card(state: &mut GameState) -> Consumable {
-    let planet = if state.shop.most_played_planet_in_pack {
-        state
-            .most_played_hand
-            .map(planet_for_hand)
-            .unwrap_or_else(|| random_planet(state))
-    } else {
-        random_planet(state)
-    };
+fn random_planet_card(state: &mut GameState, generated_consumables: &[Consumable]) -> Consumable {
+    let targeted_planet = state
+        .shop
+        .most_played_planet_in_pack
+        .then(|| state.most_played_hand.map(planet_for_hand))
+        .flatten()
+        .filter(|planet| {
+            consumable_available_in_pack(state, Consumable::Planet(*planet), generated_consumables)
+        });
+
+    let planet = targeted_planet
+        .or_else(|| {
+            available_planets(state, generated_consumables)
+                .choose(&mut state.rng)
+                .copied()
+        })
+        .unwrap_or_else(|| random_planet(state));
     Consumable::Planet(planet)
 }
 
@@ -320,12 +377,102 @@ fn random_planet(state: &mut GameState) -> Planet {
         .expect("planet choices are non-empty")
 }
 
-fn random_spectral_card(state: &mut GameState) -> Consumable {
-    let spectral = Spectral::ALL
+fn random_spectral_card(state: &mut GameState, generated_consumables: &[Consumable]) -> Consumable {
+    let soul = Consumable::Spectral(Spectral::Soul);
+    let soul_roll = state.rng.random_range(0..SOUL_PACK_ROLL_DENOMINATOR);
+    if consumable_available_in_pack(state, soul, generated_consumables)
+        && soul_pack_roll_succeeds(soul_roll)
+    {
+        return soul;
+    }
+
+    let spectral = available_spectral_cards(state, generated_consumables)
+        .into_iter()
+        .filter(|spectral| *spectral != Spectral::Soul)
         .choose(&mut state.rng)
-        .copied()
+        .or_else(|| {
+            Spectral::ALL
+                .iter()
+                .copied()
+                .filter(|spectral| *spectral != Spectral::Soul)
+                .choose(&mut state.rng)
+        })
         .expect("spectral choices are non-empty");
     Consumable::Spectral(spectral)
+}
+
+fn available_tarot_cards(state: &GameState, generated_consumables: &[Consumable]) -> Vec<Tarot> {
+    Tarot::ALL
+        .iter()
+        .copied()
+        .filter(|tarot| {
+            consumable_available_in_pack(state, Consumable::Tarot(*tarot), generated_consumables)
+        })
+        .collect()
+}
+
+fn available_spectral_cards(
+    state: &GameState,
+    generated_consumables: &[Consumable],
+) -> Vec<Spectral> {
+    Spectral::ALL
+        .iter()
+        .copied()
+        .filter(|spectral| {
+            consumable_available_in_pack(
+                state,
+                Consumable::Spectral(*spectral),
+                generated_consumables,
+            )
+        })
+        .collect()
+}
+
+fn available_planets(state: &GameState, generated_consumables: &[Consumable]) -> Vec<Planet> {
+    Planet::ALL
+        .iter()
+        .copied()
+        .filter(|planet| {
+            consumable_available_in_pack(state, Consumable::Planet(*planet), generated_consumables)
+        })
+        .collect()
+}
+
+pub(crate) fn consumable_available_in_pack(
+    state: &GameState,
+    consumable: Consumable,
+    generated_consumables: &[Consumable],
+) -> bool {
+    state.has_showman()
+        || (!state
+            .consumables
+            .iter()
+            .any(|owned| owned.consumable == consumable)
+            && !state.shop.has_consumable_offer(consumable)
+            && !generated_consumables.contains(&consumable))
+}
+
+fn joker_available_in_pack(
+    state: &GameState,
+    kind: JokerKind,
+    generated_jokers: &[JokerKind],
+) -> bool {
+    state.has_showman()
+        || (!state
+            .jokers
+            .as_slice()
+            .iter()
+            .any(|joker| joker.kind() == kind)
+            && !state
+                .shop
+                .items
+                .iter()
+                .any(|item| matches!(item, ShopItem::Joker { joker, .. } if joker.kind() == kind))
+            && !generated_jokers.contains(&kind))
+}
+
+pub(crate) const fn soul_pack_roll_succeeds(roll: u16) -> bool {
+    roll < SOUL_PACK_ROLL_THRESHOLD
 }
 
 pub(crate) fn planet_for_hand(hand: crate::core::enums::PokerHand) -> Planet {

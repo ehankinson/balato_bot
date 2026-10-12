@@ -193,6 +193,12 @@ impl ShopState {
         self.items.push(item);
     }
 
+    pub(crate) fn has_consumable_offer(&self, consumable: Consumable) -> bool {
+        self.items.iter().any(|item| {
+            matches!(item, ShopItem::Consumable { consumable: offered, .. } if *offered == consumable)
+        })
+    }
+
     pub(crate) fn refresh_base_items(&mut self, state: &mut GameState) {
         self.items.clear();
         self.items.reserve(self.number_of_shop_items);
@@ -340,11 +346,7 @@ pub(crate) fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> Sh
 
 fn random_shop_joker(state: &mut GameState) -> Joker {
     let joker = Joker::random_shop_joker(&mut state.rng);
-    if state
-        .jokers
-        .as_slice()
-        .iter()
-        .any(|owned| owned.kind() == JokerKind::Showman)
+    if state.has_showman()
         || !state
             .jokers
             .as_slice()
@@ -404,6 +406,7 @@ fn available_spectral_cards(state: &GameState) -> Vec<Spectral> {
     Spectral::ALL
         .iter()
         .copied()
+        .filter(|spectral| *spectral != Spectral::Soul)
         .filter(|spectral| {
             !state
                 .consumables
