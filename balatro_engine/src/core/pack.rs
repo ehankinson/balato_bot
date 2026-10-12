@@ -452,7 +452,7 @@ pub(crate) fn consumable_available_in_pack(
             && !generated_consumables.contains(&consumable))
 }
 
-fn joker_available_in_pack(
+pub(crate) fn joker_available_in_pack(
     state: &GameState,
     kind: JokerKind,
     generated_jokers: &[JokerKind],

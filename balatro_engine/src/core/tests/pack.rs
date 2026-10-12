@@ -5,7 +5,8 @@ use crate::core::joker::Joker;
 use crate::core::joker_types::JokerKind;
 use crate::core::pack::{
     BoosterPackKind, BoosterPackSize, PackError, PackOption, SHOP_PACK_WEIGHTS,
-    SOUL_PACK_ROLL_DENOMINATOR, ShopPack, consumable_available_in_pack, soul_pack_roll_succeeds,
+    SOUL_PACK_ROLL_DENOMINATOR, ShopPack, consumable_available_in_pack, joker_available_in_pack,
+    soul_pack_roll_succeeds,
 };
 use crate::core::shop::{ShopItem, ShopState};
 
@@ -184,6 +185,53 @@ fn showman_allows_pack_duplicates_and_cards_seen_elsewhere() {
         Consumable::Planet(Planet::Mercury),
         &[Consumable::Planet(Planet::Mercury)]
     ));
+}
+
+#[test]
+fn showman_allows_duplicates_for_every_pack_family() {
+    let mut state = GameState::new(34);
+    state.consumable_capacity = 4;
+    state.jokers.add(Joker::create_joker(JokerKind::Showman));
+    state.jokers.add(Joker::create_joker(JokerKind::Joker));
+    state
+        .add_consumable(Consumable::Tarot(Tarot::Fool))
+        .unwrap();
+    state
+        .add_consumable(Consumable::Planet(Planet::Mercury))
+        .unwrap();
+    state
+        .add_consumable(Consumable::Spectral(Spectral::Aura))
+        .unwrap();
+
+    assert!(consumable_available_in_pack(
+        &state,
+        Consumable::Tarot(Tarot::Fool),
+        &[Consumable::Tarot(Tarot::Fool)]
+    ));
+    assert!(consumable_available_in_pack(
+        &state,
+        Consumable::Planet(Planet::Mercury),
+        &[Consumable::Planet(Planet::Mercury)]
+    ));
+    assert!(consumable_available_in_pack(
+        &state,
+        Consumable::Spectral(Spectral::Aura),
+        &[Consumable::Spectral(Spectral::Aura)]
+    ));
+    assert!(joker_available_in_pack(
+        &state,
+        JokerKind::Joker,
+        &[JokerKind::Joker]
+    ));
+
+    let standard =
+        ShopPack::new(BoosterPackKind::Standard, BoosterPackSize::Normal, 4).open(&mut state);
+    assert!(
+        standard
+            .options()
+            .iter()
+            .all(|option| matches!(option, PackOption::PlayingCard(_)))
+    );
 }
 
 #[test]
