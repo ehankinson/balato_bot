@@ -1,7 +1,7 @@
 use crate::core::blind::{BlindKind, BlindSkipError, BlindState, ScoreResult};
 use crate::core::blind_selector::BlindSelector;
 use crate::core::boss_blind::{FinisherBossBlindHistory, RegularBossBlindHistory};
-use crate::core::card::Card;
+use crate::core::card::{Card, ScoringValues};
 use crate::core::consumable::{
     ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_PRICE, DEFAULT_CONSUMABLE_SLOTS,
     OwnedConsumable,
@@ -20,9 +20,9 @@ use crate::core::pack::{PackError, PackOpening};
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::tag::TagState;
 use crate::core::voucher::VoucherError;
-use rand::SeedableRng;
 use rand::prelude::{IndexedRandom, SliceRandom};
 use rand::rngs::StdRng;
+use rand::{RngExt, SeedableRng};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HandScore {
@@ -432,7 +432,7 @@ impl GameState {
         opening.choose(selections, self)
     }
 
-    pub(crate) fn finish_blind(&mut self) -> Option<BlindPayout> {
+    pub(crate) fn finish_blind(&mut self, hand: &Hand) -> Option<BlindPayout> {
         if self.blind.finished || (!self.blind.has_beaten_target() && !self.blind.prevent_death) {
             return None;
         }
@@ -444,6 +444,7 @@ impl GameState {
             self.update_jokers(UpdateEvent::BossBlindCompleted);
         }
         self.update_jokers(UpdateEvent::RoundCompleted);
+        self.apply_held_round_effects(hand);
         let blind_reward = self.blind.reward();
         let interest = (self.money.max(0) / 5).min(self.interest_cap);
         let investment = if self.blind.kind.is_boss() {
@@ -486,6 +487,61 @@ impl GameState {
 
     pub(crate) fn has_voucher(&self, voucher: Vouchers) -> bool {
         self.vouchers.contains(&voucher)
+    }
+
+    fn card_probability_roll(&mut self, probability: f64) -> bool {
+        let probability = probability * f64::from(self.jokers.modifiers().probability_multiplier);
+        probability >= 1.0 || self.rng.random_bool(probability)
+    }
+
+    pub(crate) fn played_card_values(&mut self, card: &Card) -> ScoringValues {
+        let mut values = card.scoring_values();
+        if card.is_debuffed() {
+            return values;
+        }
+        if card.enhancement() == Enhancement::Lucky {
+            let mult_success = self.card_probability_roll(1.0 / 5.0);
+            let money_success = self.card_probability_roll(1.0 / 15.0);
+            if mult_success {
+                values.add_mult += 20;
+            }
+            if money_success {
+                self.money += 20;
+            }
+            if mult_success || money_success {
+                self.update_jokers(UpdateEvent::LuckyCardSucceeded);
+            }
+        }
+        if card.seal() == Seal::Gold {
+            self.money += 3;
+        }
+        values
+    }
+
+    fn apply_held_round_effects(&mut self, hand: &Hand) {
+        let mime_repetitions = self.jokers.mime_count();
+        for card in hand.cards() {
+            if card.is_debuffed() {
+                continue;
+            }
+            let repetitions = 1 + mime_repetitions + usize::from(card.seal() == Seal::Red);
+            for _ in 0..repetitions {
+                if card.enhancement() == Enhancement::Gold {
+                    self.money += 3;
+                }
+                if card.seal() == Seal::Blue {
+                    if let Some(last_hand) = self.blind.current_hand {
+                        let planet = Planet::ALL
+                            .into_iter()
+                            .find(|&planet| {
+                                crate::core::consumable::planet_hand(planet) == last_hand
+                            })
+                            .expect("every poker hand has a Planet");
+                        self.add_generated_consumable(Consumable::Planet(planet));
+                    }
+                }
+            }
+        }
     }
 
     pub(crate) fn planet_mult_multiplier(&self, hand: PokerHand) -> f32 {
@@ -717,23 +773,44 @@ impl GameState {
                         if !self.has_consumable_room() {
                             break;
                         }
-                        let consumable = match kind {
-                            GeneratedConsumable::Tarot => Consumable::Tarot(
-                                *Tarot::ALL
-                                    .choose(&mut self.rng)
-                                    .expect("tarot choices are non-empty"),
-                            ),
-                            GeneratedConsumable::Planet => Consumable::Planet(
-                                *Planet::ALL
-                                    .choose(&mut self.rng)
-                                    .expect("planet choices are non-empty"),
-                            ),
-                            GeneratedConsumable::Spectral => Consumable::Spectral(
-                                *Spectral::ALL
-                                    .choose(&mut self.rng)
-                                    .expect("spectral choices are non-empty"),
-                            ),
+                        let pool = match kind {
+                            GeneratedConsumable::Tarot => Tarot::ALL
+                                .into_iter()
+                                .map(Consumable::Tarot)
+                                .collect::<Vec<_>>(),
+                            GeneratedConsumable::Planet => {
+                                Planet::ALL.into_iter().map(Consumable::Planet).collect()
+                            }
+                            GeneratedConsumable::Spectral => Spectral::ALL
+                                .into_iter()
+                                .map(Consumable::Spectral)
+                                .collect(),
                         };
+                        let available = pool
+                            .iter()
+                            .copied()
+                            .filter(|candidate| {
+                                self.has_showman()
+                                    || !self
+                                        .consumables
+                                        .iter()
+                                        .any(|owned| owned.consumable == *candidate)
+                            })
+                            .collect::<Vec<_>>();
+                        // A fully exhausted Tarot pool falls back to The Fool in Balatro.
+                        let consumable =
+                            available
+                                .choose(&mut self.rng)
+                                .copied()
+                                .unwrap_or(match kind {
+                                    GeneratedConsumable::Tarot => Consumable::Tarot(Tarot::Fool),
+                                    GeneratedConsumable::Planet => {
+                                        Consumable::Planet(Planet::Pluto)
+                                    }
+                                    GeneratedConsumable::Spectral => {
+                                        Consumable::Spectral(Spectral::Familiar)
+                                    }
+                                });
                         self.add_generated_consumable(consumable);
                     }
                 }
@@ -818,6 +895,9 @@ impl GameState {
         let joker_capacity = self.jokers.capacity();
         let modifiers = self.jokers.modifiers();
         let most_played_hand = self.most_played_hand();
+        let consumable_slots = self
+            .consumable_capacity()
+            .saturating_sub(self.consumables.len());
         let GameState {
             blind,
             deck,
@@ -836,6 +916,7 @@ impl GameState {
             rng,
             usize::from(joker_count),
             joker_capacity,
+            consumable_slots,
             modifiers,
         );
         jokers.trigger_at(index, event, &mut context, joker_count)
@@ -849,6 +930,9 @@ impl GameState {
         let joker_capacity = self.jokers.capacity();
         let modifiers = self.jokers.modifiers();
         let most_played_hand = self.most_played_hand();
+        let consumable_slots = self
+            .consumable_capacity()
+            .saturating_sub(self.consumables.len());
         let joker_count = self.jokers.as_slice().len();
         let GameState {
             blind,
@@ -868,6 +952,7 @@ impl GameState {
             rng,
             joker_count,
             joker_capacity,
+            consumable_slots,
             modifiers,
         );
         jokers
@@ -884,6 +969,9 @@ impl GameState {
         let joker_capacity = self.jokers.capacity();
         let modifiers = self.jokers.modifiers();
         let most_played_hand = self.most_played_hand();
+        let consumable_slots = self
+            .consumable_capacity()
+            .saturating_sub(self.consumables.len());
         let joker_count = self.jokers.as_slice().len();
         {
             let GameState {
@@ -904,6 +992,7 @@ impl GameState {
                 rng,
                 joker_count,
                 joker_capacity,
+                consumable_slots,
                 modifiers,
             );
             Jokers::apply_effect_in_context(effect, &mut context, jokers);
@@ -1076,6 +1165,18 @@ impl GameState {
                         .filter(|&&position| usize::from(position) < index)
                         .count()
             });
+        for card in &discarded {
+            if !card.is_debuffed() && card.seal() == Seal::Purple {
+                self.materialize_generated_effects(
+                    &[JokerOperation::GenerateConsumable {
+                        kind: GeneratedConsumable::Tarot,
+                        count: 1,
+                    }],
+                    &mut [],
+                    None,
+                );
+            }
+        }
         self.deck.discard_cards(discarded.clone());
         self.update_jokers(UpdateEvent::CardsDiscarded { cards: &discarded });
         self.trigger_jokers(TriggerEvent::Discard { cards: &discarded });
@@ -1149,13 +1250,33 @@ impl GameState {
             hand_type: Some(score.hand),
             hands_remaining: self.blind.hands_remaining,
         });
-        self.deck.discard_cards(played_cards);
+        // Glass rolls once per scoring card, after its complete scoring/retrigger sequence.
+        let surviving_cards = played_cards
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, card)| {
+                if scoring_card_indices.contains(&index)
+                    && !card.is_debuffed()
+                    && card.enhancement() == Enhancement::Glass
+                    && self.card_probability_roll(1.0 / 4.0)
+                {
+                    self.update_jokers(UpdateEvent::CardDestroyed { card: &card });
+                    None
+                } else {
+                    Some(card)
+                }
+            })
+            .collect();
+        self.deck.discard_cards(surviving_cards);
         self.apply_hook_discard(hand);
-        self.deal_cards(hand);
         self.blind.chips_scored = self
             .blind
             .chips_scored
             .saturating_add(score.score.max(0.0) as u64);
+        // A winning/last hand ends with the cards actually held during that play.
+        if !self.blind.has_beaten_target() && self.blind.hands_remaining > 0 {
+            self.deal_cards(hand);
+        }
         self.resolve_blind_end(hand);
         Some(score)
     }
@@ -1175,7 +1296,7 @@ impl GameState {
             }
         }
         if self.blind.has_beaten_target() || self.blind.prevent_death {
-            self.finish_blind();
+            self.finish_blind(hand);
             if self.blind.kind.is_boss() {
                 for card in hand.cards_mut() {
                     card.clear_play_history();
@@ -1193,6 +1314,9 @@ impl GameState {
         let joker_capacity = self.jokers.capacity();
         let modifiers = self.jokers.modifiers();
         let most_played_hand = self.most_played_hand();
+        let consumable_slots = self
+            .consumable_capacity()
+            .saturating_sub(self.consumables.len());
         let effect = {
             let GameState {
                 blind,
@@ -1212,6 +1336,7 @@ impl GameState {
                 rng,
                 joker_count,
                 joker_capacity,
+                consumable_slots,
                 modifiers,
             );
             jokers.trigger_in_context(event, &mut context)
@@ -1529,3 +1654,11 @@ mod joker_modifier_tests;
 #[cfg(test)]
 #[path = "tests/boss_blind.rs"]
 mod boss_blind_tests;
+
+#[cfg(test)]
+#[path = "tests/card_scoring.rs"]
+mod card_scoring_tests;
+
+#[cfg(test)]
+#[path = "tests/joker_economy_flow.rs"]
+mod joker_economy_flow_tests;

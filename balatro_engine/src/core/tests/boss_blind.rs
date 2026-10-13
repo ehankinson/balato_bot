@@ -600,7 +600,11 @@ fn pillar_history_survives_big_blind_and_clears_at_boss_completion_or_new_ante()
     let mut state = GameState::new(407);
     state.begin_blind_as(BlindKind::Small);
     state.blind.score_requirement = 1;
-    let mut hand = hand_of([card(Rank::Two, Suit::Clubs), card(Rank::Two, Suit::Clubs)]);
+    let mut hand = hand_of([
+        card(Rank::Two, Suit::Clubs),
+        card(Rank::Two, Suit::Clubs),
+        card(Rank::Two, Suit::Clubs),
+    ]);
     state.play_hand(&mut hand, vec![0]).unwrap();
     state.begin_blind_as(BlindKind::Big);
     assert!(state.deck.discarded_cards()[0].was_played_in_ante(1));
@@ -874,7 +878,7 @@ fn death_prevention_consumes_only_one_bones_and_dispatches_completion_once() {
         1
     );
     assert_eq!(game.state.money, 12); // $4 start + $4 Golden + $3 reward + $1 interest.
-    assert!(game.state.finish_blind().is_none());
+    assert!(game.state.finish_blind(&Hand::new()).is_none());
     assert_eq!(game.state.money, 12);
 }
 

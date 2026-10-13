@@ -515,6 +515,7 @@ impl Joker {
             JokerKind::EightBall => {
                 let data = JokerGenerate {
                     amount: 1,
+                    rank: Some(Rank::Eight),
                     probability: 0.25,
                     generate_type: GenerateType::Tarot,
                     ..JokerGenerate::default()
@@ -523,7 +524,7 @@ impl Joker {
                 (
                     5,
                     JokerRarity::Common,
-                    JokerTrigger::AfterHand,
+                    JokerTrigger::OnPlayedCard,
                     JokerStructure::Normal(JokerData::Generate(data)),
                 )
             }
@@ -1050,6 +1051,7 @@ impl Joker {
             JokerKind::Seance => {
                 let data = JokerGenerate {
                     amount: 1,
+                    poker_hand: Some(PokerHand::StraightFlush),
                     generate_type: GenerateType::Spectral,
                     ..JokerGenerate::default()
                 };

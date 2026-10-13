@@ -485,6 +485,29 @@ impl JokerModifiers {
             || (card.enhancement() != crate::core::enums::Enhancement::Stone && card.is_face_card())
     }
 
+    pub(crate) fn card_has_suit(
+        self,
+        card: &crate::core::card::Card,
+        required: crate::core::enums::Suit,
+    ) -> bool {
+        use crate::core::enums::Enhancement;
+        !card.is_debuffed()
+            && card.enhancement() != Enhancement::Stone
+            && (card.enhancement() == Enhancement::Wild || self.suits_match(card.suit(), required))
+    }
+
+    // Hand-wide suit checks retain a debuffed card's printed suit, but not its Wild effect.
+    pub(crate) fn card_has_flush_suit(
+        self,
+        card: &crate::core::card::Card,
+        required: crate::core::enums::Suit,
+    ) -> bool {
+        use crate::core::enums::Enhancement;
+        card.enhancement() != Enhancement::Stone
+            && ((card.enhancement() == Enhancement::Wild && !card.is_debuffed())
+                || self.suits_match(card.suit(), required))
+    }
+
     pub(crate) fn suits_match(
         self,
         actual: crate::core::enums::Suit,

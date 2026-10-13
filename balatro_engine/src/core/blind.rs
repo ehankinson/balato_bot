@@ -3,7 +3,7 @@ use crate::calculation::execute_hand::execute_hand as execute_hand_impl;
 use crate::calculation::poker::determine_poker_hand;
 pub(crate) use crate::core::boss_blind::BlindPlayError;
 use crate::core::card::Card;
-use crate::core::enums::{BossBlinds, PokerHand, Stakes, Suit};
+use crate::core::enums::{BossBlinds, Enhancement, PokerHand, Stakes, Suit};
 use crate::core::game::GameState;
 use crate::core::hand::Hand;
 use crate::core::joker_types::JokerModifiers;
@@ -46,7 +46,17 @@ impl ScoringData {
             .iter()
             .map(|card| card.id())
             .collect::<Vec<_>>();
-        let result = determine_poker_hand(&ids, modifiers)?;
+        let detection_ids = selected_cards
+            .iter()
+            .map(|card| {
+                if card.is_debuffed() && card.enhancement() == Enhancement::Wild {
+                    card.id() & !(0x0f << 5)
+                } else {
+                    card.id()
+                }
+            })
+            .collect::<Vec<_>>();
+        let result = determine_poker_hand(&detection_ids, modifiers)?;
         let scoring_indices = result.scoring_card_indices;
 
         let mut data = ScoringData::default();
@@ -90,9 +100,22 @@ pub(crate) fn execute_hand(
     selected_indices: &[usize],
     played_cards_out: &mut Vec<Card>,
 ) -> Option<ScoreResult> {
-    let (hand_type, mut scoring_data) =
-        score_played_hand(hand, selected_indices, state.jokers.modifiers())?;
     state.blind.validate_play(selected_indices).ok()?;
+    if selected_indices.is_empty()
+        || selected_indices
+            .iter()
+            .enumerate()
+            .any(|(position, &index)| {
+                hand.card(index).is_none() || selected_indices[..position].contains(&index)
+            })
+    {
+        return None;
+    }
+    let modifiers = state.jokers.modifiers();
+    for card in hand.cards_mut() {
+        card.set_debuffed(state.blind.card_is_debuffed(card, modifiers));
+    }
+    let (hand_type, mut scoring_data) = score_played_hand(hand, selected_indices, modifiers)?;
 
     state.counters.poker_hands_played[hand_type as usize - 1] += 1;
     let hand_debuffed = state
@@ -124,7 +147,6 @@ pub(crate) fn execute_hand(
                     .count()
         });
     for (index, card) in played_cards.iter_mut().enumerate() {
-        card.set_debuffed(state.blind.card_is_debuffed(card, state.jokers.modifiers()));
         if card.is_debuffed()
             && scoring_data
                 .scoring_played_cards
@@ -135,9 +157,6 @@ pub(crate) fn execute_hand(
         }
         card.set_face_down(false);
         card.mark_played(state.counters.ante);
-    }
-    for card in hand.cards_mut() {
-        card.set_debuffed(state.blind.card_is_debuffed(card, state.jokers.modifiers()));
     }
     scoring_data.scoring_held_cards = scoring_cards(&card_ids(hand.cards()));
     let result = if hand_debuffed {

@@ -26,7 +26,12 @@ pub(crate) fn determine_poker_hand(
     let mut rank_mask = 0_u16;
     let mut suit_rank_masks = [0_u16; 4];
 
+    let mut stone_indices = Vec::new();
     for (index, &card_id) in card_ids.iter().enumerate() {
+        if enhancement_from_id(card_id) == Enhancement::Stone as u8 {
+            stone_indices.push(index);
+            continue;
+        }
         let rank = Rank::from_card_id(card_id) as u8;
         let suit = suit_from_id(card_id);
         let rank_bit = 1_u16 << rank;
@@ -67,7 +72,7 @@ pub(crate) fn determine_poker_hand(
         straight_ranks(suit_rank_masks[suit], modifiers.straight_gaps).map(|ranks| (suit, ranks))
     });
 
-    let (hand, scoring_card_indices) = if let Some(suit) = flush_suit {
+    let (hand, mut scoring_card_indices) = if let Some(suit) = flush_suit {
         if has_five {
             (
                 PokerHand::FlushFive,
@@ -156,13 +161,15 @@ pub(crate) fn determine_poker_hand(
                 .unwrap_or_default(),
         )
     } else {
-        let index = rank_indices
+        let indices = rank_indices
             .iter()
-            .rposition(|indices| !indices.is_empty())
-            .unwrap();
-        (PokerHand::HighCard, vec![rank_indices[index][0]])
+            .rfind(|indices| !indices.is_empty())
+            .map(|indices| vec![indices[0]])
+            .unwrap_or_default();
+        (PokerHand::HighCard, indices)
     };
 
+    scoring_card_indices.extend(stone_indices);
     Some(PokerHandResult {
         hand,
         scoring_card_indices,
@@ -224,9 +231,9 @@ fn straight_ranks(rank_mask: u16, allow_gaps: bool) -> Option<[u8; 5]> {
 }
 
 fn suit_from_id(card_id: u16) -> u8 {
-    ((card_id >> 7) & 0x03) as u8
+    ((card_id >> 9) & 0x03) as u8
 }
 
 fn enhancement_from_id(card_id: u16) -> u8 {
-    ((card_id >> 4) & 0x0f) as u8
+    ((card_id >> 5) & 0x0f) as u8
 }

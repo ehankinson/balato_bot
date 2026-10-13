@@ -427,7 +427,7 @@ impl PokerHand {
 
 impl Rank {
     pub(crate) fn from_card_id(card_id: u16) -> Rank {
-        match ((card_id >> 9) & 0x0f) as u8 {
+        match ((card_id >> 11) & 0x0f) as u8 {
             2 => Rank::Two,
             3 => Rank::Three,
             4 => Rank::Four,

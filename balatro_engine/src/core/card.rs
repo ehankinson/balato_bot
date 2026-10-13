@@ -62,9 +62,10 @@ impl Card {
         edition: &Edition,
         seal: &Seal,
     ) -> u16 {
-        ((*rank as u16) << 9
-            | ((*suit as u16) << 7)
-            | ((*enhancement as u16) << 4)
+        // rank: 4 bits, suit: 2, enhancement: 4, seal: 3, edition: 2.
+        ((*rank as u16) << 11
+            | ((*suit as u16) << 9)
+            | ((*enhancement as u16) << 5)
             | ((*seal) as u16) << 2)
             | (*edition as u16)
     }
@@ -123,7 +124,9 @@ impl Card {
         }
 
         let mut values = self.scoring_values;
-        values.chips += self.rank.base_chips() as i32;
+        if self.enhancement != Enhancement::Stone {
+            values.chips += self.rank.base_chips() as i32;
+        }
 
         match self.enhancement {
             Enhancement::Bonus => values.chips += 30,
@@ -137,13 +140,19 @@ impl Card {
             | Enhancement::Wild => {}
         }
 
-        match self.edition {
-            Edition::Foil => values.chips += 50,
-            Edition::Holographic => values.add_mult += 10,
-            Edition::Polychrome => values.x_mult *= 1.5,
-            Edition::None => {}
-        }
+        values
+    }
 
+    pub(crate) fn edition_scoring_values(&self) -> ScoringValues {
+        let mut values = ScoringValues::default();
+        if !self.debuffed {
+            match self.edition {
+                Edition::Foil => values.chips = 50,
+                Edition::Holographic => values.add_mult = 10,
+                Edition::Polychrome => values.x_mult = 1.5,
+                Edition::None => {}
+            }
+        }
         values
     }
 
@@ -156,7 +165,7 @@ impl Card {
     }
 
     pub(crate) fn is_low_card(&self) -> bool {
-        self.rank.is_low_card()
+        self.enhancement != Enhancement::Stone && self.rank.is_low_card()
     }
 
     pub(crate) fn id(&self) -> u16 {

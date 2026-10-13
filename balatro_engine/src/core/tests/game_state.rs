@@ -336,7 +336,7 @@ fn completing_a_boss_pays_its_reward_and_clears_pillar_marks() {
     state.blind.chips_scored = state.blind.score_requirement;
 
     assert_eq!(
-        state.finish_blind().unwrap(),
+        state.finish_blind(&Hand::new()).unwrap(),
         crate::core::game::BlindPayout {
             blind_reward: 5,
             interest: 2,
@@ -360,7 +360,7 @@ fn finishing_a_boss_dispatches_boss_and_round_completion_events() {
     state.begin_blind_as(BlindKind::Boss(BossBlinds::Hook));
     state.blind.chips_scored = state.blind.score_requirement;
 
-    state.finish_blind();
+    state.finish_blind(&Hand::new());
 
     assert_eq!(state.money, 8);
 }
@@ -372,7 +372,7 @@ fn finish_blind_pays_small_and_big_blinds_with_capped_interest() {
     small.begin_blind_as(BlindKind::Small);
     small.blind.chips_scored = small.blind.score_requirement;
     assert_eq!(
-        small.finish_blind().unwrap(),
+        small.finish_blind(&Hand::new()).unwrap(),
         crate::core::game::BlindPayout {
             blind_reward: 3,
             interest: 4,
@@ -388,7 +388,7 @@ fn finish_blind_pays_small_and_big_blinds_with_capped_interest() {
     big.begin_blind_as(BlindKind::Big);
     big.blind.chips_scored = big.blind.score_requirement;
     assert_eq!(
-        big.finish_blind().unwrap(),
+        big.finish_blind(&Hand::new()).unwrap(),
         crate::core::game::BlindPayout {
             blind_reward: 4,
             interest: 10,
@@ -602,7 +602,8 @@ fn cards_build_scoring_values_from_attributes_and_permanent_modifiers() {
 
     let values = card.scoring_values();
 
-    assert_eq!(values.chips, 98);
+    assert_eq!(values.chips, 48);
+    assert_eq!(card.edition_scoring_values().chips, 50);
     assert_eq!(values.add_mult, 0);
     assert_eq!(values.x_mult, 1.0);
 }

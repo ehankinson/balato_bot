@@ -212,7 +212,7 @@ fn investment_tag_pays_at_the_next_boss_payout() {
     state.blind.chips_scored = state.blind.score_requirement;
     apply_tag(&mut state, SkipTag::Investment);
 
-    let payout = state.finish_blind().unwrap();
+    let payout = state.finish_blind(&Hand::new()).unwrap();
 
     assert_eq!(state.money, i16::from(payout.total));
     assert!(state.money >= 25);

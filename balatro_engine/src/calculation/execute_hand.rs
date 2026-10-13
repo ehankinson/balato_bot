@@ -1,6 +1,6 @@
 use crate::core::blind::{BlindKind, ScoringCard, ScoringData};
 use crate::core::card::{Card, ScoringValues};
-use crate::core::enums::{Enhancement, PokerHand};
+use crate::core::enums::{Enhancement, PokerHand, Seal};
 use crate::core::game::GameState;
 use crate::core::hand::Hand;
 use crate::core::joker::{JokerScoringEffect, TriggerEvent};
@@ -115,7 +115,11 @@ pub(crate) fn execute_hand(
             continue;
         }
 
-        let mut trigger_count = 1u8;
+        let mut trigger_count = 1u8
+            + u8::from(
+                !played_cards[card_index].is_debuffed()
+                    && played_cards[card_index].seal() == Seal::Red,
+            );
         for joker_index in 0..joker_len {
             let retriggers = {
                 let event = TriggerEvent::PlayedCard {
@@ -133,8 +137,9 @@ pub(crate) fn execute_hand(
         }
 
         for _ in 0..trigger_count {
-            let card_values = played_cards[card_index].scoring_values();
+            let card_values = state.played_card_values(&played_cards[card_index]);
             score.apply_card_values(card_values);
+            score.apply_card_values(played_cards[card_index].edition_scoring_values());
 
             for joker_index in 0..joker_len {
                 if state.jokers.is_played_retrigger(joker_index) {
@@ -170,7 +175,9 @@ pub(crate) fn execute_hand(
             continue;
         }
 
-        for _ in 0..held_trigger_count {
+        for _ in
+            0..held_trigger_count + usize::from(held_hand.cards()[card_index].seal() == Seal::Red)
+        {
             if held_hand.cards()[card_index].enhancement() == Enhancement::Steel {
                 score.multiply_mult(1.5);
             }
@@ -228,6 +235,8 @@ pub(crate) fn execute_hand(
             .edition_scoring_effect();
         score.apply_joker_scoring_effect(&edition);
     }
+
+    score.multiply_mult(state.planet_mult_multiplier(hand_type));
 
     ScoreResult {
         hand: hand_type,
