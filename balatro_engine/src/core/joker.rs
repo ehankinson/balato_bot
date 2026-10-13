@@ -3,6 +3,7 @@ use crate::core::joker_types::{
     CopyType, GameStateModifications, GenerateType, JokerEdition, JokerKind, JokerRarity,
     JokerTrigger, RetriggerTarget,
 };
+use rand::RngExt;
 use rand::prelude::IndexedRandom;
 use rand::rngs::StdRng;
 
@@ -23,6 +24,9 @@ pub struct Joker {
     discount_percent: u8,
     sell_value_bonus: u8,
     debuffed: bool,
+    eternal: bool,
+    perishable_rounds: Option<u8>,
+    rental: bool,
     face_down: bool,
     update_mask: u32,
     rounds_completed: u8,
@@ -61,7 +65,7 @@ impl Joker {
     }
 
     pub(crate) fn edition_scoring_effect(&self) -> JokerScoringEffect {
-        if self.debuffed {
+        if self.is_debuffed() {
             return JokerScoringEffect::default();
         }
         match self.edition {
@@ -94,7 +98,56 @@ impl Joker {
     }
 
     pub(crate) fn is_debuffed(&self) -> bool {
-        self.debuffed
+        self.debuffed || self.perishable_rounds() == Some(0)
+    }
+
+    pub(crate) fn is_eternal(&self) -> bool {
+        self.eternal
+    }
+    pub(crate) fn perishable_rounds(&self) -> Option<u8> {
+        self.perishable_rounds
+    }
+    pub(crate) fn is_rental(&self) -> bool {
+        self.rental
+    }
+
+    pub(crate) fn set_eternal(&mut self) {
+        if self.kind.eternal_compatible() && self.perishable_rounds.is_none() {
+            self.eternal = true;
+        }
+    }
+
+    pub(crate) fn set_perishable(&mut self) {
+        if self.kind.perishable_compatible() && !self.eternal {
+            self.perishable_rounds = Some(5);
+        }
+    }
+
+    pub(crate) fn set_rental(&mut self) {
+        self.rental = true;
+        self.apply_discount(self.discount_percent);
+    }
+
+    pub(crate) fn roll_stickers(&mut self, stake: crate::core::enums::Stakes, rng: &mut StdRng) {
+        use crate::core::enums::Stakes;
+        if stake as u8 >= Stakes::Black as u8 {
+            let roll = rng.random_range(0..100u8);
+            if roll >= 70 {
+                self.set_eternal();
+            } else if stake as u8 >= Stakes::Orange as u8 && roll >= 40 {
+                self.set_perishable();
+            }
+        }
+        if stake == Stakes::Gold && rng.random_bool(0.3) {
+            self.set_rental();
+        }
+    }
+
+    pub(crate) fn finish_round_stickers(&mut self) -> i16 {
+        if let Some(rounds) = &mut self.perishable_rounds {
+            *rounds = rounds.saturating_sub(1);
+        }
+        if self.is_rental() { 3 } else { 0 }
     }
 
     pub(crate) fn set_debuffed(&mut self, debuffed: bool) {
@@ -102,11 +155,17 @@ impl Joker {
     }
 
     pub(crate) fn sell_value(&self) -> u8 {
+        if self.is_rental() {
+            return 1u8.saturating_add(self.sell_value_bonus);
+        }
         (self.current_price.saturating_div(2).min(u8::MAX as u16) as u8)
             .saturating_add(self.sell_value_bonus)
     }
 
     pub(crate) fn price(&self) -> u16 {
+        if self.is_rental() {
+            return 1;
+        }
         self.original_price as u16
             + match self.edition {
                 JokerEdition::Foil => 2,
@@ -117,6 +176,9 @@ impl Joker {
     }
 
     pub(crate) fn original_price(&self) -> u16 {
+        if self.is_rental() {
+            return 1;
+        }
         self.original_price as u16
             + match self.edition {
                 JokerEdition::Foil => 2,
@@ -2162,6 +2224,9 @@ impl Joker {
             discount_percent: 0,
             sell_value_bonus: 0,
             debuffed: false,
+            eternal: false,
+            perishable_rounds: None,
+            rental: false,
             face_down: false,
             update_mask,
             rounds_completed: 0,

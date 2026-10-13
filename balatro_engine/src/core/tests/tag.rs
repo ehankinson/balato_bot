@@ -214,7 +214,7 @@ fn investment_tag_pays_at_the_next_boss_payout() {
 
     let payout = state.finish_blind(&Hand::new()).unwrap();
 
-    assert_eq!(state.money, i16::from(payout.total));
+    assert_eq!(state.money, 4 + i16::from(payout.total));
     assert!(state.money >= 25);
 }
 

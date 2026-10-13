@@ -41,7 +41,7 @@ fn red_deck_adds_one_discard_to_the_white_stake_default() {
 
     assert_eq!(red.hands_per_blind(), 4);
     assert_eq!(red.discards_per_blind(), 4);
-    assert_eq!(blue.hands_per_blind(), 4);
+    assert_eq!(blue.hands_per_blind(), 5);
     assert_eq!(blue.discards_per_blind(), 3);
 }
 
@@ -287,6 +287,7 @@ fn play_hand_runs_hook_discard_and_refills_the_hand() {
 #[test]
 fn discarding_triggers_jokers_and_refills_the_hand() {
     let mut state = GameState::new(112);
+    state.money = 0;
     state.jokers.add(Joker::create_joker(JokerKind::Faceless));
     let mut hand = Hand::new();
     for rank in [Rank::Jack, Rank::Queen, Rank::King] {
@@ -320,7 +321,7 @@ fn play_hand_finishes_and_pays_when_the_target_is_reached() {
 
     assert!(state.blind.finished);
     assert!(state.blind.has_beaten_target());
-    assert_eq!(state.money, 3);
+    assert_eq!(state.money, 10);
 }
 
 #[test]
@@ -340,10 +341,12 @@ fn completing_a_boss_pays_its_reward_and_clears_pillar_marks() {
         crate::core::game::BlindPayout {
             blind_reward: 5,
             interest: 2,
-            total: 7,
+            hand_money: 4,
+            discard_money: 0,
+            total: 11,
         }
     );
-    assert_eq!(state.money, 17);
+    assert_eq!(state.money, 21);
     assert!(
         !state
             .deck
@@ -362,7 +365,7 @@ fn finishing_a_boss_dispatches_boss_and_round_completion_events() {
 
     state.finish_blind(&Hand::new());
 
-    assert_eq!(state.money, 8);
+    assert_eq!(state.money, 17);
 }
 
 #[test]
@@ -376,10 +379,12 @@ fn finish_blind_pays_small_and_big_blinds_with_capped_interest() {
         crate::core::game::BlindPayout {
             blind_reward: 3,
             interest: 4,
-            total: 7,
+            hand_money: 4,
+            discard_money: 0,
+            total: 11,
         }
     );
-    assert_eq!(small.money, 27);
+    assert_eq!(small.money, 31);
 
     let mut big = GameState::new(23);
     big.money = 100;
@@ -392,10 +397,12 @@ fn finish_blind_pays_small_and_big_blinds_with_capped_interest() {
         crate::core::game::BlindPayout {
             blind_reward: 4,
             interest: 10,
-            total: 14,
+            hand_money: 4,
+            discard_money: 0,
+            total: 18,
         }
     );
-    assert_eq!(big.money, 114);
+    assert_eq!(big.money, 118);
 }
 
 #[test]
@@ -439,7 +446,7 @@ fn deck_hand_size_modifiers_are_part_of_the_owned_deck() {
     let black_deck = GameState::with_deck(2, Decks::Black);
     let painted_deck = GameState::with_deck(3, Decks::Painted);
 
-    assert_eq!(black_deck.hand_size(), 7);
+    assert_eq!(black_deck.hand_size(), 8);
     assert_eq!(painted_deck.hand_size(), 10);
 }
 
@@ -1683,6 +1690,7 @@ fn copy_chains_and_brainstorm_reject_incompatible_payouts_and_can_retarget_scori
         vec![JokerKind::Golden, JokerKind::Brainstorm],
     ] {
         let mut state = GameState::new(824);
+        state.money = 0;
         state.begin_blind_as(BlindKind::Small);
         for kind in kinds {
             state.jokers.add(Joker::create_joker(kind));

@@ -328,7 +328,13 @@ impl BlindState {
 
     pub(crate) fn reward(&self) -> u8 {
         match self.kind {
-            BlindKind::Small => 3,
+            BlindKind::Small => {
+                if self.stake == Stakes::White {
+                    3
+                } else {
+                    0
+                }
+            }
             BlindKind::Big => 4,
             BlindKind::Boss(boss) => boss.rule().reward,
         }
@@ -348,7 +354,10 @@ impl BlindState {
             self.hand_size_modifier += 1;
         }
         self.boss_ability_disabled = true;
-        self.score_requirement = self.kind.score_requirement(self.stake, self.ante, true);
+        self.score_requirement = self
+            .kind
+            .score_requirement(self.stake, self.ante, true)
+            .saturating_mul(self.ante_scaling);
         self.forced_card_index = None;
         self.face_down_draws = false;
         self.face_down_face_cards = false;

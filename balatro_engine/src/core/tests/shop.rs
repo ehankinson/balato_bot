@@ -264,7 +264,7 @@ fn game_state_can_start_with_a_non_red_deck_for_shop_card_purchases() {
 
     shop.buy_item(0, &mut state).unwrap();
 
-    assert_eq!(state.hand_size(), 7);
+    assert_eq!(state.hand_size(), 8);
     assert_eq!(state.deck_size(), 53);
 }
 

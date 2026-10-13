@@ -285,6 +285,7 @@ fn blueprint_and_brainstorm_delegate_economy_state_retrigger_and_generation_effe
     economy.add(Joker::create_joker(JokerKind::Blueprint));
     economy.add(Joker::create_joker(JokerKind::GoldenTicket));
     let mut state = GameState::new(32);
+    state.money = 0;
     economy.trigger(
         TriggerEvent::PlayedCard {
             card: &gold,
@@ -303,6 +304,7 @@ fn blueprint_and_brainstorm_delegate_economy_state_retrigger_and_generation_effe
     game_state_copy.add(Joker::create_joker(JokerKind::Blueprint));
     game_state_copy.add(Joker::create_joker(JokerKind::Burglar));
     let mut state = GameState::new(34);
+    state.money = 0;
     let effect = game_state_copy.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
     assert_eq!(effect.hands, 6);
     assert_eq!(effect.discards, -8);
@@ -314,6 +316,7 @@ fn blueprint_and_brainstorm_delegate_economy_state_retrigger_and_generation_effe
     retriggers.add(Joker::create_joker(JokerKind::Blueprint));
     retriggers.add(Joker::create_joker(JokerKind::Mime));
     let mut state = GameState::new(35);
+    state.money = 0;
     let effect = retriggers.trigger(
         TriggerEvent::HeldCard {
             card: &held,
@@ -329,6 +332,7 @@ fn blueprint_and_brainstorm_delegate_economy_state_retrigger_and_generation_effe
     generated.add(Joker::create_joker(JokerKind::Blueprint));
     generated.add(Joker::create_joker(JokerKind::Perkeo));
     let mut state = GameState::new(36);
+    state.money = 0;
     state.consumable_capacity = 4;
     state
         .add_consumable(Consumable::Tarot(Tarot::Hermit))

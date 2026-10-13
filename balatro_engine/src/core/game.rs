@@ -9,7 +9,7 @@ use crate::core::consumable::{
 use crate::core::deck::Deck;
 use crate::core::enums::{
     ALL_RANKS, ALL_SUITS, BossBlinds, Consumable, Decks, Edition, Enhancement, Planet, PokerHand,
-    Seal, SkipTag, Spectral, Tarot, Vouchers,
+    Seal, SkipTag, Spectral, Stakes, Tarot, Vouchers,
 };
 use crate::core::hand::Hand;
 use crate::core::joker::{
@@ -34,6 +34,8 @@ pub(crate) struct HandScore {
 pub(crate) struct BlindPayout {
     pub(crate) blind_reward: u8,
     pub(crate) interest: i16,
+    pub(crate) hand_money: i16,
+    pub(crate) discard_money: i16,
     pub(crate) total: i16,
 }
 
@@ -207,6 +209,10 @@ impl GameState {
     }
 
     pub(crate) fn with_deck(seed: u64, deck_type: Decks) -> GameState {
+        Self::with_rules(seed, deck_type, Stakes::White)
+    }
+
+    pub(crate) fn with_rules(seed: u64, deck_type: Decks, stake: Stakes) -> GameState {
         let mut rng = StdRng::seed_from_u64(seed);
 
         let deck = Deck::new(deck_type, &mut rng);
@@ -218,7 +224,7 @@ impl GameState {
             blind_selector: BlindSelector::empty(),
             deck,
             jokers: Jokers::new(),
-            money: 0,
+            money: 4,
             interest_cap: 5,
             consumable_capacity,
             shop_discount_percent: 0,
@@ -239,9 +245,56 @@ impl GameState {
             finisher_boss_blinds: FinisherBossBlindHistory::new(),
             rng,
         };
+        state.blind.stake = stake;
+        state.blind.ante_scaling = if deck_type == Decks::Plasma { 2 } else { 1 };
         state
             .blind
             .adjust_discards_per_blind(state.deck.discard_modifier());
+        if stake as u8 >= Stakes::Blue as u8 {
+            state.blind.adjust_discards_per_blind(-1);
+        }
+        if deck_type == Decks::Blue {
+            state.blind.adjust_hands_per_blind(1);
+        }
+        if deck_type == Decks::Black {
+            state.blind.adjust_hands_per_blind(-1);
+            state.jokers.increase_capacity(1);
+        }
+        if deck_type == Decks::Painted {
+            state.jokers.decrease_capacity(1);
+        }
+        match deck_type {
+            Decks::Yellow => state.money += 10,
+            Decks::Magic => {
+                state.redeem_voucher(Vouchers::CrystalBall).unwrap();
+                state
+                    .add_consumable(Consumable::Tarot(Tarot::Fool))
+                    .unwrap();
+                state
+                    .add_consumable(Consumable::Tarot(Tarot::Fool))
+                    .unwrap();
+            }
+            Decks::Nebula => {
+                state.redeem_voucher(Vouchers::Telescope).unwrap();
+            }
+            Decks::Ghost => {
+                state
+                    .add_consumable(Consumable::Spectral(Spectral::Hex))
+                    .unwrap();
+            }
+            Decks::Zodiac => {
+                for voucher in [
+                    Vouchers::TarotMerchant,
+                    Vouchers::PlanetMerchant,
+                    Vouchers::Overstock,
+                ] {
+                    state.redeem_voucher(voucher).unwrap();
+                }
+            }
+            _ => {}
+        }
+        state.shop.apply_deck_rules(deck_type);
+        state.blind.hands_remaining = state.blind.hands_per_blind;
         state.blind.discards_remaining = state.blind.discards_per_blind;
         state.regenerate_blind_selector();
         state.roll_ante_voucher();
@@ -338,6 +391,7 @@ impl GameState {
         self.jokers.clear_blind_effects();
         self.blind.begin(kind, self.counters.ante);
         self.blind.hand_size_modifier += self.tags.take_juggle_hand_size();
+        self.update_jokers(UpdateEvent::RoundStarted);
         self.update_jokers(UpdateEvent::BlindSelected {
             is_boss: kind.is_boss(),
         });
@@ -444,9 +498,21 @@ impl GameState {
             self.update_jokers(UpdateEvent::BossBlindCompleted);
         }
         self.update_jokers(UpdateEvent::RoundCompleted);
+        self.money -= self.jokers.finish_round_stickers();
         self.apply_held_round_effects(hand);
         let blind_reward = self.blind.reward();
-        let interest = (self.money.max(0) / 5).min(self.interest_cap);
+        let green = self.deck.deck_type() == Decks::Green;
+        let interest = if green {
+            0
+        } else {
+            (self.money.max(0) / 5).min(self.interest_cap)
+        };
+        let hand_money = i16::from(self.blind.hands_remaining) * if green { 2 } else { 1 };
+        let discard_money = if green {
+            i16::from(self.blind.discards_remaining)
+        } else {
+            0
+        };
         let investment = if self.blind.kind.is_boss() {
             let mut tags = std::mem::take(&mut self.tags);
             let reward = i16::from(tags.take_investment()).saturating_mul(25);
@@ -455,8 +521,16 @@ impl GameState {
         } else {
             0
         };
-        let total = i16::from(blind_reward) + interest + investment;
+        let total = i16::from(blind_reward) + interest + investment + hand_money + discard_money;
         self.money += total;
+        self.counters.round += 1;
+        if is_boss && self.deck.deck_type() == Decks::Anaglyph {
+            self.materialize_generated_effects(
+                &[JokerOperation::AddDoubleTag { count: 1 }],
+                &mut [],
+                None,
+            );
+        }
         self.deck.clear_debuffs();
         self.jokers.clear_blind_effects();
         if is_boss {
@@ -466,6 +540,8 @@ impl GameState {
         Some(BlindPayout {
             blind_reward,
             interest,
+            hand_money,
+            discard_money,
             total,
         })
     }
@@ -1027,7 +1103,11 @@ impl GameState {
     }
 
     pub(crate) fn sell_joker(&mut self, index: usize) -> Option<u16> {
-        let sell_value = self.jokers.get(index)?.sell_value();
+        let joker = self.jokers.get(index)?;
+        if joker.is_eternal() {
+            return None;
+        }
+        let sell_value = joker.sell_value();
         Jokers::dispatch_sale(self, index);
         self.money += sell_value as i16;
         self.update_jokers(UpdateEvent::AfterCardSold);
@@ -1351,12 +1431,20 @@ impl GameState {
 }
 
 /// The runtime object that will coordinate phase transitions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BlindStage {
+    Small,
+    Big,
+    Boss,
+}
+
 pub struct Game {
     pub(crate) state: GameState,
     pub(crate) hand: Hand,
     decision_point: DecisionPoint,
     shop_active: bool,
     pending_pack: Option<PendingPack>,
+    blind_stage: BlindStage,
 }
 
 struct PendingPack {
@@ -1366,12 +1454,17 @@ struct PendingPack {
 
 impl Game {
     pub fn new(seed: u64) -> Game {
+        Self::with_rules(seed, Decks::Red, Stakes::White)
+    }
+
+    pub(crate) fn with_rules(seed: u64, deck: Decks, stake: Stakes) -> Game {
         Game {
-            state: GameState::new(seed),
+            state: GameState::with_rules(seed, deck, stake),
             hand: Hand::new(),
             decision_point: DecisionPoint::BlindSelection,
             shop_active: false,
             pending_pack: None,
+            blind_stage: BlindStage::Small,
         }
     }
 
@@ -1426,9 +1519,13 @@ impl Game {
                 if self.decision_point != DecisionPoint::BlindSelection {
                     return Err(ActionError::InvalidPhase);
                 }
+                if kind != self.available_blind() {
+                    return Err(ActionError::Decision(DecisionError::InvalidBlindChoice));
+                }
                 self.state
                     .skip_blind(kind)
                     .map_err(ActionError::BlindSkip)?;
+                self.advance_blind_stage();
                 self.open_next_tag_pack();
             }
             GameAction::PlayCards(positions) => {
@@ -1441,6 +1538,7 @@ impl Game {
                 if self.state.blind.finished {
                     self.enter_shop().map_err(ActionError::Shop)?;
                 } else if self.state.blind.hands_remaining == 0 || self.hand.cards().is_empty() {
+                    self.state.counters.life = 0;
                     self.decision_point = DecisionPoint::RunComplete;
                 }
             }
@@ -1455,6 +1553,7 @@ impl Game {
                 if self.state.blind.finished {
                     self.enter_shop().map_err(ActionError::Shop)?;
                 } else if self.hand.cards().is_empty() {
+                    self.state.counters.life = 0;
                     self.decision_point = DecisionPoint::RunComplete;
                 }
             }
@@ -1503,10 +1602,28 @@ impl Game {
                 self.open_next_tag_pack();
             }
             GameAction::UseConsumable { index, target } => {
-                self.require_shop()?;
+                if !matches!(
+                    self.decision_point,
+                    DecisionPoint::Shop | DecisionPoint::PlayingHand
+                ) {
+                    return Err(ActionError::InvalidPhase);
+                }
                 self.state
                     .use_consumable(index, &mut self.hand, target)
                     .map_err(ActionError::Consumable)?;
+                if self.decision_point == DecisionPoint::PlayingHand {
+                    if self.hand.cards().is_empty() && self.state.blind.hands_remaining > 0 {
+                        self.state.deal_cards(&mut self.hand);
+                    }
+                    self.state.resolve_blind_end(&mut self.hand);
+                    if self.state.blind.finished {
+                        self.enter_shop().map_err(ActionError::Shop)?;
+                    } else if self.hand.cards().is_empty() || self.state.blind.hands_remaining == 0
+                    {
+                        self.state.counters.life = 0;
+                        self.decision_point = DecisionPoint::RunComplete;
+                    }
+                }
             }
             GameAction::SellJoker(index) => {
                 if !matches!(
@@ -1552,19 +1669,31 @@ impl Game {
         }
     }
 
+    pub(crate) fn available_blind(&self) -> BlindKind {
+        match self.blind_stage {
+            BlindStage::Small => BlindKind::Small,
+            BlindStage::Big => BlindKind::Big,
+            BlindStage::Boss => self.state.blind_selector.boss().kind,
+        }
+    }
+
+    fn advance_blind_stage(&mut self) {
+        self.blind_stage = match self.blind_stage {
+            BlindStage::Small => BlindStage::Big,
+            BlindStage::Big => BlindStage::Boss,
+            BlindStage::Boss => {
+                self.state.begin_next_ante();
+                BlindStage::Small
+            }
+        };
+    }
+
     pub(crate) fn select_blind(&mut self, kind: BlindKind) -> Result<(), DecisionError> {
         if self.decision_point != DecisionPoint::BlindSelection {
             return Err(DecisionError::InvalidPhase);
         }
 
-        let selector = self.state.blind_selector;
-        if ![
-            selector.small().kind,
-            selector.big().kind,
-            selector.boss().kind,
-        ]
-        .contains(&kind)
-        {
+        if kind != self.available_blind() {
             return Err(DecisionError::InvalidBlindChoice);
         }
 
@@ -1573,7 +1702,16 @@ impl Game {
         self.state.deck.reset_deck();
         self.state.begin_blind_as(kind);
         self.state.deal_cards(&mut self.hand);
-        self.decision_point = DecisionPoint::PlayingHand;
+        self.state.resolve_blind_end(&mut self.hand);
+        self.decision_point = if (self.hand.cards().is_empty()
+            || self.state.blind.hands_remaining == 0)
+            && !self.state.blind.finished
+        {
+            self.state.counters.life = 0;
+            DecisionPoint::RunComplete
+        } else {
+            DecisionPoint::PlayingHand
+        };
         Ok(())
     }
 
@@ -1610,6 +1748,16 @@ impl Game {
         }
         self.state.update_jokers(UpdateEvent::ShopClosed);
         self.shop_active = false;
+        if self.state.blind.finished
+            && matches!(
+                (self.blind_stage, self.state.blind.kind),
+                (BlindStage::Small, BlindKind::Small)
+                    | (BlindStage::Big, BlindKind::Big)
+                    | (BlindStage::Boss, BlindKind::Boss(_))
+            )
+        {
+            self.advance_blind_stage();
+        }
         self.decision_point = DecisionPoint::BlindSelection;
         Some(())
     }
@@ -1662,3 +1810,7 @@ mod card_scoring_tests;
 #[cfg(test)]
 #[path = "tests/joker_economy_flow.rs"]
 mod joker_economy_flow_tests;
+
+#[cfg(test)]
+#[path = "tests/run_rules.rs"]
+mod run_rules_tests;

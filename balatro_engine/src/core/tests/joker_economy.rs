@@ -14,6 +14,7 @@ fn mail_in_rebate_uses_the_currently_selected_rank() {
     let mut jokers = Jokers::new();
     jokers.add(Joker::create_joker(JokerKind::MailInRebate));
     let mut state = GameState::new(14);
+    state.money = 0;
     jokers.initialize(&mut state);
 
     let target = match &jokers.jokers[0].structure {
@@ -38,6 +39,7 @@ fn golden_ticket_pays_for_gold_played_cards() {
     let gold = card(Rank::Seven, Suit::Hearts, Enhancement::Gold);
     let plain = card(Rank::Seven, Suit::Hearts, Enhancement::None);
     let mut state = GameState::new(15);
+    state.money = 0;
 
     jokers.trigger(
         TriggerEvent::PlayedCard {
@@ -74,6 +76,7 @@ fn matador_pays_only_when_a_boss_ability_triggers() {
     let mut jokers = Jokers::new();
     jokers.add(Joker::create_joker(JokerKind::Matador));
     let mut state = GameState::new(16);
+    state.money = 0;
 
     jokers.trigger(
         TriggerEvent::AfterHand {
@@ -235,6 +238,7 @@ fn todo_list_pays_for_the_selected_hand_only() {
     let mut jokers = Jokers::new();
     jokers.add(Joker::create_joker(JokerKind::ToDoList));
     let mut state = GameState::new(24);
+    state.money = 0;
     jokers.initialize(&mut state);
     let target = match &jokers.jokers[0].structure {
         JokerStructure::Normal(JokerData::Econ(data)) => data.poker_hand,

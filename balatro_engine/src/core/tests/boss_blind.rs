@@ -395,7 +395,7 @@ fn whole_hand_debuffs_consume_cards_and_do_not_activate_card_jokers_or_editions(
         state.deck.cards().len() + state.deck.discarded_cards().len() + hand.cards().len(),
         total
     );
-    assert_eq!(state.money, 8);
+    assert_eq!(state.money, 12);
 }
 
 #[test]
@@ -1008,6 +1008,7 @@ fn ox_uses_the_previous_ante_target_and_is_not_retargeted_by_current_plays() {
 fn copied_matador_does_not_pay_when_the_copy_or_target_is_debuffed() {
     for debuff_copy in [false, true] {
         let mut state = GameState::new(419);
+        state.money = 0;
         state.jokers.add(Joker::create_joker(JokerKind::Blueprint));
         state.jokers.add(Joker::create_joker(JokerKind::Matador));
         state.begin_blind_as(BlindKind::Boss(BossBlinds::Flint));

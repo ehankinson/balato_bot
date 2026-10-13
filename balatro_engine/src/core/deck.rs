@@ -20,7 +20,6 @@ impl Deck {
     pub(crate) fn new(deck_type: Decks, rng: &mut StdRng) -> Deck {
         let cards = Deck::build_cards(&deck_type, rng);
         let hand_size_modifier = match deck_type {
-            Decks::Black => -1,
             Decks::Painted => 2,
             _ => 0,
         };
@@ -197,6 +196,15 @@ impl Deck {
                 }
 
                 for suit in ALL_SUITS {
+                    let suit = if *deck_type == Decks::Checkered {
+                        match suit {
+                            crate::core::enums::Suit::Clubs => crate::core::enums::Suit::Spades,
+                            crate::core::enums::Suit::Diamonds => crate::core::enums::Suit::Hearts,
+                            _ => suit,
+                        }
+                    } else {
+                        suit
+                    };
                     vec.push(Card::new(
                         rank,
                         suit,

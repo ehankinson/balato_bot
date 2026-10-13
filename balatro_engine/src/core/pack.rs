@@ -231,6 +231,7 @@ fn random_option(
         BoosterPackKind::Buffoon => {
             let mut joker = random_pack_joker(state, generated_jokers);
             joker.set_edition(random_shop_joker_edition(state));
+            joker.roll_stickers(state.blind.stake, &mut state.rng);
             PackOption::Joker(joker)
         }
         BoosterPackKind::Spectral => {

@@ -71,6 +71,7 @@ pub(crate) enum Edition {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[pyo3::pyclass(name = "Deck", from_py_object)]
 pub(crate) enum Decks {
     Red = 1,
     Blue = 2,
@@ -90,6 +91,7 @@ pub(crate) enum Decks {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[pyo3::pyclass(name = "Stake", from_py_object)]
 pub(crate) enum Stakes {
     White = 1,
     Red = 2,

@@ -20,6 +20,22 @@ impl PyGame {
     }
 
     #[getter]
+    fn ante(&self) -> u8 {
+        self.game.state().counters.ante
+    }
+
+    #[getter]
+    fn blind_index(&self) -> Option<u8> {
+        (self.game.decision_point() == crate::core::game::DecisionPoint::BlindSelection).then(
+            || match self.game.available_blind() {
+                BlindKind::Small => 0,
+                BlindKind::Big => 1,
+                BlindKind::Boss(_) => 2,
+            },
+        )
+    }
+
+    #[getter]
     fn decision_point(&self) -> u8 {
         self.game.decision_point().code()
     }
@@ -71,7 +87,13 @@ impl PyGame {
                 index: index.ok_or_else(|| {
                     pyo3::exceptions::PyValueError::new_err("consumable actions require an index")
                 })?,
-                target: ConsumableTarget::default(),
+                target: positions
+                    .map(|indices| {
+                        ConsumableTarget::hand(
+                            indices.into_iter().map(usize::from).collect::<Vec<_>>(),
+                        )
+                    })
+                    .unwrap_or_default(),
             },
             ActionKind::SellJoker => GameAction::SellJoker(index.ok_or_else(|| {
                 pyo3::exceptions::PyValueError::new_err("selling a Joker requires an index")
@@ -90,9 +112,10 @@ impl PyGame {
 }
 
 #[pyfunction]
-fn new(seed: u64) -> PyGame {
+#[pyo3(signature = (seed, deck=crate::core::enums::Decks::Red, stake=crate::core::enums::Stakes::White))]
+fn new(seed: u64, deck: crate::core::enums::Decks, stake: crate::core::enums::Stakes) -> PyGame {
     PyGame {
-        game: crate::core::game::Game::new(seed),
+        game: crate::core::game::Game::with_rules(seed, deck, stake),
     }
 }
 
@@ -106,6 +129,9 @@ mod balatro_engine {
 
     #[pymodule_export]
     use super::new;
+
+    #[pymodule_export]
+    use crate::core::enums::{Decks, Stakes};
 
     #[pymodule_export]
     use crate::core::game::ActionKind;

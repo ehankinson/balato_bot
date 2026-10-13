@@ -254,7 +254,9 @@ fn spectral_joker_effects_preserve_the_selected_joker_rules() {
     state
         .use_consumable(0, &mut hand, ConsumableTarget::default())
         .unwrap();
-    assert_eq!(state.jokers.as_slice()[0].edition(), JokerEdition::None);
+    assert_eq!(state.jokers.as_slice().len(), 2);
+    assert_eq!(state.jokers.as_slice()[0].edition(), JokerEdition::Negative);
+    assert_eq!(state.jokers.as_slice()[1].edition(), JokerEdition::None);
 }
 
 #[test]

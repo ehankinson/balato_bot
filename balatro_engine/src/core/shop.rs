@@ -305,6 +305,7 @@ pub(crate) fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> Sh
         ShopOfferKind::Joker => {
             let mut joker = random_shop_joker(state);
             joker.set_edition(crate::core::voucher::random_shop_joker_edition(state));
+            joker.roll_stickers(state.blind.stake, &mut state.rng);
             let price = joker.price();
             ShopItem::Joker { joker, price }
         }

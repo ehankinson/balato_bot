@@ -97,12 +97,14 @@ fn each_generated_blind_can_be_selected_and_deals_a_hand() {
     );
 
     let mut big = Game::new(32);
+    big.blind_stage = BlindStage::Big;
     assert_eq!(
         big.apply_action(GameAction::SelectBlind(BlindKind::Big)),
         Ok(DecisionPoint::PlayingHand)
     );
 
     let mut boss = Game::new(33);
+    boss.blind_stage = BlindStage::Boss;
     let boss_kind = boss.state().blind_selector.boss().kind;
     assert!(boss_kind.is_boss());
     assert_eq!(
@@ -205,6 +207,7 @@ fn running_out_of_hands_enters_the_terminal_decision() {
 #[test]
 fn boss_blinds_cannot_be_skipped() {
     let mut game = Game::new(36);
+    game.blind_stage = BlindStage::Boss;
     let boss = game.state().blind_selector.boss().kind;
 
     assert_eq!(

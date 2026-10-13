@@ -547,11 +547,11 @@ fn delayed_gratification_pays_once_after_win_and_not_after_earlier_hands() {
     let second = state.play_hand(&mut hand, vec![0]).unwrap();
     assert_eq!(second.mult, 1.0);
     assert_eq!(
-        state.money, 12,
-        "$8 delayed payout + $3 reward + $1 interest"
+        state.money, 14,
+        "$8 delayed payout + $3 reward + $1 interest + $2 unused hands"
     );
     assert!(state.finish_blind(&hand).is_none());
-    assert_eq!(state.money, 12);
+    assert_eq!(state.money, 14);
 }
 
 #[test]
@@ -566,7 +566,7 @@ fn delayed_gratification_does_not_pay_after_used_discard_or_loss() {
             state.blind.score_requirement = 1;
         }
         state.play_hand(&mut hand, vec![0]).unwrap();
-        assert_eq!(state.money, if lost { 0 } else { 3 });
+        assert_eq!(state.money, if lost { 0 } else { 6 });
     }
 }
 
@@ -595,8 +595,8 @@ fn normal_game_action_records_score_and_enters_shop_after_economy_and_generation
     game.apply_action(GameAction::PlayCards(vec![0])).unwrap();
     assert_eq!(game.state.blind.chips_scored, 45);
     assert_eq!(
-        game.state.money, 15,
-        "$10 card income + $3 reward + $2 interest"
+        game.state.money, 18,
+        "$10 card income + $3 reward + $2 interest + $3 unused hands"
     );
     assert!(game.state.consumables.is_empty());
     assert_eq!(game.decision_point(), DecisionPoint::Shop);
@@ -698,8 +698,8 @@ fn delayed_gratification_copy_is_incompatible_and_hook_does_not_count_as_used_di
     assert_eq!(state.blind.discards_used, 0);
     assert_eq!(state.deck.discarded_cards().len(), 3);
     assert_eq!(
-        state.money, 14,
-        "$8 Delayed Gratification + $5 boss + $1 interest"
+        state.money, 17,
+        "$8 Delayed Gratification + $5 boss + $1 interest + $3 unused hands"
     );
 }
 
@@ -726,7 +726,7 @@ fn winning_game_action_keeps_generated_tarots_through_the_shop_transition() {
     game.apply_action(GameAction::PlayCards(vec![0, 1, 2, 3, 4]))
         .unwrap();
     assert_eq!(game.state.blind.chips_scored, 1208);
-    assert_eq!(game.state.money, 7);
+    assert_eq!(game.state.money, 10);
     assert_eq!(game.state.consumables.len(), 2);
     assert!(
         game.state

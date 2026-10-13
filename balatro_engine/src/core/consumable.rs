@@ -342,7 +342,28 @@ fn apply_spectral(
                 .clone_at(index)
                 .expect("validated Joker target");
             joker.clear_negative_edition();
-            state.jokers.replace_with(joker);
+            let survivors = state
+                .jokers
+                .as_slice()
+                .iter()
+                .enumerate()
+                .filter(|(position, entry)| *position == index || entry.is_eternal())
+                .count();
+            let surviving_negative_slots = state
+                .jokers
+                .as_slice()
+                .iter()
+                .enumerate()
+                .filter(|(position, entry)| {
+                    (*position == index || entry.is_eternal())
+                        && entry.edition() == JokerEdition::Negative
+                })
+                .count();
+            if survivors >= state.jokers.capacity() + surviving_negative_slots {
+                return Err(ConsumableUseError::NoCapacity);
+            }
+            state.jokers.destroy_other_jokers(index);
+            state.jokers.add(joker);
         }
         DejaVu => apply_hand_seal(hand, target, Seal::Red)?,
         Hex => {
@@ -352,7 +373,7 @@ fn apply_spectral(
                 .get_mut(index)
                 .expect("validated Joker target")
                 .set_edition(JokerEdition::Polychrome);
-            state.jokers.keep_only(index);
+            state.jokers.destroy_other_jokers(index);
         }
         Trance => apply_hand_seal(hand, target, Seal::Blue)?,
         Medium => apply_hand_seal(hand, target, Seal::Purple)?,

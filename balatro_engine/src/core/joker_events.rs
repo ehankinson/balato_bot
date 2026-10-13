@@ -419,7 +419,7 @@ impl Jokers {
 
         let mut current = index;
         for _ in 0..self.jokers.len() {
-            if self.jokers[current].debuffed {
+            if self.jokers[current].is_debuffed() {
                 return None;
             }
             let next = match &self.jokers[current].structure {
@@ -448,7 +448,7 @@ impl Jokers {
         let Some(effective_index) = self.effective_index(index) else {
             return JokerEffect::default();
         };
-        if self.jokers[index].debuffed || self.jokers[effective_index].debuffed {
+        if self.jokers[index].is_debuffed() || self.jokers[effective_index].is_debuffed() {
             return JokerEffect::default();
         }
         self.jokers[effective_index].trigger(event, context, joker_count)
@@ -463,7 +463,7 @@ impl Jokers {
         let Some(effective_index) = self.effective_index(index) else {
             return JokerRetriggerEffect::default();
         };
-        if self.jokers[index].debuffed || self.jokers[effective_index].debuffed {
+        if self.jokers[index].is_debuffed() || self.jokers[effective_index].is_debuffed() {
             return JokerRetriggerEffect::default();
         }
         if !matches!(
@@ -516,7 +516,7 @@ impl Jokers {
     pub(crate) fn modifiers(&self) -> JokerModifiers {
         let mut modifiers = JokerModifiers::default();
         for joker in &self.jokers {
-            if joker.debuffed {
+            if joker.is_debuffed() {
                 continue;
             }
             let JokerStructure::Normal(JokerData::GameState(data)) = &joker.structure else {
@@ -547,6 +547,17 @@ impl Jokers {
         self.capacity
     }
 
+    pub(crate) fn decrease_capacity(&mut self, amount: usize) {
+        self.capacity -= amount;
+    }
+
+    pub(crate) fn finish_round_stickers(&mut self) -> i16 {
+        self.jokers
+            .iter_mut()
+            .map(Joker::finish_round_stickers)
+            .sum()
+    }
+
     pub(crate) fn increase_capacity(&mut self, amount: usize) {
         self.capacity = self.capacity.saturating_add(amount);
     }
@@ -563,19 +574,17 @@ impl Jokers {
         self.jokers.get(index).cloned()
     }
 
-    pub(crate) fn replace_with(&mut self, joker: Joker) {
-        self.jokers.clear();
-        self.jokers.push(joker);
-    }
-
-    pub(crate) fn keep_only(&mut self, index: usize) -> bool {
+    pub(crate) fn destroy_other_jokers(&mut self, index: usize) -> bool {
         if index >= self.jokers.len() {
             return false;
         }
 
-        let joker = self.jokers[index].clone();
-        self.jokers.clear();
-        self.jokers.push(joker);
+        let mut position = 0;
+        self.jokers.retain(|entry| {
+            let keep = position == index || entry.is_eternal();
+            position += 1;
+            keep
+        });
         true
     }
 
@@ -585,7 +594,7 @@ impl Jokers {
 
     pub(crate) fn disable_random(&mut self, rng: &mut StdRng) -> Option<usize> {
         let index = (0..self.jokers.len())
-            .filter(|&index| self.jokers.len() == 1 || !self.jokers[index].debuffed)
+            .filter(|&index| self.jokers.len() == 1 || !self.jokers[index].is_debuffed())
             .choose(rng)?;
         for joker in &mut self.jokers {
             joker.set_debuffed(false);
@@ -704,10 +713,13 @@ impl Jokers {
             // during this blind-selection event.
             (index + 1 < original_end).then_some(index + 1)
         } else if effect.remove_random_joker && self.jokers.len() > 1 {
-            (0..self.jokers.len()).choose(context.rng)
+            (0..self.jokers.len())
+                .filter(|&victim| victim != index && !self.jokers[victim].is_eternal())
+                .choose(context.rng)
         } else {
             None
         };
+        let removed = removed.filter(|&victim| !self.jokers[victim].is_eternal());
         if let Some(removed) = removed {
             if effect.remove_right_joker {
                 let growth = u32::from(self.jokers[removed].sell_value()) * 2;
@@ -951,7 +963,7 @@ impl Joker {
         context: &mut JokerContext<'_>,
         joker_count: u8,
     ) -> JokerEffect {
-        if self.debuffed {
+        if self.is_debuffed() {
             return JokerEffect::default();
         }
 
@@ -992,7 +1004,7 @@ impl Joker {
         context: &mut JokerContext<'_>,
         joker_count: u8,
     ) -> JokerScoringEffect {
-        if self.debuffed || !matches!(self.trigger, JokerTrigger::OnPlayedCard) {
+        if self.is_debuffed() || !matches!(self.trigger, JokerTrigger::OnPlayedCard) {
             return JokerScoringEffect::default();
         }
 
@@ -1053,7 +1065,7 @@ impl Joker {
         event: &TriggerEvent<'_>,
         context: &mut JokerContext<'_>,
     ) -> JokerRetriggerEffect {
-        if self.debuffed {
+        if self.is_debuffed() {
             return JokerRetriggerEffect::default();
         }
 
@@ -1100,7 +1112,7 @@ impl Joker {
         context: &mut JokerContext<'_>,
         joker_count: u8,
     ) -> JokerScoringEffect {
-        if self.debuffed || !matches!(self.trigger, JokerTrigger::AfterHand) {
+        if self.is_debuffed() || !matches!(self.trigger, JokerTrigger::AfterHand) {
             return JokerScoringEffect::default();
         }
 
@@ -1522,7 +1534,7 @@ impl Joker {
     }
 
     fn update(&mut self, event: &UpdateEvent<'_>, context: &mut JokerContext<'_>) -> JokerEffect {
-        if self.debuffed {
+        if self.is_debuffed() {
             return JokerEffect::default();
         }
 

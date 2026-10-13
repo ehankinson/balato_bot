@@ -238,6 +238,12 @@ pub(crate) fn execute_hand(
 
     score.multiply_mult(state.planet_mult_multiplier(hand_type));
 
+    if state.deck.deck_type() == crate::core::enums::Decks::Plasma {
+        let balanced = ((score.chips as f32 + score.mult) / 2.0).floor();
+        score.chips = balanced as u64;
+        score.mult = balanced;
+    }
+
     ScoreResult {
         hand: hand_type,
         chips: score.chips,

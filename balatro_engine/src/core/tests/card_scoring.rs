@@ -150,7 +150,7 @@ fn plant_suppresses_every_played_and_held_card_effect() {
             ]);
             let result = state.play_hand(&mut hand, vec![0]).unwrap();
             assert_eq!((result.chips, result.mult), (5, 1.0));
-            assert_eq!(state.money, 5, "only the boss reward pays");
+            assert_eq!(state.money, 8, "only the boss reward and unused hands pay");
             assert!(state.consumables.is_empty());
             assert_eq!(state.deck.discarded_cards().len(), 1);
         }
@@ -202,8 +202,8 @@ fn gold_and_blue_round_effects_use_held_cards_before_refill_and_pay_once() {
     assert_eq!(hand.hand_size(), 1);
     assert_eq!(state.deck.size(), deck_size);
     assert_eq!(
-        state.money, 9,
-        "Gold pays before interest: 2 + 3 + 3 reward + 1 interest"
+        state.money, 12,
+        "Gold pays before interest: 2 + 3 + 3 reward + 3 unused hands + 1 interest"
     );
     assert_eq!(
         state.consumables[0].consumable,
@@ -211,7 +211,7 @@ fn gold_and_blue_round_effects_use_held_cards_before_refill_and_pay_once() {
     );
     assert!(state.finish_blind(&hand).is_none());
     state.resolve_blind_end(&mut hand);
-    assert_eq!(state.money, 9);
+    assert_eq!(state.money, 12);
     assert_eq!(state.consumables.len(), 1);
 }
 
@@ -227,7 +227,7 @@ fn winning_hand_does_not_pay_newly_drawn_gold_cards_or_blue_seals() {
     let mut hand = hand_of([card(Enhancement::Gold, Edition::None, Seal::Blue)]);
     state.play_hand(&mut hand, vec![0]).unwrap();
     assert!(hand.cards().is_empty());
-    assert_eq!(state.money, 3);
+    assert_eq!(state.money, 6);
     assert!(state.consumables.is_empty());
 }
 
@@ -240,7 +240,10 @@ fn gold_red_round_effects_repeat_with_mime() {
         card(Enhancement::Gold, Edition::Polychrome, Seal::Red),
     ]);
     state.play_hand(&mut hand, vec![0]).unwrap();
-    assert_eq!(state.money, 13, "three Gold payouts + reward + interest");
+    assert_eq!(
+        state.money, 16,
+        "three Gold payouts + reward + three unused hands + interest"
+    );
 }
 
 #[test]
@@ -725,8 +728,8 @@ fn gold_round_card_effects_follow_round_joker_payouts_and_precede_interest() {
     ]);
     state.play_hand(&mut hand, vec![0]).unwrap();
     assert_eq!(
-        state.money, 11,
-        "Golden 4 + held Gold 3 + interest 1 + reward 3"
+        state.money, 14,
+        "Golden 4 + held Gold 3 + interest 1 + reward 3 + unused hands 3"
     );
 }
 
@@ -822,7 +825,7 @@ fn dna_copy_retains_blue_gold_and_scores_held_steel_red_during_same_hand() {
     let mut hand = hand_of([card(Enhancement::Gold, Edition::None, Seal::Blue)]);
     state.play_hand(&mut hand, vec![0]).unwrap();
     assert_eq!(hand.cards().len(), 1);
-    assert_eq!(state.money, 6);
+    assert_eq!(state.money, 9);
     assert_eq!(state.consumables.len(), 1);
 
     let mut state = state_with(&[JokerKind::DNA]);

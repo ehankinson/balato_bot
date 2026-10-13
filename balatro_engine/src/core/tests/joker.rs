@@ -9,6 +9,7 @@ fn mail_in_rebate_triggers_for_matching_discarded_cards() {
     let mut jokers = Jokers::new();
     jokers.add(Joker::create_joker(JokerKind::MailInRebate));
     let mut game_state = GameState::new(7);
+    game_state.money = 0;
     jokers.initialize(&mut game_state);
 
     let target = match &jokers.jokers[0].structure {

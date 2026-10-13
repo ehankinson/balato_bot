@@ -230,6 +230,7 @@ impl BlindKind {
 pub(crate) struct BlindState {
     pub(crate) kind: BlindKind,
     pub(crate) stake: Stakes,
+    pub(crate) ante_scaling: u64,
     pub(crate) hands_per_blind: u8,
     pub(crate) discards_per_blind: u8,
     pub(crate) hands_remaining: u8,
@@ -262,6 +263,7 @@ impl BlindState {
         BlindState {
             kind: BlindKind::Small,
             stake: Stakes::White,
+            ante_scaling: 1,
             hands_per_blind: 4,
             discards_per_blind: 3,
             hands_remaining: 4,
@@ -293,7 +295,9 @@ impl BlindState {
     pub(crate) fn begin(&mut self, kind: BlindKind, ante: u8) {
         self.kind = kind;
         self.ante = ante.max(1);
-        self.score_requirement = kind.score_requirement(self.stake, self.ante, false);
+        self.score_requirement = kind
+            .score_requirement(self.stake, self.ante, false)
+            .saturating_mul(self.ante_scaling);
         self.finished = false;
         self.hands_remaining = self.hands_per_blind;
         self.discards_remaining = self.discards_per_blind;

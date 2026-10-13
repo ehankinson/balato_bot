@@ -516,3 +516,46 @@ impl JokerModifiers {
         actual == required || (self.smeared_suits && (actual as u8 / 2 == required as u8 / 2))
     }
 }
+
+impl JokerKind {
+    pub(crate) fn eternal_compatible(self) -> bool {
+        !matches!(
+            self,
+            Self::GrosMichel
+                | Self::IceCream
+                | Self::Cavendish
+                | Self::Luchador
+                | Self::TurtleBean
+                | Self::DietCola
+                | Self::Popcorn
+                | Self::Ramen
+                | Self::Seltzer
+                | Self::MrBones
+                | Self::Invisible
+        )
+    }
+
+    pub(crate) fn perishable_compatible(self) -> bool {
+        !matches!(
+            self,
+            Self::CeremonialDagger
+                | Self::RideTheBus
+                | Self::Runner
+                | Self::Constellation
+                | Self::Green
+                | Self::RedCard
+                | Self::Madness
+                | Self::SquareJoker
+                | Self::Vampire
+                | Self::Hologram
+                | Self::Rocket
+                | Self::Obelisk
+                | Self::LuckyCat
+                | Self::FlashCard
+                | Self::SpareTrousers
+                | Self::Castle
+                | Self::Glass
+                | Self::Wee
+        )
+    }
+}
