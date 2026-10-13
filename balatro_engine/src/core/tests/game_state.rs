@@ -190,7 +190,9 @@ fn house_and_wheel_draws_mark_cards_face_down() {
             Edition::None,
             Seal::None,
         );
-        wheel.blind.prepare_drawn_card(&mut card, &mut wheel.rng);
+        wheel
+            .blind
+            .prepare_drawn_card(&mut card, &mut wheel.rng, wheel.jokers.modifiers());
         saw_face_down |= card.is_face_down();
     }
     assert!(saw_face_down);
@@ -466,7 +468,7 @@ fn played_hand_partition_uses_the_poker_calculation() {
         Seal::None,
     ));
 
-    let (hand_type, scoring) = score_played_hand(&hand, &[0, 1, 2]).unwrap();
+    let (hand_type, scoring) = score_played_hand(&hand, &[0, 1, 2], Default::default()).unwrap();
 
     assert_eq!(hand_type, PokerHand::HighCard);
     assert_eq!(scoring.scoring_played_cards.len(), 1);
@@ -498,7 +500,8 @@ fn played_hand_scoring_uses_only_selected_cards() {
         ));
     }
 
-    let (hand_type, scoring) = score_played_hand(&hand, &[0, 1, 2, 3, 4]).unwrap();
+    let (hand_type, scoring) =
+        score_played_hand(&hand, &[0, 1, 2, 3, 4], Default::default()).unwrap();
 
     assert_eq!(hand_type, PokerHand::HighCard);
     assert_eq!(scoring.scoring_played_cards[0].index, 2);
@@ -603,6 +606,7 @@ fn owned_jokers_dispatch_through_game_state_without_reordering() {
 
     let effect = state.trigger_jokers(TriggerEvent::AfterHand {
         played_cards: std::slice::from_ref(&played_card),
+        scoring_card_indices: &[0],
         held_cards: &[],
         hand_type: None,
         hands_remaining: 3,
@@ -666,6 +670,7 @@ fn certificate_and_consumable_generators_materialize_in_game_state() {
     state.money = 4;
     state.trigger_jokers(TriggerEvent::AfterHand {
         played_cards: &[],
+        scoring_card_indices: &[],
         held_cards: &[],
         hand_type: Some(PokerHand::HighCard),
         hands_remaining: 3,
@@ -1385,6 +1390,7 @@ fn todo_list_pays_before_bootstraps_scoring_in_either_collection_order() {
             .expect("seeded To Do List hand target found");
         let scoring = state.trigger_jokers(TriggerEvent::AfterHand {
             played_cards: &played,
+            scoring_card_indices: &(0..(&played).len()).collect::<Vec<_>>(),
             held_cards: &[],
             hand_type: Some(matching_hand),
             hands_remaining: 3,
@@ -1487,6 +1493,7 @@ fn generated_results_respect_capacity_and_seeded_randomness() {
     full_consumable_state.money = 4;
     full_consumable_state.trigger_jokers(TriggerEvent::AfterHand {
         played_cards: &[],
+        scoring_card_indices: &[],
         held_cards: &[],
         hand_type: Some(PokerHand::HighCard),
         hands_remaining: 3,

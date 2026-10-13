@@ -537,7 +537,7 @@ fn apply_hand_seal(
 
 fn apply_wheel_of_fortune(state: &mut GameState) -> Result<(), ConsumableUseError> {
     let index = random_joker_index(state)?;
-    if state.rng.random_range(0..4) != 0 {
+    if state.rng.random_range(0..4) as f32 >= state.jokers.modifiers().probability_multiplier {
         return Ok(());
     }
     let edition = joker_edition_for_roll(state.rng.random_range(0..100));

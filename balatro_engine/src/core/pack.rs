@@ -37,6 +37,14 @@ pub(crate) struct ShopPack {
 }
 
 impl ShopPack {
+    pub(crate) fn price(&self, state: &GameState) -> u16 {
+        if self.kind == BoosterPackKind::Celestial && state.jokers.modifiers().free_planets {
+            0
+        } else {
+            state.shop_price(self.price)
+        }
+    }
+
     pub(crate) fn new(kind: BoosterPackKind, size: BoosterPackSize, price: u16) -> ShopPack {
         ShopPack { kind, size, price }
     }

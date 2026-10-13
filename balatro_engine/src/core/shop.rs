@@ -98,12 +98,23 @@ pub(crate) enum ShopItem {
 }
 
 impl ShopItem {
-    pub(crate) fn price(&self) -> u16 {
-        match self {
+    pub(crate) fn price(&self, state: &GameState) -> u16 {
+        if state.jokers.modifiers().free_planets
+            && matches!(
+                self,
+                ShopItem::Consumable {
+                    consumable: Consumable::Planet(_),
+                    ..
+                }
+            )
+        {
+            return 0;
+        }
+        state.shop_price(match self {
             ShopItem::Joker { price, .. }
             | ShopItem::Consumable { price, .. }
             | ShopItem::PlayingCard { price, .. } => *price,
-        }
+        })
     }
 }
 
@@ -225,7 +236,7 @@ impl ShopState {
         state: &mut GameState,
     ) -> Result<(), ShopError> {
         let item = self.items.get(index).ok_or(ShopError::InvalidOffer)?;
-        let price = state.shop_price(item.price());
+        let price = item.price(state);
         require_funds(state, price)?;
 
         match item {
@@ -268,7 +279,7 @@ impl ShopState {
         state: &mut GameState,
     ) -> Result<PackOpening, ShopError> {
         let pack = self.packs.get(index).ok_or(ShopError::InvalidOffer)?;
-        let price = state.shop_price(pack.price);
+        let price = pack.price(state);
         require_funds(state, price)?;
 
         let pack = self.packs.remove(index);
@@ -313,7 +324,9 @@ pub(crate) fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> Sh
                 .most_played_hand
                 .filter(|_| state.shop.most_played_planet_in_pack)
                 .map(planet_for_hand)
-                .filter(|planet| !has_owned_consumable(state, Consumable::Planet(*planet)));
+                .filter(|planet| {
+                    state.has_showman() || !has_owned_consumable(state, Consumable::Planet(*planet))
+                });
             let planet = targeted_planet.unwrap_or_else(|| {
                 available_planets(state)
                     .choose(&mut state.rng)
@@ -381,10 +394,11 @@ fn available_tarot_cards(state: &GameState) -> Vec<Tarot> {
         .iter()
         .copied()
         .filter(|tarot| {
-            !state
-                .consumables
-                .iter()
-                .any(|owned| owned.consumable == Consumable::Tarot(*tarot))
+            state.has_showman()
+                || !state
+                    .consumables
+                    .iter()
+                    .any(|owned| owned.consumable == Consumable::Tarot(*tarot))
         })
         .collect()
 }
@@ -394,10 +408,11 @@ fn available_planets(state: &GameState) -> Vec<Planet> {
         .iter()
         .copied()
         .filter(|planet| {
-            !state
-                .consumables
-                .iter()
-                .any(|owned| owned.consumable == Consumable::Planet(*planet))
+            state.has_showman()
+                || !state
+                    .consumables
+                    .iter()
+                    .any(|owned| owned.consumable == Consumable::Planet(*planet))
         })
         .collect()
 }
@@ -408,10 +423,11 @@ fn available_spectral_cards(state: &GameState) -> Vec<Spectral> {
         .copied()
         .filter(|spectral| *spectral != Spectral::Soul)
         .filter(|spectral| {
-            !state
-                .consumables
-                .iter()
-                .any(|owned| owned.consumable == Consumable::Spectral(*spectral))
+            state.has_showman()
+                || !state
+                    .consumables
+                    .iter()
+                    .any(|owned| owned.consumable == Consumable::Spectral(*spectral))
         })
         .collect()
 }

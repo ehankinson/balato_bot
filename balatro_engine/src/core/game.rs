@@ -16,7 +16,6 @@ use crate::core::joker::{
     GeneratedConsumable, Joker, JokerContext, JokerEffect, JokerOperation, Jokers, TriggerEvent,
     UpdateEvent,
 };
-use crate::core::joker_types::JokerKind;
 use crate::core::pack::{PackError, PackOpening};
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::tag::TagState;
@@ -267,10 +266,7 @@ impl GameState {
     }
 
     pub(crate) fn has_showman(&self) -> bool {
-        self.jokers
-            .as_slice()
-            .iter()
-            .any(|joker| joker.kind() == JokerKind::Showman)
+        self.jokers.modifiers().showman
     }
 
     pub(crate) fn joker_has_room(&self) -> bool {
@@ -764,6 +760,7 @@ impl GameState {
         joker_count: u8,
     ) -> crate::core::joker::JokerEffect {
         let joker_capacity = self.jokers.capacity();
+        let modifiers = self.jokers.modifiers();
         let GameState {
             blind,
             deck,
@@ -783,6 +780,7 @@ impl GameState {
             rng,
             usize::from(joker_count),
             joker_capacity,
+            modifiers,
         );
         jokers.trigger_at(index, event, &mut context, joker_count)
     }
@@ -793,6 +791,7 @@ impl GameState {
         event: &TriggerEvent<'_>,
     ) -> u8 {
         let joker_capacity = self.jokers.capacity();
+        let modifiers = self.jokers.modifiers();
         let joker_count = self.jokers.as_slice().len();
         let GameState {
             blind,
@@ -813,6 +812,7 @@ impl GameState {
             rng,
             joker_count,
             joker_capacity,
+            modifiers,
         );
         jokers
             .trigger_retrigger_at(index, event, &mut context)
@@ -826,6 +826,7 @@ impl GameState {
         held_hand: &mut Hand,
     ) {
         let joker_capacity = self.jokers.capacity();
+        let modifiers = self.jokers.modifiers();
         let joker_count = self.jokers.as_slice().len();
         {
             let GameState {
@@ -847,6 +848,7 @@ impl GameState {
                 rng,
                 joker_count,
                 joker_capacity,
+                modifiers,
             );
             Jokers::apply_effect_in_context(effect, &mut context, jokers);
         }
@@ -951,7 +953,8 @@ impl GameState {
             .min(u8::MAX as usize) as u8;
         self.deck.deal_cards(hand, hand_size, &mut self.rng);
         for card in hand.cards_mut() {
-            self.blind.prepare_drawn_card(card, &mut self.rng);
+            self.blind
+                .prepare_drawn_card(card, &mut self.rng, self.jokers.modifiers());
         }
         self.blind
             .choose_forced_card(hand.hand_size() as usize, &mut self.rng);
@@ -1030,8 +1033,21 @@ impl GameState {
         if played_cards.is_empty() {
             return None;
         }
+        let scoring_card_indices = selected_indices
+            .iter()
+            .enumerate()
+            .filter_map(|(index, hand_index)| {
+                score
+                    .scoring_data
+                    .scoring_played_cards
+                    .iter()
+                    .any(|card| card.index == *hand_index)
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>();
         self.update_jokers(UpdateEvent::HandCompleted {
             played_cards: &played_cards,
+            scoring_card_indices: &scoring_card_indices,
             hand_type: Some(score.hand),
             hands_remaining: self.blind.hands_remaining,
         });
@@ -1051,6 +1067,7 @@ impl GameState {
     pub(crate) fn trigger_jokers(&mut self, event: TriggerEvent<'_>) -> JokerEffect {
         let joker_count = self.jokers.as_slice().len();
         let joker_capacity = self.jokers.capacity();
+        let modifiers = self.jokers.modifiers();
         let effect = {
             let GameState {
                 blind,
@@ -1071,6 +1088,7 @@ impl GameState {
                 rng,
                 joker_count,
                 joker_capacity,
+                modifiers,
             );
             jokers.trigger_in_context(event, &mut context)
         };
@@ -1355,3 +1373,7 @@ mod tag_tests;
 #[cfg(test)]
 #[path = "tests/game_flow.rs"]
 mod game_flow_tests;
+
+#[cfg(test)]
+#[path = "tests/joker_modifiers.rs"]
+mod joker_modifier_tests;

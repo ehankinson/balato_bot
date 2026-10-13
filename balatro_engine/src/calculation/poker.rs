@@ -1,4 +1,5 @@
 use crate::core::enums::{Enhancement, PokerHand, Rank};
+use crate::core::joker_types::JokerModifiers;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct PokerHandResult {
@@ -10,7 +11,10 @@ pub(crate) struct PokerHandResult {
 ///
 /// This first version ignores seals and editions. Wild cards count toward
 /// every suit for flush detection while retaining their stored rank.
-pub(crate) fn determine_poker_hand(card_ids: &[u16]) -> Option<PokerHandResult> {
+pub(crate) fn determine_poker_hand(
+    card_ids: &[u16],
+    modifiers: JokerModifiers,
+) -> Option<PokerHandResult> {
     if card_ids.is_empty() {
         return None;
     }
@@ -32,8 +36,11 @@ pub(crate) fn determine_poker_hand(card_ids: &[u16]) -> Option<PokerHandResult> 
         rank_indices[rank as usize].push(index);
         rank_mask |= rank_bit;
 
-        if is_wild {
+        if is_wild || modifiers.smeared_suits {
             for suit_index in 0..suit_indices.len() {
+                if !is_wild && suit_index / 2 != suit as usize / 2 {
+                    continue;
+                }
                 suit_counts[suit_index] += 1;
                 suit_indices[suit_index].push(index);
                 suit_rank_masks[suit_index] |= rank_bit;
@@ -55,9 +62,10 @@ pub(crate) fn determine_poker_hand(card_ids: &[u16]) -> Option<PokerHandResult> 
     let has_four = rank_counts.iter().any(|&count| count >= 4);
     let has_three = rank_counts.iter().any(|&count| count >= 3);
     let pair_count = rank_counts.iter().filter(|&&count| count >= 2).count();
-    let straight = straight_ranks(rank_mask);
-    let straight_flush = flush_suit
-        .and_then(|suit| straight_ranks(suit_rank_masks[suit]).map(|ranks| (suit, ranks)));
+    let straight = straight_ranks(rank_mask, modifiers.straight_gaps);
+    let straight_flush = flush_suit.and_then(|suit| {
+        straight_ranks(suit_rank_masks[suit], modifiers.straight_gaps).map(|ranks| (suit, ranks))
+    });
 
     let (hand, scoring_card_indices) = if let Some(suit) = flush_suit {
         if has_five {
@@ -186,26 +194,33 @@ fn sequence_indices(
         .collect()
 }
 
-fn straight_ranks(rank_mask: u16) -> Option<[u8; 5]> {
-    for start in (2..=10).rev() {
-        if (start..start + 5).all(|rank| rank_mask & (1_u16 << rank) != 0) {
-            return Some([
-                start as u8,
-                (start + 1) as u8,
-                (start + 2) as u8,
-                (start + 3) as u8,
-                (start + 4) as u8,
-            ]);
+fn straight_ranks(rank_mask: u16, allow_gaps: bool) -> Option<[u8; 5]> {
+    // Ace can end a high straight or start a low one, never wrap through King.
+    let mut ranks = Vec::new();
+    for rank in (2..=14).rev() {
+        if rank_mask & (1 << rank) != 0 {
+            ranks.push(rank as u8);
         }
     }
-    if [Rank::Ace, Rank::Two, Rank::Three, Rank::Four, Rank::Five]
-        .iter()
-        .all(|rank| rank_mask & (1_u16 << *rank as u8) != 0)
-    {
-        Some([14, 2, 3, 4, 5])
-    } else {
-        None
+    if rank_mask & (1 << 14) != 0 {
+        ranks.push(1);
     }
+    let maximum_step = if allow_gaps { 2 } else { 1 };
+    for window in ranks.windows(5) {
+        if window
+            .windows(2)
+            .all(|pair| pair[0] - pair[1] <= maximum_step)
+        {
+            return Some(std::array::from_fn(|index| {
+                if window[4 - index] == 1 {
+                    14
+                } else {
+                    window[4 - index]
+                }
+            }));
+        }
+    }
+    None
 }
 
 fn suit_from_id(card_id: u16) -> u8 {

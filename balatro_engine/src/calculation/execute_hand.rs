@@ -196,6 +196,7 @@ pub(crate) fn execute_hand(
         let effect = {
             let event = TriggerEvent::AfterHand {
                 played_cards,
+                scoring_card_indices: &scoring_card_indices,
                 held_cards: held_hand.cards(),
                 hand_type: Some(hand_type),
                 hands_remaining: state.blind.hands_remaining,

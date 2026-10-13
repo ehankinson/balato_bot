@@ -9,7 +9,8 @@ use crate::core::game::{GameCounters, GameState};
 use crate::core::joker::{Joker, JokerData, JokerStructure};
 use crate::core::joker_types::JokerUpdate::*;
 use crate::core::joker_types::{
-    CopyType, GenerateType, JokerKind, JokerRarity, JokerTrigger, JokerUpdate, RetriggerTarget,
+    CopyType, GameStateModifications, GenerateType, JokerKind, JokerModifiers, JokerRarity,
+    JokerTrigger, JokerUpdate, RetriggerTarget,
 };
 
 pub(crate) struct JokerContext<'a> {
@@ -21,10 +22,16 @@ pub(crate) struct JokerContext<'a> {
     pub(crate) rng: &'a mut StdRng,
     joker_count: usize,
     joker_capacity: usize,
+    pub(crate) modifiers: JokerModifiers,
 }
 
 impl<'a> JokerContext<'a> {
-    pub(crate) fn new(state: &'a mut GameState, joker_count: usize, joker_capacity: usize) -> Self {
+    pub(crate) fn new(
+        state: &'a mut GameState,
+        joker_count: usize,
+        joker_capacity: usize,
+        modifiers: JokerModifiers,
+    ) -> Self {
         Self::from_parts(
             &mut state.blind,
             &mut state.deck,
@@ -34,6 +41,7 @@ impl<'a> JokerContext<'a> {
             &mut state.rng,
             joker_count,
             joker_capacity,
+            modifiers,
         )
     }
 
@@ -46,6 +54,7 @@ impl<'a> JokerContext<'a> {
         rng: &'a mut StdRng,
         joker_count: usize,
         joker_capacity: usize,
+        modifiers: JokerModifiers,
     ) -> Self {
         Self {
             blind,
@@ -56,6 +65,7 @@ impl<'a> JokerContext<'a> {
             rng,
             joker_count,
             joker_capacity,
+            modifiers,
         }
     }
 
@@ -95,6 +105,7 @@ pub enum TriggerEvent<'a> {
     },
     AfterHand {
         played_cards: &'a [Card],
+        scoring_card_indices: &'a [usize],
         held_cards: &'a [Card],
         hand_type: Option<PokerHand>,
         hands_remaining: u8,
@@ -120,6 +131,7 @@ pub enum UpdateEvent<'a> {
     },
     HandCompleted {
         played_cards: &'a [Card],
+        scoring_card_indices: &'a [usize],
         hand_type: Option<PokerHand>,
         hands_remaining: u8,
     },
@@ -490,6 +502,31 @@ impl Jokers {
         apply_game_effect(effect, context, jokers);
     }
 
+    pub(crate) fn modifiers(&self) -> JokerModifiers {
+        let mut modifiers = JokerModifiers::default();
+        for joker in &self.jokers {
+            if joker.debuffed {
+                continue;
+            }
+            let JokerStructure::Normal(JokerData::GameState(data)) = &joker.structure else {
+                continue;
+            };
+            match data.game_state_modification {
+                Some(GameStateModifications::AllFaces) => modifiers.all_faces = true,
+                Some(GameStateModifications::PlayAllCards) => modifiers.splash = true,
+                Some(GameStateModifications::AllowStraightGaps) => modifiers.straight_gaps = true,
+                Some(GameStateModifications::DoubleSuit) => modifiers.smeared_suits = true,
+                Some(GameStateModifications::DuplicateJokers) => modifiers.showman = true,
+                Some(GameStateModifications::DoubleProbability) => {
+                    modifiers.probability_multiplier *= 2.0
+                }
+                Some(GameStateModifications::FreePlanetCards) => modifiers.free_planets = true,
+                _ => {}
+            }
+        }
+        modifiers
+    }
+
     pub(crate) fn capacity(&self) -> usize {
         self.capacity
     }
@@ -574,7 +611,8 @@ impl Jokers {
     pub fn trigger(&mut self, event: TriggerEvent<'_>, game_state: &mut GameState) -> JokerEffect {
         let joker_count = game_state.jokers.as_slice().len();
         let joker_capacity = game_state.jokers.capacity();
-        let mut context = JokerContext::new(game_state, joker_count, joker_capacity);
+        let mut context =
+            JokerContext::new(game_state, joker_count, joker_capacity, self.modifiers());
         self.trigger_in_context(event, &mut context)
     }
 
@@ -677,6 +715,7 @@ impl Jokers {
             let (effect, removed) = {
                 let joker_count = state.jokers.as_slice().len();
                 let joker_capacity = state.jokers.capacity();
+                let modifiers = state.jokers.modifiers();
                 let GameState {
                     blind,
                     deck,
@@ -696,6 +735,7 @@ impl Jokers {
                     rng,
                     joker_count,
                     joker_capacity,
+                    modifiers,
                 );
                 let effect = jokers.update_at(index, &event, &mut context);
                 let removed =
@@ -728,6 +768,7 @@ impl Jokers {
         let effect = {
             let joker_count = state.jokers.as_slice().len();
             let joker_capacity = state.jokers.capacity();
+            let modifiers = state.jokers.modifiers();
             let GameState {
                 blind,
                 deck,
@@ -747,6 +788,7 @@ impl Jokers {
                 rng,
                 joker_count,
                 joker_capacity,
+                modifiers,
             );
             let kind = jokers
                 .effective_index(index)
@@ -982,7 +1024,7 @@ impl Joker {
     pub(crate) fn trigger_retrigger(
         &mut self,
         event: &TriggerEvent<'_>,
-        _context: &mut JokerContext<'_>,
+        context: &mut JokerContext<'_>,
     ) -> JokerRetriggerEffect {
         if self.debuffed {
             return JokerRetriggerEffect::default();
@@ -1014,6 +1056,7 @@ impl Joker {
                 *card_index,
                 scoring_card_indices.first().copied(),
                 *hands_remaining,
+                context.modifiers,
             )
         {
             return JokerRetriggerEffect::default();
@@ -1036,6 +1079,7 @@ impl Joker {
 
         let TriggerEvent::AfterHand {
             played_cards,
+            scoring_card_indices,
             held_cards,
             hand_type,
             hands_remaining,
@@ -1060,7 +1104,7 @@ impl Joker {
             held_cards,
             *hand_type,
             0,
-            &[],
+            scoring_card_indices,
             *hands_remaining,
             context,
             joker_count,
@@ -1102,6 +1146,10 @@ impl Joker {
             return JokerEffect::default();
         };
 
+        if card.is_debuffed() {
+            return JokerEffect::default();
+        }
+
         match &self.structure {
             JokerStructure::Normal(JokerData::Scoring(_)) => {
                 JokerEffect::from_scoring(self.trigger_scoring(event, context, joker_count))
@@ -1110,14 +1158,16 @@ impl Joker {
                 let mut effect = JokerEffect::default();
                 match self.kind {
                     JokerKind::BusinessCard
-                        if card.is_face_card() && chance(context, data.probability) =>
+                        if context.modifiers.is_face(card) && chance(context, data.probability) =>
                     {
                         effect.money += data.money as i16;
                     }
                     JokerKind::GoldenTicket if card.enhancement() == Enhancement::Gold => {
                         effect.money += data.money as i16;
                     }
-                    JokerKind::RoughGem if card.suit() == Suit::Diamonds => {
+                    JokerKind::RoughGem
+                        if context.modifiers.suits_match(card.suit(), Suit::Diamonds) =>
+                    {
                         effect.money += data.money as i16;
                     }
                     _ => {}
@@ -1179,7 +1229,10 @@ impl Joker {
             }
             JokerKind::MidasMask => {
                 for (index, card) in played_cards.iter().enumerate() {
-                    if scoring_card_indices.contains(&index) && card.is_face_card() {
+                    if scoring_card_indices.contains(&index)
+                        && !card.is_debuffed()
+                        && context.modifiers.is_face(card)
+                    {
                         effect.add_operation(JokerOperation::EnhancePlayedCard {
                             index,
                             enhancement: Enhancement::Gold,
@@ -1245,7 +1298,7 @@ impl Joker {
             }
             JokerStructure::Normal(JokerData::Econ(data))
                 if self.kind == JokerKind::ReservedParking
-                    && card.is_face_card()
+                    && context.modifiers.is_face(card)
                     && chance(context, data.probability) =>
             {
                 JokerEffect {
@@ -1254,7 +1307,14 @@ impl Joker {
                 }
             }
             JokerStructure::Normal(JokerData::Retrigger(data))
-                if retrigger_matches(data.target, card, *card_index, None, 0) =>
+                if retrigger_matches(
+                    data.target,
+                    card,
+                    *card_index,
+                    None,
+                    0,
+                    context.modifiers,
+                ) =>
             {
                 JokerEffect {
                     retriggers: data.retrigger,
@@ -1280,7 +1340,13 @@ impl Joker {
                     ..JokerEffect::default()
                 }
             }
-            JokerKind::Faceless if cards.iter().filter(|card| card.is_face_card()).count() >= 3 => {
+            JokerKind::Faceless
+                if cards
+                    .iter()
+                    .filter(|card| !card.is_debuffed() && context.modifiers.is_face(card))
+                    .count()
+                    >= 3 =>
+            {
                 JokerEffect {
                     money: 5,
                     ..JokerEffect::default()
@@ -1294,7 +1360,12 @@ impl Joker {
                 let count = context
                     .blind
                     .target_suit
-                    .map(|suit| cards.iter().filter(|card| card.suit() == suit).count())
+                    .map(|suit| {
+                        cards
+                            .iter()
+                            .filter(|card| context.modifiers.suits_match(card.suit(), suit))
+                            .count()
+                    })
                     .unwrap_or(0);
                 JokerEffect {
                     chips: count as i32 * 3,
@@ -1304,6 +1375,7 @@ impl Joker {
             JokerKind::BurntJoker => {
                 let hand_type = crate::calculation::poker::determine_poker_hand(
                     &cards.iter().map(Card::id).collect::<Vec<_>>(),
+                    context.modifiers,
                 )
                 .map(|result| result.hand);
                 let Some(hand_type) = hand_type else {
@@ -1423,7 +1495,9 @@ impl Joker {
                     effect.x_mult = data.x_mult;
                 }
             }
-            (UpdateEvent::CardDestroyed { card }, JokerKind::Canio) if card.is_face_card() => {
+            (UpdateEvent::CardDestroyed { card }, JokerKind::Canio)
+                if !card.is_debuffed() && context.modifiers.is_face(card) =>
+            {
                 if let JokerStructure::Normal(JokerData::Scoring(data)) = &mut self.structure {
                     data.x_mult += 1.0;
                     effect.x_mult = data.x_mult;
@@ -1450,9 +1524,19 @@ impl Joker {
                     data.x_mult = 1.0;
                 }
             }
-            (UpdateEvent::HandCompleted { played_cards, .. }, JokerKind::RideTheBus) => {
+            (
+                UpdateEvent::HandCompleted {
+                    played_cards,
+                    scoring_card_indices,
+                    ..
+                },
+                JokerKind::RideTheBus,
+            ) => {
                 if let JokerStructure::Normal(JokerData::Scoring(data)) = &mut self.structure {
-                    if played_cards.iter().any(Card::is_face_card) {
+                    if scoring_card_indices.iter().any(|&index| {
+                        let card = &played_cards[index];
+                        !card.is_debuffed() && context.modifiers.is_face(card)
+                    }) {
                         data.add_mult = 0;
                     } else {
                         data.add_mult += 1;
@@ -1690,7 +1774,9 @@ impl Joker {
                         data.chips = data.chips.saturating_add(
                             cards
                                 .iter()
-                                .filter(|card| card.suit() == target_suit)
+                                .filter(|card| {
+                                    context.modifiers.suits_match(card.suit(), target_suit)
+                                })
                                 .count() as u16
                                 * 3,
                         );
@@ -1784,7 +1870,7 @@ fn add_scoring_effect(
                 effect.add_mult += 1;
             }
         }
-        JokerKind::Misprint if !chance(context, 0.5) => {
+        JokerKind::Misprint if !context.rng.random_bool(0.5) => {
             effect.chips = 0;
             effect.add_mult = 0;
             effect.x_mult = 1.0;
@@ -1826,6 +1912,7 @@ fn generated_effect(data: &crate::core::joker::JokerGenerate) -> JokerEffect {
 }
 
 fn chance(context: &mut JokerContext<'_>, probability: f32) -> bool {
+    let probability = probability * context.modifiers.probability_multiplier;
     if probability >= 1.0 {
         return true;
     }
@@ -1841,9 +1928,10 @@ fn retrigger_matches(
     card_index: usize,
     first_scoring_card: Option<usize>,
     hands_remaining: u8,
+    modifiers: JokerModifiers,
 ) -> bool {
     match target {
-        RetriggerTarget::FaceCards => card.is_face_card(),
+        RetriggerTarget::FaceCards => modifiers.is_face(card),
         RetriggerTarget::LowCards => card.is_low_card(),
         RetriggerTarget::FinalHand => hands_remaining == 1,
         RetriggerTarget::FirstCard => Some(card_index) == first_scoring_card,
@@ -1870,7 +1958,7 @@ fn scoring_condition(
         }
     }
     if let Some(suit) = data.suit {
-        if card.suit() != suit {
+        if !context.modifiers.suits_match(card.suit(), suit) {
             return false;
         }
     }
@@ -1882,7 +1970,7 @@ fn scoring_condition(
 
     match kind {
         JokerKind::Half => played_cards.len() <= 3,
-        JokerKind::ScaryFace | JokerKind::SmileyFace => card.is_face_card(),
+        JokerKind::ScaryFace | JokerKind::SmileyFace => context.modifiers.is_face(card),
         JokerKind::Steel
         | JokerKind::Banner
         | JokerKind::Abstract
@@ -1903,11 +1991,24 @@ fn scoring_condition(
             Rank::Ace | Rank::Two | Rank::Three | Rank::Five | Rank::Eight
         ),
         JokerKind::FlowerPot => {
-            let mut suits = [false; 4];
-            for played in played_cards {
-                suits[played.suit() as usize] = true;
+            fn covers_suits(
+                cards: &[Card],
+                indices: &[usize],
+                suit: usize,
+                used: u8,
+                modifiers: JokerModifiers,
+            ) -> bool {
+                if suit == ALL_SUITS.len() {
+                    return true;
+                }
+                indices.iter().copied().any(|index| {
+                    let card = &cards[index];
+                    used & (1 << index) == 0
+                        && modifiers.suits_match(card.suit(), ALL_SUITS[suit])
+                        && covers_suits(cards, indices, suit + 1, used | (1 << index), modifiers)
+                })
             }
-            suits.iter().all(|present| *present)
+            covers_suits(played_cards, scoring_card_indices, 0, 0, context.modifiers)
         }
         JokerKind::Blackboard => held_cards
             .iter()
@@ -1916,17 +2017,20 @@ fn scoring_condition(
             scoring_card_indices
                 .iter()
                 .copied()
-                .find(|&index| played_cards[index].is_face_card())
+                .find(|&index| context.modifiers.is_face(&played_cards[index]))
                 == Some(card_index)
         }
-        JokerKind::SeeingDouble => {
-            played_cards
-                .iter()
-                .any(|played| played.suit() == Suit::Clubs)
-                && played_cards
-                    .iter()
-                    .any(|played| played.suit() != Suit::Clubs)
-        }
+        JokerKind::SeeingDouble => scoring_card_indices.iter().copied().any(|index| {
+            context
+                .modifiers
+                .suits_match(played_cards[index].suit(), Suit::Clubs)
+                && scoring_card_indices.iter().copied().any(|other| {
+                    other != index
+                        && !context
+                            .modifiers
+                            .suits_match(played_cards[other].suit(), Suit::Clubs)
+                })
+        }),
         JokerKind::SpareTrousers => hand_type == Some(PokerHand::TwoPair),
         JokerKind::DriversLicense => context.deck.enhanced_count() >= 16,
         JokerKind::Obelisk => context.most_played_hand != hand_type,

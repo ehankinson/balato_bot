@@ -34,6 +34,7 @@ fn runner_updates_after_a_straight_and_ignores_other_hands() {
     let straight = jokers.update(
         UpdateEvent::HandCompleted {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             hand_type: Some(PokerHand::Straight),
             hands_remaining: 3,
         },
@@ -42,6 +43,7 @@ fn runner_updates_after_a_straight_and_ignores_other_hands() {
     let pair = jokers.update(
         UpdateEvent::HandCompleted {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             hand_type: Some(PokerHand::Pair),
             hands_remaining: 2,
         },
@@ -78,6 +80,7 @@ fn green_joker_tracks_hands_and_discards_in_place() {
     let after_hand = jokers.update(
         UpdateEvent::HandCompleted {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             hand_type: Some(PokerHand::Pair),
             hands_remaining: 3,
         },
@@ -190,6 +193,7 @@ fn seltzer_retrigger_expires_after_ten_hands() {
         jokers.update(
             UpdateEvent::HandCompleted {
                 played_cards: std::slice::from_ref(&played),
+                scoring_card_indices: &[0],
                 hand_type: Some(PokerHand::HighCard),
                 hands_remaining: 3,
             },
@@ -200,6 +204,7 @@ fn seltzer_retrigger_expires_after_ten_hands() {
     jokers.update(
         UpdateEvent::HandCompleted {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             hand_type: Some(PokerHand::HighCard),
             hands_remaining: 2,
         },
@@ -385,6 +390,7 @@ fn generation_updates_emit_the_expected_kind_and_amount() {
     let effect = vagabond.trigger(
         TriggerEvent::AfterHand {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             held_cards: &[],
             hand_type: Some(PokerHand::HighCard),
             hands_remaining: 3,
@@ -449,6 +455,7 @@ fn discard_and_hand_lifecycle_updates_use_exact_boundaries() {
             .update(
                 UpdateEvent::HandCompleted {
                     played_cards: &four,
+                    scoring_card_indices: &(0..(&four).len()).collect::<Vec<_>>(),
                     hand_type: Some(PokerHand::HighCard),
                     hands_remaining: 3,
                 },
@@ -462,6 +469,7 @@ fn discard_and_hand_lifecycle_updates_use_exact_boundaries() {
             .update(
                 UpdateEvent::HandCompleted {
                     played_cards: three,
+                    scoring_card_indices: &(0..(three).len()).collect::<Vec<_>>(),
                     hand_type: Some(PokerHand::HighCard),
                     hands_remaining: 2,
                 },
@@ -483,6 +491,7 @@ fn ride_the_bus_resets_on_a_face_card() {
     let first = jokers.update(
         UpdateEvent::HandCompleted {
             played_cards: std::slice::from_ref(&number),
+            scoring_card_indices: &[0],
             hand_type: Some(PokerHand::HighCard),
             hands_remaining: 3,
         },
@@ -493,6 +502,7 @@ fn ride_the_bus_resets_on_a_face_card() {
     let reset = jokers.update(
         UpdateEvent::HandCompleted {
             played_cards: std::slice::from_ref(&face),
+            scoring_card_indices: &[0],
             hand_type: Some(PokerHand::HighCard),
             hands_remaining: 2,
         },
@@ -519,6 +529,7 @@ fn scoring_updates_apply_thresholds_and_clamps() {
     let effect = ice_cream.update(
         UpdateEvent::HandCompleted {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             hand_type: Some(PokerHand::HighCard),
             hands_remaining: 3,
         },
@@ -637,6 +648,7 @@ fn round_lifecycle_updates_apply_their_boundaries_in_place() {
             .trigger(
                 TriggerEvent::AfterHand {
                     played_cards: std::slice::from_ref(&played),
+                    scoring_card_indices: &[0],
                     held_cards: &[],
                     hand_type: Some(PokerHand::HighCard),
                     hands_remaining: 3,
@@ -654,6 +666,7 @@ fn round_lifecycle_updates_apply_their_boundaries_in_place() {
             .trigger(
                 TriggerEvent::AfterHand {
                     played_cards: std::slice::from_ref(&played),
+                    scoring_card_indices: &[0],
                     held_cards: &[],
                     hand_type: Some(PokerHand::HighCard),
                     hands_remaining: 3,
@@ -694,6 +707,7 @@ fn obelisk_and_spare_trousers_use_hand_boundaries() {
             .update(
                 UpdateEvent::HandCompleted {
                     played_cards: std::slice::from_ref(&played),
+                    scoring_card_indices: &[0],
                     hand_type: Some(PokerHand::Flush),
                     hands_remaining: 3,
                 },
@@ -707,6 +721,7 @@ fn obelisk_and_spare_trousers_use_hand_boundaries() {
             .update(
                 UpdateEvent::HandCompleted {
                     played_cards: std::slice::from_ref(&played),
+                    scoring_card_indices: &[0],
                     hand_type: Some(PokerHand::Pair),
                     hands_remaining: 2,
                 },
@@ -723,6 +738,7 @@ fn obelisk_and_spare_trousers_use_hand_boundaries() {
             .update(
                 UpdateEvent::HandCompleted {
                     played_cards: std::slice::from_ref(&played),
+                    scoring_card_indices: &[0],
                     hand_type: Some(PokerHand::TwoPair),
                     hands_remaining: 3,
                 },
@@ -736,6 +752,7 @@ fn obelisk_and_spare_trousers_use_hand_boundaries() {
             .update(
                 UpdateEvent::HandCompleted {
                     played_cards: std::slice::from_ref(&played),
+                    scoring_card_indices: &[0],
                     hand_type: Some(PokerHand::Pair),
                     hands_remaining: 2,
                 },
@@ -891,6 +908,7 @@ fn lifecycle_edges_are_safe_for_singletons_floors_and_expiration() {
         ice_cream.update(
             UpdateEvent::HandCompleted {
                 played_cards: &[],
+                scoring_card_indices: &[],
                 hand_type: Some(PokerHand::HighCard),
                 hands_remaining: 1,
             },
@@ -902,6 +920,7 @@ fn lifecycle_edges_are_safe_for_singletons_floors_and_expiration() {
             .update(
                 UpdateEvent::HandCompleted {
                     played_cards: &[],
+                    scoring_card_indices: &[],
                     hand_type: Some(PokerHand::HighCard),
                     hands_remaining: 1,
                 },

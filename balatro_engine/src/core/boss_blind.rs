@@ -2,6 +2,7 @@ use crate::consts::ante_scores::score_requirements;
 use crate::core::blind::{BlindKind, BlindState};
 use crate::core::card::Card;
 use crate::core::enums::{BossBlinds, PokerHand, Stakes, Suit};
+use crate::core::joker_types::JokerModifiers;
 use rand::prelude::RngExt;
 use rand::rngs::StdRng;
 
@@ -276,13 +277,20 @@ impl BlindState {
         }
     }
 
-    pub(crate) fn prepare_drawn_card(&self, card: &mut Card, rng: &mut StdRng) {
-        card.set_debuffed(self.card_is_debuffed(card));
+    pub(crate) fn prepare_drawn_card(
+        &self,
+        card: &mut Card,
+        rng: &mut StdRng,
+        modifiers: JokerModifiers,
+    ) {
+        card.set_debuffed(self.card_is_debuffed(card, modifiers));
         let face_down = match self.kind {
             BlindKind::Boss(BossBlinds::House) => !self.first_action_taken,
-            BlindKind::Boss(BossBlinds::Wheel) => rng.random_range(0..7u8) == 0,
+            BlindKind::Boss(BossBlinds::Wheel) => {
+                (rng.random_range(0..7u8) as f32) < modifiers.probability_multiplier
+            }
             BlindKind::Boss(BossBlinds::Fish) => self.face_down_draws,
-            BlindKind::Boss(BossBlinds::Mark) => card.is_face_card(),
+            BlindKind::Boss(BossBlinds::Mark) => modifiers.is_face(card),
             _ => false,
         };
         card.set_face_down(face_down);
@@ -318,25 +326,25 @@ impl BlindState {
         self.verdant_leaf_active = false;
     }
 
-    pub(crate) fn card_is_debuffed(&self, card: &Card) -> bool {
+    pub(crate) fn card_is_debuffed(&self, card: &Card, modifiers: JokerModifiers) -> bool {
         if self.boss_ability_disabled {
-            return card.is_debuffed();
+            return false;
         }
 
         let boss = match self.kind {
             BlindKind::Boss(boss) => boss,
-            _ => return card.is_debuffed(),
+            _ => return false,
         };
         let boss_debuffs_card = match boss {
-            BossBlinds::Club => card.suit() == Suit::Clubs,
-            BossBlinds::Goad => card.suit() == Suit::Spades,
-            BossBlinds::Window => card.suit() == Suit::Diamonds,
-            BossBlinds::Head => card.suit() == Suit::Hearts,
-            BossBlinds::Plante => card.is_face_card(),
+            BossBlinds::Club => modifiers.suits_match(card.suit(), Suit::Clubs),
+            BossBlinds::Goad => modifiers.suits_match(card.suit(), Suit::Spades),
+            BossBlinds::Window => modifiers.suits_match(card.suit(), Suit::Diamonds),
+            BossBlinds::Head => modifiers.suits_match(card.suit(), Suit::Hearts),
+            BossBlinds::Plante => modifiers.is_face(card),
             BossBlinds::VerdantLeaf => self.verdant_leaf_active,
             _ => false,
         };
-        card.is_debuffed() || boss_debuffs_card
+        boss_debuffs_card
     }
 
     pub(crate) fn arm_active(&self) -> bool {

@@ -274,7 +274,8 @@ fn copy_jokers_delegate_without_replacing_their_collection_entries() {
 
 fn scoring_data_for(played: &[Card], held: &[Card]) -> (PokerHand, ScoringData) {
     let played_ids = played.iter().map(Card::id).collect::<Vec<_>>();
-    let detected = determine_poker_hand(&played_ids).expect("test hand should be valid");
+    let detected =
+        determine_poker_hand(&played_ids, Default::default()).expect("test hand should be valid");
     let scoring_played_cards = detected
         .scoring_card_indices
         .iter()

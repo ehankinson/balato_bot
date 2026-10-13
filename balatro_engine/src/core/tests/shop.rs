@@ -357,9 +357,9 @@ fn shop_consumable_prices_match_their_card_types() {
     let planet = random_base_item(ShopOfferKind::Planet, &mut state);
     let spectral = random_base_item(ShopOfferKind::Spectral, &mut state);
 
-    assert_eq!(tarot.price(), 3);
-    assert_eq!(planet.price(), 3);
-    assert_eq!(spectral.price(), SPECTRAL_CONSUMABLE_PRICE);
+    assert_eq!(tarot.price(&state), 3);
+    assert_eq!(planet.price(&state), 3);
+    assert_eq!(spectral.price(&state), SPECTRAL_CONSUMABLE_PRICE);
 }
 
 #[test]

@@ -56,6 +56,7 @@ fn poker_hand_scoring_joker_checks_the_hand_type() {
     let pair = jokers.trigger(
         TriggerEvent::AfterHand {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             held_cards: &[],
             hand_type: Some(PokerHand::Pair),
             hands_remaining: 3,
@@ -67,6 +68,7 @@ fn poker_hand_scoring_joker_checks_the_hand_type() {
     let straight = jokers.trigger(
         TriggerEvent::AfterHand {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             held_cards: &[],
             hand_type: Some(PokerHand::Straight),
             hands_remaining: 3,
@@ -129,6 +131,7 @@ fn dynamic_joker_values_are_accumulated_without_allocating_results() {
     let effect = jokers.trigger(
         TriggerEvent::AfterHand {
             played_cards: std::slice::from_ref(&played),
+            scoring_card_indices: &[0],
             held_cards: &[],
             hand_type: Some(PokerHand::HighCard),
             hands_remaining: 3,

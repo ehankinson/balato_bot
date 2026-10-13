@@ -1197,7 +1197,6 @@ impl Joker {
             JokerKind::Photograph => {
                 let data = JokerScoring {
                     x_mult: 2.0,
-                    rank: Some(vec![Rank::King, Rank::Queen, Rank::Jack]),
                     ..JokerScoring::default()
                 };
 
@@ -1531,7 +1530,6 @@ impl Joker {
             JokerKind::SmileyFace => {
                 let data = JokerScoring {
                     add_mult: 5,
-                    rank: Some(vec![Rank::King, Rank::Queen, Rank::Jack]),
                     ..JokerScoring::default()
                 };
 
@@ -1841,7 +1839,6 @@ impl Joker {
             JokerKind::SeeingDouble => {
                 let data = JokerScoring {
                     x_mult: 2.0,
-                    suit: Some(Suit::Clubs),
                     ..JokerScoring::default()
                 };
 

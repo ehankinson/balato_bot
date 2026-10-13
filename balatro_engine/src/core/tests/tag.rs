@@ -201,7 +201,7 @@ fn coupon_tag_makes_initial_shop_items_and_packs_free() {
     tags.prepare_shop(&mut state, &mut shop);
     state.tags = tags;
 
-    assert_eq!(shop.items[0].price(), 0);
+    assert_eq!(shop.items[0].price(&state), 0);
     assert_eq!(shop.packs[0].price, 0);
 }
 

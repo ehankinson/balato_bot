@@ -450,3 +450,43 @@ impl JokerUpdate {
         1_u32 << (self as u32)
     }
 }
+
+/// Passive rules supplied by the currently owned, non-debuffed Jokers.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct JokerModifiers {
+    pub(crate) all_faces: bool,
+    pub(crate) splash: bool,
+    pub(crate) straight_gaps: bool,
+    pub(crate) smeared_suits: bool,
+    pub(crate) showman: bool,
+    pub(crate) free_planets: bool,
+    pub(crate) probability_multiplier: f32,
+}
+
+impl Default for JokerModifiers {
+    fn default() -> Self {
+        Self {
+            all_faces: false,
+            splash: false,
+            straight_gaps: false,
+            smeared_suits: false,
+            showman: false,
+            free_planets: false,
+            probability_multiplier: 1.0,
+        }
+    }
+}
+
+impl JokerModifiers {
+    pub(crate) fn is_face(self, card: &crate::core::card::Card) -> bool {
+        self.all_faces || card.is_face_card()
+    }
+
+    pub(crate) fn suits_match(
+        self,
+        actual: crate::core::enums::Suit,
+        required: crate::core::enums::Suit,
+    ) -> bool {
+        actual == required || (self.smeared_suits && (actual as u8 / 2 == required as u8 / 2))
+    }
+}

@@ -9,14 +9,14 @@ fn card(rank: Rank, suit: Suit) -> Card {
 
 #[test]
 fn empty_cards_have_no_poker_hand() {
-    assert_eq!(determine_poker_hand(&[]), None);
+    assert_eq!(determine_poker_hand(&[], Default::default()), None);
 }
 
 #[test]
 fn naive_poker_hand_detection_covers_common_hands() {
     let pair = [card(Rank::Two, Suit::Spades), card(Rank::Two, Suit::Hearts)];
     assert_eq!(
-        determine_poker_hand(&card_ids(&pair)).map(|result| result.hand),
+        determine_poker_hand(&card_ids(&pair), Default::default()).map(|result| result.hand),
         Some(PokerHand::Pair)
     );
     let straight_flush = [
@@ -27,7 +27,8 @@ fn naive_poker_hand_detection_covers_common_hands() {
         card(Rank::Six, Suit::Spades),
     ];
     assert_eq!(
-        determine_poker_hand(&card_ids(&straight_flush)).map(|result| result.hand),
+        determine_poker_hand(&card_ids(&straight_flush), Default::default())
+            .map(|result| result.hand),
         Some(PokerHand::StraightFlush)
     );
 }
@@ -42,7 +43,7 @@ fn naive_detection_handles_ace_low_straights() {
         card(Rank::Five, Suit::Spades),
     ];
     assert_eq!(
-        determine_poker_hand(&card_ids(&cards)).map(|result| result.hand),
+        determine_poker_hand(&card_ids(&cards), Default::default()).map(|result| result.hand),
         Some(PokerHand::Straight)
     );
 }
@@ -57,7 +58,7 @@ fn result_identifies_only_the_cards_that_score_the_hand() {
         card(Rank::Seven, Suit::Hearts),
     ];
 
-    let result = determine_poker_hand(&card_ids(&cards)).unwrap();
+    let result = determine_poker_hand(&card_ids(&cards), Default::default()).unwrap();
 
     assert_eq!(result.hand, PokerHand::HighCard);
     assert_eq!(result.scoring_card_indices, vec![2]);
@@ -81,7 +82,7 @@ fn scoring_data_preserves_card_ids_and_source_order() {
 fn hand_priority_prefers_the_requested_higher_hand() {
     let flush_five = vec![card(Rank::Ace, Suit::Spades); 5];
     assert_eq!(
-        determine_poker_hand(&card_ids(&flush_five)).map(|result| result.hand),
+        determine_poker_hand(&card_ids(&flush_five), Default::default()).map(|result| result.hand),
         Some(PokerHand::FlushFive)
     );
 
@@ -93,7 +94,7 @@ fn hand_priority_prefers_the_requested_higher_hand() {
         card(Rank::King, Suit::Spades),
     ];
     assert_eq!(
-        determine_poker_hand(&card_ids(&flush_house)).map(|result| result.hand),
+        determine_poker_hand(&card_ids(&flush_house), Default::default()).map(|result| result.hand),
         Some(PokerHand::FlushHouse)
     );
 
@@ -105,7 +106,8 @@ fn hand_priority_prefers_the_requested_higher_hand() {
         card(Rank::Ace, Suit::Spades),
     ];
     assert_eq!(
-        determine_poker_hand(&card_ids(&five_of_a_kind)).map(|result| result.hand),
+        determine_poker_hand(&card_ids(&five_of_a_kind), Default::default())
+            .map(|result| result.hand),
         Some(PokerHand::FiveOfAKind)
     );
 }
@@ -127,7 +129,7 @@ fn wild_cards_count_as_every_suit_for_flushes() {
     ];
 
     assert_eq!(
-        determine_poker_hand(&card_ids(&cards)).map(|result| result.hand),
+        determine_poker_hand(&card_ids(&cards), Default::default()).map(|result| result.hand),
         Some(PokerHand::StraightFlush)
     );
 }

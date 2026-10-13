@@ -78,6 +78,7 @@ fn matador_pays_only_when_a_boss_ability_triggers() {
     jokers.trigger(
         TriggerEvent::AfterHand {
             played_cards: &[],
+            scoring_card_indices: &[],
             held_cards: &[],
             hand_type: None,
             hands_remaining: 3,

@@ -39,6 +39,7 @@ fn hand_effect(
     jokers.trigger(
         TriggerEvent::AfterHand {
             played_cards,
+            scoring_card_indices: &(0..played_cards.len()).collect::<Vec<_>>(),
             held_cards,
             hand_type,
             hands_remaining: 3,
@@ -62,6 +63,7 @@ fn hand_effect_with_state(
     jokers.trigger(
         TriggerEvent::AfterHand {
             played_cards,
+            scoring_card_indices: &(0..played_cards.len()).collect::<Vec<_>>(),
             held_cards,
             hand_type,
             hands_remaining: 3,
@@ -382,6 +384,7 @@ fn basic_and_held_hand_scoring_have_safe_negative_cases() {
         debuffed.trigger(
             TriggerEvent::AfterHand {
                 played_cards: std::slice::from_ref(&played),
+                scoring_card_indices: &[0],
                 held_cards: &[],
                 hand_type: None,
                 hands_remaining: 3,
@@ -822,6 +825,7 @@ fn misprint_uses_a_seeded_value_within_its_current_range() {
         let effect = jokers.trigger(
             TriggerEvent::AfterHand {
                 played_cards: &played,
+                scoring_card_indices: &(0..(&played).len()).collect::<Vec<_>>(),
                 held_cards: &[],
                 hand_type: Some(PokerHand::HighCard),
                 hands_remaining: 3,
