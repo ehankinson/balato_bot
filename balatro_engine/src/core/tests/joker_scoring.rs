@@ -74,6 +74,24 @@ fn hand_effect_with_state(
     )
 }
 
+fn cards_for_hand(hand: PokerHand) -> Vec<Card> {
+    let ranks: &[Rank] = match hand {
+        PokerHand::Pair => &[Rank::Seven, Rank::Seven],
+        PokerHand::TwoPair => &[Rank::Seven, Rank::Seven, Rank::Eight, Rank::Eight],
+        PokerHand::ThreeOfAKind => &[Rank::Seven, Rank::Seven, Rank::Seven],
+        PokerHand::FourOfAKind => &[Rank::Seven, Rank::Seven, Rank::Seven, Rank::Seven],
+        PokerHand::Straight | PokerHand::Flush => {
+            &[Rank::Two, Rank::Three, Rank::Four, Rank::Five, Rank::Six]
+        }
+        _ => &[Rank::Seven],
+    };
+    ranks
+        .iter()
+        .copied()
+        .map(|rank| card(rank, Suit::Spades))
+        .collect()
+}
+
 #[test]
 fn suit_jokers_score_only_their_matching_suit() {
     for (kind, suit) in [
@@ -96,7 +114,7 @@ fn suit_jokers_score_only_their_matching_suit() {
 }
 
 #[test]
-fn poker_hand_jokers_accept_only_their_configured_hand() {
+fn poker_hand_jokers_require_their_pattern_in_the_played_cards() {
     for (kind, required_hand, add_mult, chips) in [
         (JokerKind::Jolly, PokerHand::Pair, 8, 0),
         (JokerKind::Zany, PokerHand::ThreeOfAKind, 12, 0),
@@ -109,9 +127,14 @@ fn poker_hand_jokers_accept_only_their_configured_hand() {
         (JokerKind::Devious, PokerHand::Straight, 0, 100),
         (JokerKind::Crafty, PokerHand::Flush, 0, 80),
     ] {
-        let played = [card(Rank::Seven, Suit::Spades)];
+        let played = cards_for_hand(required_hand);
         let matching = hand_effect(kind, &played, &[], Some(required_hand));
-        let non_matching = hand_effect(kind, &played, &[], Some(PokerHand::HighCard));
+        let non_matching = hand_effect(
+            kind,
+            &[card(Rank::Seven, Suit::Spades)],
+            &[],
+            Some(PokerHand::HighCard),
+        );
         assert_eq!(matching.add_mult, add_mult);
         assert_eq!(matching.chips, chips);
         assert_eq!(non_matching, JokerEffect::default());
@@ -283,7 +306,7 @@ fn deck_and_lineup_scoring_jokers_use_current_counts() {
     let mut state = GameState::new(106);
     assert_eq!(
         hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut state, 1).chips,
-        26
+        104
     );
 
     assert_eq!(
@@ -293,7 +316,7 @@ fn deck_and_lineup_scoring_jokers_use_current_counts() {
     state.deck.remove_cards(2);
     assert_eq!(
         hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut state, 1).add_mult,
-        8
+        4 // 50 draw-pile cards plus the synthetic played card = 51 owned.
     );
 
     for _ in 0..3 {
@@ -304,7 +327,7 @@ fn deck_and_lineup_scoring_jokers_use_current_counts() {
         3.0
     );
 
-    state.blind.current_hand = Some(PokerHand::Pair);
+    state.blind.record_play(PokerHand::Pair);
     assert_eq!(
         hand_effect_with_state(
             JokerKind::CardSharp,
@@ -416,7 +439,7 @@ fn basic_and_held_hand_scoring_have_safe_negative_cases() {
 }
 
 #[test]
-fn poker_hand_x_mult_jokers_match_only_their_poker_hand() {
+fn poker_hand_x_mult_jokers_require_their_pattern_in_the_played_cards() {
     let played = [card(Rank::Seven, Suit::Spades)];
     for (kind, hand, expected) in [
         (JokerKind::Duo, PokerHand::Pair, 2.0),
@@ -425,7 +448,10 @@ fn poker_hand_x_mult_jokers_match_only_their_poker_hand() {
         (JokerKind::Order, PokerHand::Straight, 3.0),
         (JokerKind::Tribe, PokerHand::Flush, 2.0),
     ] {
-        assert_eq!(hand_effect(kind, &played, &[], Some(hand)).x_mult, expected);
+        assert_eq!(
+            hand_effect(kind, &cards_for_hand(hand), &[], Some(hand)).x_mult,
+            expected
+        );
         assert_eq!(
             hand_effect(kind, &played, &[], Some(PokerHand::HighCard)).x_mult,
             1.0
@@ -658,14 +684,14 @@ fn dynamic_scoring_jokers_use_zero_and_nonzero_state_boundaries() {
     one_card.deck.remove_cards(51);
     assert_eq!(
         hand_effect_with_state(JokerKind::Blue, &played, &[], None, &mut one_card, 1).chips,
-        0
+        2
     );
 
     let mut eroded = GameState::new(112);
     eroded.deck.remove_cards(1);
     assert_eq!(
         hand_effect_with_state(JokerKind::Erosion, &played, &[], None, &mut eroded, 1).add_mult,
-        4
+        0 // 51 draw-pile cards plus one synthetic played card.
     );
     let mut state = GameState::new(113);
     state.money = -10;

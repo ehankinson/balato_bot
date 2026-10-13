@@ -77,8 +77,19 @@ impl ShopPack {
         let mut generated_consumables = Vec::with_capacity(self.option_count());
         let mut generated_jokers = Vec::with_capacity(self.option_count());
         let mut options = Vec::with_capacity(self.option_count());
-        for _ in 0..self.option_count() {
-            let option = random_option(self.kind, state, &generated_consumables, &generated_jokers);
+        for option_index in 0..self.option_count() {
+            let option = if self.kind == BoosterPackKind::Celestial
+                && option_index == 0
+                && state.has_voucher(crate::core::enums::Vouchers::Telescope)
+            {
+                PackOption::Consumable(Consumable::Planet(planet_for_hand(
+                    state
+                        .most_played_hand()
+                        .unwrap_or(crate::core::enums::PokerHand::HighCard),
+                )))
+            } else {
+                random_option(self.kind, state, &generated_consumables, &generated_jokers)
+            };
             match &option {
                 PackOption::Consumable(consumable) => generated_consumables.push(*consumable),
                 PackOption::Joker(joker) => generated_jokers.push(joker.kind()),
@@ -86,6 +97,7 @@ impl ShopPack {
             }
             options.push(option);
         }
+        state.update_jokers(UpdateEvent::BoosterPackOpened);
         PackOpening {
             options,
             choices: self.choices(),
@@ -115,17 +127,27 @@ impl PackOpening {
     }
 
     pub(crate) fn choose(
-        self,
+        &mut self,
         selections: &[usize],
         state: &mut GameState,
     ) -> Result<(), PackError> {
         validate_selections(&self, selections, state)?;
 
+        if selections.is_empty() {
+            state.update_jokers(UpdateEvent::BoosterPackSkipped);
+            self.choices = 0;
+            return Ok(());
+        }
         for index in selections {
             match self.options.get(*index).expect("validated pack selection") {
                 PackOption::Joker(joker) => {
                     state.jokers.add(joker.clone());
                     state.update_jokers(UpdateEvent::JokerOrderChanged);
+                }
+                PackOption::Consumable(consumable @ Consumable::Planet(_)) => {
+                    state
+                        .use_pack_consumable(*consumable)
+                        .map_err(PackError::Consumable)?;
                 }
                 PackOption::Consumable(consumable) => state
                     .add_consumable(*consumable)
@@ -137,6 +159,12 @@ impl PackOpening {
             }
         }
 
+        let mut removed = selections.to_vec();
+        removed.sort_unstable();
+        for index in removed.into_iter().rev() {
+            self.options.remove(index);
+        }
+        self.choices -= selections.len();
         Ok(())
     }
 }
@@ -171,7 +199,8 @@ fn validate_selections(
     selections: &[usize],
     state: &GameState,
 ) -> Result<(), PackError> {
-    if selections.len() != opening.choices
+    if opening.choices == 0
+        || selections.len() > opening.choices
         || selections
             .iter()
             .any(|index| *index >= opening.options.len())
@@ -193,7 +222,12 @@ fn validate_selections(
 
     let consumable_count = selections
         .iter()
-        .filter(|index| matches!(opening.options[**index], PackOption::Consumable(_)))
+        .filter(|index| {
+            matches!(
+                opening.options[**index],
+                PackOption::Consumable(Consumable::Tarot(_) | Consumable::Spectral(_))
+            )
+        })
         .count();
     if state.consumables.len() + consumable_count > state.consumable_capacity() {
         return Err(PackError::InventoryFull);
@@ -360,21 +394,9 @@ fn random_arcana_card(state: &mut GameState, generated_consumables: &[Consumable
 }
 
 fn random_planet_card(state: &mut GameState, generated_consumables: &[Consumable]) -> Consumable {
-    let targeted_planet = state
-        .shop
-        .most_played_planet_in_pack
-        .then(|| state.most_played_hand().map(planet_for_hand))
-        .flatten()
-        .filter(|planet| {
-            consumable_available_in_pack(state, Consumable::Planet(*planet), generated_consumables)
-        });
-
-    let planet = targeted_planet
-        .or_else(|| {
-            available_planets(state, generated_consumables)
-                .choose(&mut state.rng)
-                .copied()
-        })
+    let planet = available_planets(state, generated_consumables)
+        .choose(&mut state.rng)
+        .copied()
         .unwrap_or_else(|| random_planet(state));
     Consumable::Planet(planet)
 }

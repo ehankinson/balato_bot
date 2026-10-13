@@ -4,9 +4,7 @@ use crate::core::enums::{Consumable, Decks, Planet, Spectral, Tarot, Vouchers};
 use crate::core::game::GameState;
 use crate::core::joker::{Joker, UpdateEvent};
 use crate::core::joker_types::JokerKind;
-use crate::core::pack::{
-    PackOpening, ShopPack, planet_for_hand, random_shop_pack, random_shop_playing_card,
-};
+use crate::core::pack::{PackOpening, ShopPack, random_shop_pack, random_shop_playing_card};
 use rand::prelude::{IndexedRandom, RngExt};
 use rand::rngs::StdRng;
 
@@ -127,7 +125,6 @@ pub(crate) struct ShopState {
     pub(crate) initial_reroll_cost: u16,
     pub(crate) reroll_cost: u16,
     pub(crate) offer_weights: ShopOfferWeights,
-    pub(crate) most_played_planet_in_pack: bool,
     pub(crate) playing_card_edition_chance: u8,
     pub(crate) playing_card_enhancement_chance: u8,
 }
@@ -143,7 +140,6 @@ impl ShopState {
             initial_reroll_cost: DEFAULT_REROLL_COST,
             reroll_cost: DEFAULT_REROLL_COST,
             offer_weights: ShopOfferWeights::BASE,
-            most_played_planet_in_pack: false,
             playing_card_edition_chance: DEFAULT_PLAYING_CARD_EDITION_CHANCE,
             playing_card_enhancement_chance: DEFAULT_PLAYING_CARD_ENHANCEMENT_CHANCE,
         }
@@ -321,20 +317,11 @@ pub(crate) fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> Sh
             }
         }
         ShopOfferKind::Planet => {
-            let targeted_planet = state
-                .most_played_hand()
-                .filter(|_| state.shop.most_played_planet_in_pack)
-                .map(planet_for_hand)
-                .filter(|planet| {
-                    state.has_showman() || !has_owned_consumable(state, Consumable::Planet(*planet))
-                });
-            let planet = targeted_planet.unwrap_or_else(|| {
-                available_planets(state)
-                    .choose(&mut state.rng)
-                    .copied()
-                    .or_else(|| Planet::ALL.choose(&mut state.rng).copied())
-                    .expect("the Planet table must not be empty")
-            });
+            let planet = available_planets(state)
+                .choose(&mut state.rng)
+                .copied()
+                .or_else(|| Planet::ALL.choose(&mut state.rng).copied())
+                .expect("the Planet table must not be empty");
             ShopItem::Consumable {
                 consumable: Consumable::Planet(planet),
                 price: DEFAULT_CONSUMABLE_PRICE,
@@ -431,13 +418,6 @@ fn available_spectral_cards(state: &GameState) -> Vec<Spectral> {
                     .any(|owned| owned.consumable == Consumable::Spectral(*spectral))
         })
         .collect()
-}
-
-fn has_owned_consumable(state: &GameState, consumable: Consumable) -> bool {
-    state
-        .consumables
-        .iter()
-        .any(|owned| owned.consumable == consumable)
 }
 
 fn require_funds(state: &GameState, price: u16) -> Result<(), ShopError> {

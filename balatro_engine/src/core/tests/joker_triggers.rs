@@ -47,7 +47,7 @@ fn suit_scoring_joker_only_scores_matching_played_cards() {
 }
 
 #[test]
-fn poker_hand_scoring_joker_checks_the_hand_type() {
+fn poker_hand_scoring_joker_checks_the_played_pattern() {
     let mut jokers = Jokers::new();
     jokers.add(Joker::create_joker(JokerKind::Jolly));
     let played = card(Rank::Seven, Suit::Diamonds);
@@ -55,7 +55,7 @@ fn poker_hand_scoring_joker_checks_the_hand_type() {
 
     let pair = jokers.trigger(
         TriggerEvent::AfterHand {
-            played_cards: std::slice::from_ref(&played),
+            played_cards: &[played.clone(), played.clone()],
             scoring_card_indices: &[0],
             held_cards: &[],
             hand_type: Some(PokerHand::Pair),

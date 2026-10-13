@@ -27,7 +27,13 @@ fn mail_in_rebate_uses_the_currently_selected_rank() {
         card(Rank::Ace, Suit::Spades, Enhancement::None),
     ];
 
-    jokers.trigger(TriggerEvent::Discard { cards: &cards }, &mut state);
+    jokers.trigger(
+        TriggerEvent::Discard {
+            cards: &cards,
+            is_discard_action: true,
+        },
+        &mut state,
+    );
 
     assert_eq!(state.money, 10);
 }
@@ -115,7 +121,7 @@ fn round_end_economy_jokers_pay_only_for_their_current_state() {
     }
     assert_eq!(
         cloud_nine
-            .update(UpdateEvent::RoundCompleted, &mut state)
+            .update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state)
             .money,
         3
     );
@@ -123,7 +129,10 @@ fn round_end_economy_jokers_pay_only_for_their_current_state() {
     no_nines.deck.remove_cards_of_rank(Rank::Nine, 4);
     assert_eq!(
         cloud_nine
-            .update(UpdateEvent::RoundCompleted, &mut no_nines)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut no_nines
+            )
             .money,
         0
     );
@@ -134,14 +143,20 @@ fn round_end_economy_jokers_pay_only_for_their_current_state() {
     interest_state.money = 10;
     assert_eq!(
         to_the_moon
-            .update(UpdateEvent::RoundCompleted, &mut interest_state)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut interest_state
+            )
             .money,
         2
     );
     let mut zero_state = GameState::new(19);
     assert_eq!(
         to_the_moon
-            .update(UpdateEvent::RoundCompleted, &mut zero_state)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut zero_state
+            )
             .money,
         0
     );
@@ -151,7 +166,10 @@ fn round_end_economy_jokers_pay_only_for_their_current_state() {
     let mut golden_state = GameState::new(20);
     assert_eq!(
         golden
-            .update(UpdateEvent::RoundCompleted, &mut golden_state)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut golden_state
+            )
             .money,
         4
     );
@@ -162,7 +180,10 @@ fn round_end_economy_jokers_pay_only_for_their_current_state() {
     satellite_state.counters.used_planets = 0b11;
     assert_eq!(
         satellite
-            .update(UpdateEvent::RoundCompleted, &mut satellite_state)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut satellite_state
+            )
             .money,
         2
     );
@@ -175,14 +196,20 @@ fn rocket_and_egg_accumulate_only_at_their_lifecycle_events() {
     let mut rocket_state = GameState::new(22);
     assert_eq!(
         rocket
-            .update(UpdateEvent::RoundCompleted, &mut rocket_state)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut rocket_state
+            )
             .money,
         1
     );
     rocket.update(UpdateEvent::BossBlindCompleted, &mut rocket_state);
     assert_eq!(
         rocket
-            .update(UpdateEvent::RoundCompleted, &mut rocket_state)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut rocket_state
+            )
             .money,
         3
     );
@@ -190,7 +217,10 @@ fn rocket_and_egg_accumulate_only_at_their_lifecycle_events() {
     debuffed_rocket.add(Joker::create_joker(JokerKind::Rocket));
     debuffed_rocket.jokers[0].debuffed = true;
     assert_eq!(
-        debuffed_rocket.update(UpdateEvent::RoundCompleted, &mut rocket_state),
+        debuffed_rocket.update(
+            UpdateEvent::RoundCompleted { held_cards: &[] },
+            &mut rocket_state
+        ),
         JokerEffect::default()
     );
 
@@ -198,8 +228,14 @@ fn rocket_and_egg_accumulate_only_at_their_lifecycle_events() {
     egg.add(Joker::create_joker(JokerKind::Egg));
     let mut egg_state = GameState::new(23);
     let initial_value = egg.jokers[0].sell_value();
-    egg.update(UpdateEvent::RoundCompleted, &mut egg_state);
-    egg.update(UpdateEvent::RoundCompleted, &mut egg_state);
+    egg.update(
+        UpdateEvent::RoundCompleted { held_cards: &[] },
+        &mut egg_state,
+    );
+    egg.update(
+        UpdateEvent::RoundCompleted { held_cards: &[] },
+        &mut egg_state,
+    );
     assert_eq!(egg.jokers[0].sell_value(), initial_value + 6);
     assert_eq!(
         egg.update(
@@ -302,7 +338,7 @@ fn sold_jokers_apply_their_own_sale_effect_and_respect_debuffs() {
     golden.add(Joker::create_joker(JokerKind::Golden));
     golden.jokers[0].debuffed = true;
     assert_eq!(
-        golden.update(UpdateEvent::RoundCompleted, &mut state),
+        golden.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state),
         JokerEffect::default()
     );
 }
@@ -325,13 +361,25 @@ fn mail_in_rebate_has_a_zero_payout_for_nonmatching_and_empty_discards() {
     let cards = [card(non_matching, Suit::Hearts, Enhancement::None)];
     assert_eq!(
         jokers
-            .trigger(TriggerEvent::Discard { cards: &cards }, &mut state)
+            .trigger(
+                TriggerEvent::Discard {
+                    cards: &cards,
+                    is_discard_action: true
+                },
+                &mut state
+            )
             .money,
         0
     );
     assert_eq!(
         jokers
-            .trigger(TriggerEvent::Discard { cards: &[] }, &mut state)
+            .trigger(
+                TriggerEvent::Discard {
+                    cards: &[],
+                    is_discard_action: true
+                },
+                &mut state
+            )
             .money,
         0
     );

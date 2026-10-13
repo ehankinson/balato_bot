@@ -49,31 +49,10 @@ pub(crate) fn execute_hand(
     mut scoring_data: ScoringData,
     boss_ability_triggered: bool,
 ) -> ScoreResult {
-    let mut hand_score = state.hand_score(hand_type);
-    if state.blind.flint_active() {
-        hand_score.chips = hand_score.chips.div_ceil(2);
-        hand_score.mult = hand_score.mult.div_ceil(2);
-        hand_score.mult = hand_score.mult.max(1);
-    }
     let joker_count = state.jokers.as_slice().len() as u8;
     let joker_len = usize::from(joker_count);
     let held_trigger_count = 1usize.saturating_add(state.jokers.mime_count());
     let original_held_count = held_hand.cards().len();
-    let mut score = ScoreAccumulator {
-        chips: hand_score.chips as u64,
-        mult: hand_score.mult as f32,
-    };
-    for joker_index in 0..joker_len {
-        let effect = {
-            let event = TriggerEvent::BeforePlayedCards {
-                played_cards: &played_cards,
-                held_cards: held_hand.cards(),
-            };
-            state.trigger_joker_at(joker_index, &event, joker_count)
-        };
-        score.apply(effect.chips, effect.add_mult, effect.x_mult);
-        state.apply_scoring_joker_effect(&effect, played_cards, held_hand);
-    }
 
     let scoring_card_indices = hand_indices
         .iter()
@@ -95,6 +74,29 @@ pub(crate) fn execute_hand(
             };
             state.trigger_joker_at(joker_index, &event, joker_count)
         };
+        state.apply_scoring_joker_effect(&effect, played_cards, held_hand);
+    }
+    let mut hand_score = state.hand_score(hand_type);
+    if state.blind.flint_active() {
+        hand_score.chips = hand_score.chips.div_ceil(2);
+        hand_score.mult = hand_score.mult.div_ceil(2);
+        hand_score.mult = hand_score.mult.max(1);
+    }
+    // Space Joker's ordered hand-played operations can upgrade these base
+    // values before card scoring begins.
+    let mut score = ScoreAccumulator {
+        chips: hand_score.chips as u64,
+        mult: hand_score.mult as f32,
+    };
+    for joker_index in 0..joker_len {
+        let effect = {
+            let event = TriggerEvent::BeforePlayedCards {
+                played_cards: &played_cards,
+                held_cards: held_hand.cards(),
+            };
+            state.trigger_joker_at(joker_index, &event, joker_count)
+        };
+        score.apply(effect.chips, effect.add_mult, effect.x_mult);
         state.apply_scoring_joker_effect(&effect, played_cards, held_hand);
     }
     for index in original_held_count..held_hand.cards().len() {

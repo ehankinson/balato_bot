@@ -145,17 +145,6 @@ impl Deck {
         }
     }
 
-    pub(crate) fn enhanced_count(&self) -> u16 {
-        self.cards
-            .iter()
-            .filter(|card| card.enhancement() != Enhancement::None)
-            .count() as u16
-    }
-
-    pub(crate) fn rank_count(&self, rank: Rank) -> u16 {
-        self.cards.iter().filter(|card| card.rank() == rank).count() as u16
-    }
-
     pub(crate) fn remove_cards_of_rank(&mut self, rank: Rank, amount: usize) -> Vec<Card> {
         let mut remaining = amount;
         let mut removed = Vec::new();

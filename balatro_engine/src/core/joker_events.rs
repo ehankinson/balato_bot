@@ -24,8 +24,31 @@ pub(crate) struct JokerContext<'a> {
     joker_capacity: usize,
     consumable_slots: usize,
     pub(crate) modifiers: JokerModifiers,
+    owned: OwnedCardCounts,
 }
 
+#[derive(Default)]
+struct OwnedCardCounts {
+    count: usize,
+    steel: usize,
+    stone: usize,
+    enhanced: usize,
+    nines: usize,
+}
+impl OwnedCardCounts {
+    fn from_cards<'a>(cards: impl Iterator<Item = &'a Card>) -> Self {
+        let mut counts = Self::default();
+        for card in cards {
+            counts.count += 1;
+            counts.steel += usize::from(card.enhancement() == Enhancement::Steel);
+            counts.stone += usize::from(card.enhancement() == Enhancement::Stone);
+            counts.enhanced += usize::from(card.enhancement() != Enhancement::None);
+            counts.nines +=
+                usize::from(card.enhancement() != Enhancement::Stone && card.rank() == Rank::Nine);
+        }
+        counts
+    }
+}
 impl<'a> JokerContext<'a> {
     pub(crate) fn new(
         state: &'a mut GameState,
@@ -74,6 +97,7 @@ impl<'a> JokerContext<'a> {
             joker_capacity,
             consumable_slots,
             modifiers,
+            owned: OwnedCardCounts::default(),
         }
     }
 
@@ -106,6 +130,7 @@ pub enum TriggerEvent<'a> {
     },
     Discard {
         cards: &'a [Card],
+        is_discard_action: bool,
     },
     BeforePlayedCards {
         played_cards: &'a [Card],
@@ -168,7 +193,9 @@ pub enum UpdateEvent<'a> {
         card: &'a Card,
     },
     RoundStarted,
-    RoundCompleted,
+    RoundCompleted {
+        held_cards: &'a [Card],
+    },
     DiscardActionCompleted,
     LuckyCardSucceeded,
     ShopRerolled,
@@ -196,7 +223,7 @@ impl UpdateEvent<'_> {
             Self::AfterPlayerDeath { .. } => JokerUpdate::AfterPlayerDeath,
             Self::CardDestroyed { .. } => JokerUpdate::CardDestroyed,
             Self::RoundStarted => JokerUpdate::RoundStarted,
-            Self::RoundCompleted => JokerUpdate::RoundCompleted,
+            Self::RoundCompleted { .. } => JokerUpdate::RoundCompleted,
             Self::DiscardActionCompleted => JokerUpdate::DiscardActionCompleted,
             Self::LuckyCardSucceeded => JokerUpdate::LuckyCardSucceeded,
             Self::ShopRerolled => JokerUpdate::ShopRerolled,
@@ -257,6 +284,10 @@ pub(crate) enum GeneratedConsumable {
 /// Fully specified game operation emitted by a Joker activation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum JokerOperation {
+    AddPlayedCardChips {
+        index: usize,
+        chips: i32,
+    },
     CopyPlayedCard {
         index: usize,
         count: u8,
@@ -313,6 +344,7 @@ pub struct JokerEffect {
     pub disable_boss_blind: bool,
     pub prevent_death: bool,
     pub sell_value_bonus: u8,
+    pub destroy_discarded_card: bool,
 }
 
 impl Default for JokerEffect {
@@ -334,6 +366,7 @@ impl Default for JokerEffect {
             disable_boss_blind: false,
             prevent_death: false,
             sell_value_bonus: 0,
+            destroy_discarded_card: false,
         }
     }
 }
@@ -387,6 +420,7 @@ impl JokerEffect {
         self.remove_right_joker |= other.remove_right_joker;
         self.remove_random_joker |= other.remove_random_joker;
         self.remove_self |= other.remove_self;
+        self.destroy_discarded_card |= other.destroy_discarded_card;
         self.disable_boss_blind |= other.disable_boss_blind;
         self.prevent_death |= other.prevent_death;
         self.sell_value_bonus = self.sell_value_bonus.saturating_add(other.sell_value_bonus);
@@ -449,6 +483,17 @@ impl Jokers {
             return JokerEffect::default();
         };
         if self.jokers[index].is_debuffed() || self.jokers[effective_index].is_debuffed() {
+            return JokerEffect::default();
+        }
+        // Copied scoring abilities read persistent growth; only the actual
+        // scaler updates on a played card or in the before-scoring phase.
+        if effective_index != index
+            && matches!(
+                (self.jokers[effective_index].kind, event),
+                (JokerKind::Wee, TriggerEvent::PlayedCard { .. })
+                    | (JokerKind::Vampire, TriggerEvent::HandPlayed { .. })
+            )
+        {
             return JokerEffect::default();
         }
         self.jokers[effective_index].trigger(event, context, joker_count)
@@ -522,6 +567,7 @@ impl Jokers {
             let JokerStructure::Normal(JokerData::GameState(data)) = &joker.structure else {
                 continue;
             };
+            modifiers.four_fingers |= joker.kind == JokerKind::FourFingers;
             match data.game_state_modification {
                 Some(GameStateModifications::AllFaces) => modifiers.all_faces = true,
                 Some(GameStateModifications::PlayAllCards) => modifiers.splash = true,
@@ -541,6 +587,18 @@ impl Jokers {
             }
         }
         modifiers
+    }
+
+    pub(crate) fn hand_size_modifier(&self) -> i8 {
+        self.jokers
+            .iter()
+            .filter(|joker| !joker.is_debuffed())
+            .map(|joker| match &joker.structure {
+                JokerStructure::Normal(JokerData::GameState(data)) => data.hand_size,
+                JokerStructure::Normal(JokerData::Scoring(data)) => data.hand_size,
+                _ => 0,
+            })
+            .sum()
     }
 
     pub(crate) fn capacity(&self) -> usize {
@@ -967,9 +1025,56 @@ impl Joker {
             return JokerEffect::default();
         }
 
+        let (played, held) = match event {
+            TriggerEvent::PlayedCard {
+                played_cards,
+                held_cards,
+                ..
+            }
+            | TriggerEvent::AfterHand {
+                played_cards,
+                held_cards,
+                ..
+            }
+            | TriggerEvent::BeforePlayedCards {
+                played_cards,
+                held_cards,
+            } => (*played_cards, *held_cards),
+            _ => (&[][..], &[][..]),
+        };
+        if matches!(
+            self.kind,
+            JokerKind::Steel | JokerKind::Stone | JokerKind::Erosion | JokerKind::DriversLicense
+        ) {
+            context.owned = OwnedCardCounts::from_cards(
+                context
+                    .deck
+                    .cards()
+                    .iter()
+                    .chain(context.deck.discarded_cards())
+                    .chain(played)
+                    .chain(held),
+            );
+        }
         match (event, self.trigger) {
+            (TriggerEvent::HandPlayed { .. }, _)
+                if matches!(self.kind, JokerKind::Vampire | JokerKind::Space) =>
+            {
+                self.on_hand_played(event, context)
+            }
             (TriggerEvent::HandPlayed { .. }, JokerTrigger::OnHandPlayed) => {
                 self.on_hand_played(event, context)
+            }
+            (TriggerEvent::PlayedCard { card, .. }, _) if self.kind == JokerKind::Wee => {
+                if !card.is_debuffed()
+                    && card.enhancement() != Enhancement::Stone
+                    && card.rank() == Rank::Two
+                {
+                    if let JokerStructure::Normal(JokerData::Scoring(data)) = &mut self.structure {
+                        data.chips += 8;
+                    }
+                }
+                JokerEffect::default()
             }
             (TriggerEvent::PlayedCard { .. }, JokerTrigger::OnPlayedCard) => {
                 self.on_played_card(event, context, joker_count)
@@ -977,13 +1082,21 @@ impl Joker {
             (TriggerEvent::HeldCard { .. }, JokerTrigger::OnHeldCard) => {
                 self.on_held_card(event, context)
             }
-            (TriggerEvent::Discard { cards }, JokerTrigger::OnDiscard) => {
-                self.on_discard(cards, context)
-            }
-            (TriggerEvent::Discard { cards }, _)
-                if matches!(self.kind, JokerKind::Faceless | JokerKind::TradingCard) =>
-            {
-                self.on_discard(cards, context)
+            (
+                TriggerEvent::Discard {
+                    cards,
+                    is_discard_action,
+                },
+                JokerTrigger::OnDiscard,
+            ) => self.on_discard(cards, *is_discard_action, context),
+            (
+                TriggerEvent::Discard {
+                    cards,
+                    is_discard_action,
+                },
+                _,
+            ) if matches!(self.kind, JokerKind::Faceless | JokerKind::TradingCard) => {
+                self.on_discard(cards, *is_discard_action, context)
             }
             (TriggerEvent::BeforePlayedCards { .. }, JokerTrigger::BeforePlayedCards) => {
                 self.on_before_played_cards(event)
@@ -1189,6 +1302,17 @@ impl Joker {
             return JokerEffect::default();
         }
 
+        if self.kind == JokerKind::Hiker {
+            let TriggerEvent::PlayedCard { card_index, .. } = event else {
+                unreachable!()
+            };
+            let mut effect = JokerEffect::default();
+            effect.add_operation(JokerOperation::AddPlayedCardChips {
+                index: *card_index,
+                chips: 5,
+            });
+            return effect;
+        }
         match &self.structure {
             JokerStructure::Normal(JokerData::Scoring(_)) => {
                 JokerEffect::from_scoring(self.trigger_scoring(event, context, joker_count))
@@ -1254,6 +1378,32 @@ impl Joker {
             if let JokerStructure::Normal(JokerData::Econ(data)) = &self.structure {
                 if data.poker_hand == Some(*hand_type) {
                     effect.money = data.money as i16;
+                }
+            }
+            return effect;
+        }
+        if self.kind == JokerKind::Vampire {
+            if let JokerStructure::Normal(JokerData::Scoring(data)) = &mut self.structure {
+                for &index in *scoring_card_indices {
+                    let card = &played_cards[index];
+                    if !card.is_debuffed() && card.enhancement() != Enhancement::None {
+                        data.x_mult += 0.1;
+                        effect.add_operation(JokerOperation::EnhancePlayedCard {
+                            index,
+                            enhancement: Enhancement::None,
+                        });
+                    }
+                }
+            }
+            return effect;
+        }
+        if self.kind == JokerKind::Space {
+            if let JokerStructure::Normal(JokerData::GameState(data)) = &self.structure {
+                if chance(context, data.probability) {
+                    effect.add_operation(JokerOperation::UpgradeHand {
+                        hand: *hand_type,
+                        levels: 1,
+                    });
                 }
             }
             return effect;
@@ -1373,7 +1523,12 @@ impl Joker {
         }
     }
 
-    fn on_discard(&mut self, cards: &[Card], context: &mut JokerContext<'_>) -> JokerEffect {
+    fn on_discard(
+        &mut self,
+        cards: &[Card],
+        is_discard_action: bool,
+        context: &mut JokerContext<'_>,
+    ) -> JokerEffect {
         match self.kind {
             JokerKind::MailInRebate => {
                 let JokerStructure::Normal(JokerData::Econ(data)) = &self.structure else {
@@ -1400,10 +1555,15 @@ impl Joker {
                     ..JokerEffect::default()
                 }
             }
-            JokerKind::TradingCard if !cards.is_empty() => JokerEffect {
-                money: 3,
-                ..JokerEffect::default()
-            },
+            JokerKind::TradingCard
+                if is_discard_action && cards.len() == 1 && context.blind.discards_used == 0 =>
+            {
+                JokerEffect {
+                    money: 3,
+                    destroy_discarded_card: true,
+                    ..JokerEffect::default()
+                }
+            }
             JokerKind::Castle => {
                 let count = context
                     .blind
@@ -1420,7 +1580,7 @@ impl Joker {
                     ..JokerEffect::default()
                 }
             }
-            JokerKind::BurntJoker => {
+            JokerKind::BurntJoker if is_discard_action && context.blind.discards_used == 0 => {
                 let hand_type = crate::calculation::poker::determine_poker_hand(
                     &cards.iter().map(Card::id).collect::<Vec<_>>(),
                     context.modifiers,
@@ -1554,6 +1714,17 @@ impl Joker {
             return JokerEffect::default();
         }
 
+        if let (JokerKind::Cloud9, UpdateEvent::RoundCompleted { held_cards }) = (self.kind, event)
+        {
+            context.owned = OwnedCardCounts::from_cards(
+                context
+                    .deck
+                    .cards()
+                    .iter()
+                    .chain(context.deck.discarded_cards())
+                    .chain(*held_cards),
+            );
+        }
         let mut effect = JokerEffect::default();
         match (event, self.kind) {
             (UpdateEvent::BlindSelected { .. }, JokerKind::Marble) => {
@@ -1576,7 +1747,7 @@ impl Joker {
             }
             (UpdateEvent::BlindSelected { .. }, JokerKind::Burglar) => {
                 effect.hands = 3;
-                effect.discards = -4;
+                effect.discards = -(context.blind.discards_remaining as i8);
             }
             (UpdateEvent::BlindSelected { is_boss: false }, JokerKind::Madness) => {
                 if let JokerStructure::Normal(JokerData::Scoring(data)) = &mut self.structure {
@@ -1671,56 +1842,63 @@ impl Joker {
             (UpdateEvent::HandCompleted { .. }, JokerKind::Seltzer) => {
                 self.active_hands = self.active_hands.saturating_sub(1);
             }
-            (UpdateEvent::RoundCompleted, JokerKind::Popcorn) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::Popcorn) => {
                 if let JokerStructure::Normal(JokerData::Scoring(data)) = &mut self.structure {
                     data.add_mult = data.add_mult.saturating_sub(4);
                     effect.add_mult = data.add_mult as i32;
                 }
             }
-            (UpdateEvent::RoundCompleted, JokerKind::DelayedGratification)
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::DelayedGratification)
                 if context.blind.discards_used == 0 =>
             {
                 if let JokerStructure::Normal(JokerData::Econ(data)) = &self.structure {
                     effect.money = data.money as i16 * context.blind.discards_remaining as i16;
                 }
             }
-            (UpdateEvent::RoundCompleted, JokerKind::TurtleBean) => effect.hand_size = -1,
-            (UpdateEvent::RoundCompleted, JokerKind::Invisible) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::TurtleBean) => {
+                if let JokerStructure::Normal(JokerData::GameState(data)) = &mut self.structure {
+                    data.hand_size -= 1;
+                    effect.remove_self = data.hand_size == 0;
+                }
+            }
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::Invisible) => {
                 self.rounds_completed = self.rounds_completed.saturating_add(1);
             }
-            (UpdateEvent::RoundCompleted, JokerKind::Egg) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::Egg) => {
                 self.sell_value_bonus = self.sell_value_bonus.saturating_add(3);
             }
-            (UpdateEvent::RoundCompleted, JokerKind::Cloud9) => {
-                effect.money = context.deck.rank_count(Rank::Nine) as i16;
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::Cloud9) => {
+                effect.money = context.owned.nines as i16;
             }
-            (UpdateEvent::RoundCompleted, JokerKind::GiftCard) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::GiftCard) => {
                 effect.sell_value_bonus = 1;
             }
-            (UpdateEvent::RoundCompleted, JokerKind::ToTheMoon) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::ToTheMoon) => {
                 effect.money = (*context.money).max(0) / 5;
             }
-            (UpdateEvent::RoundCompleted, JokerKind::Golden) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::Golden) => {
                 effect.money = 4;
             }
-            (UpdateEvent::RoundCompleted, JokerKind::Satellite) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::Satellite) => {
                 effect.money = context.counters.used_planets.count_ones() as i16;
             }
-            (UpdateEvent::RoundCompleted, JokerKind::Rocket) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::Rocket) => {
                 if let JokerStructure::Normal(JokerData::Econ(data)) = &self.structure {
                     effect.money = data.money as i16;
                 }
             }
-            (UpdateEvent::RoundCompleted, JokerKind::GrosMichel) if chance(context, 1.0 / 6.0) => {
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::GrosMichel)
+                if chance(context, 1.0 / 6.0) =>
+            {
                 effect.remove_self = true;
             }
-            (UpdateEvent::RoundCompleted, JokerKind::Cavendish)
+            (UpdateEvent::RoundCompleted { .. }, JokerKind::Cavendish)
                 if chance(context, 1.0 / 1000.0) =>
             {
                 effect.remove_self = true;
             }
             (
-                UpdateEvent::RoundStarted | UpdateEvent::RoundCompleted,
+                UpdateEvent::RoundStarted | UpdateEvent::RoundCompleted { .. },
                 JokerKind::Ancient | JokerKind::Castle,
             ) => {
                 let suit = *ALL_SUITS.choose(&mut context.rng).unwrap();
@@ -1933,10 +2111,7 @@ fn add_scoring_effect(
             effect.x_mult *= 1.0 + context.empty_joker_slots() as f32;
         }
         JokerKind::Steel => {
-            let steel_cards = held_cards
-                .iter()
-                .filter(|held| held.enhancement() == Enhancement::Steel)
-                .count();
+            let steel_cards = context.owned.steel;
             effect.x_mult *= 1.0 + steel_cards as f32 * 0.2;
         }
         JokerKind::RaisedFist => {
@@ -1951,18 +2126,18 @@ fn add_scoring_effect(
         }
         JokerKind::Bootstraps => effect.add_mult += ((*context.money).max(0) / 5) as i32 * 2,
         JokerKind::Bull => effect.chips += (*context.money).max(0) as i32 * 2,
-        JokerKind::Blue => effect.chips += context.deck.size() as i32 / 2,
+        JokerKind::Blue => effect.chips += context.deck.size() as i32 * 2,
+        JokerKind::Stone => effect.chips += context.owned.stone as i32 * 25,
         JokerKind::Erosion => {
             effect.add_mult += context
                 .deck
                 .starting_size()
-                .saturating_sub(context.deck.size()) as i32
+                .saturating_sub(context.owned.count as u16) as i32
                 * 4;
         }
         JokerKind::Throwback => {
             effect.x_mult *= 1.0 + context.counters.blinds_skipped as f32 * 0.25
         }
-        JokerKind::Hiker => effect.chips += 5,
         JokerKind::Supernova => {
             if context.blind.current_hand == hand_type {
                 effect.add_mult += 1;
@@ -2061,7 +2236,39 @@ fn scoring_condition(
         }
     }
     if let Some(required_hand) = data.poker_hand {
-        if hand_type != Some(required_hand) {
+        let mut ranks = [0u8; 15];
+        for card in played_cards
+            .iter()
+            .filter(|card| card.enhancement() != Enhancement::Stone)
+        {
+            ranks[card.rank() as usize] += 1;
+        }
+        let contains = match required_hand {
+            PokerHand::Pair => ranks.iter().any(|&count| count >= 2),
+            PokerHand::TwoPair => ranks.iter().filter(|&&count| count >= 2).count() >= 2,
+            PokerHand::ThreeOfAKind => ranks.iter().any(|&count| count >= 3),
+            PokerHand::FourOfAKind => ranks.iter().any(|&count| count >= 4),
+            PokerHand::Straight => {
+                let mask = ranks.iter().enumerate().fold(0u16, |mask, (rank, &count)| {
+                    if count > 0 { mask | (1 << rank) } else { mask }
+                });
+                crate::calculation::poker::straight_ranks(
+                    mask,
+                    context.modifiers.straight_gaps,
+                    if context.modifiers.four_fingers { 4 } else { 5 },
+                )
+                .is_some()
+            }
+            PokerHand::Flush => ALL_SUITS.iter().copied().any(|suit| {
+                played_cards
+                    .iter()
+                    .filter(|card| context.modifiers.card_has_flush_suit(card, suit))
+                    .count()
+                    >= if context.modifiers.four_fingers { 4 } else { 5 }
+            }),
+            _ => hand_type == Some(required_hand),
+        };
+        if !contains {
             return false;
         }
     }
@@ -2141,9 +2348,11 @@ fn scoring_condition(
                 })
         }),
         JokerKind::SpareTrousers => hand_type == Some(PokerHand::TwoPair),
-        JokerKind::DriversLicense => context.deck.enhanced_count() >= 16,
+        JokerKind::DriversLicense => context.owned.enhanced >= 16,
         JokerKind::Obelisk => context.most_played_hand != hand_type,
-        JokerKind::CardSharp => context.blind.current_hand == hand_type,
+        JokerKind::CardSharp => {
+            hand_type.is_some_and(|hand| context.blind.played_hand_types.contains(&hand))
+        }
         _ => true,
     }
 }

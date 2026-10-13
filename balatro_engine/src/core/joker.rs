@@ -2021,7 +2021,6 @@ impl Joker {
                 let data = JokerScoring {
                     chips: 250,
                     hand_size: -2,
-                    poker_hand: Some(PokerHand::Flush),
                     ..JokerScoring::default()
                 };
 

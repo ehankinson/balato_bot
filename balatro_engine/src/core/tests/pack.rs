@@ -29,11 +29,11 @@ fn opening_and_choosing_a_standard_pack_adds_a_card_to_the_deck() {
     let mut state = GameState::new(25);
     let starting_size = state.deck_size();
     let pack = ShopPack::new(BoosterPackKind::Standard, BoosterPackSize::Normal, 4);
-    let opening = pack.open(&mut state);
+    let mut opening = pack.open(&mut state);
 
     assert_eq!(opening.options().len(), 3);
     assert!(matches!(opening.options()[0], PackOption::PlayingCard(_)));
-    state.select_pack_options(opening, &[0]).unwrap();
+    state.select_pack_options(&mut opening, &[0]).unwrap();
 
     assert_eq!(state.deck_size(), starting_size + 1);
 }
@@ -42,10 +42,10 @@ fn opening_and_choosing_a_standard_pack_adds_a_card_to_the_deck() {
 fn pack_selection_is_atomic_when_the_selection_is_invalid() {
     let mut state = GameState::new(26);
     let pack = ShopPack::new(BoosterPackKind::Buffoon, BoosterPackSize::Mega, 8);
-    let opening = pack.open(&mut state);
+    let mut opening = pack.open(&mut state);
 
     assert_eq!(
-        state.select_pack_options(opening, &[0]),
+        state.select_pack_options(&mut opening, &[0, 0]),
         Err(PackError::InvalidSelection)
     );
     assert!(state.jokers.as_slice().is_empty());
@@ -88,16 +88,22 @@ fn shop_pack_weights_match_the_configured_distribution() {
 }
 
 #[test]
-fn telescope_uses_the_most_played_hand_for_celestial_pack_planets() {
+fn telescope_forces_the_first_planet_even_when_already_owned() {
     let mut state = GameState::new(28);
-    state.jokers.add(Joker::create_joker(JokerKind::Showman));
     state.counters.poker_hands_played[PokerHand::Pair as usize - 1] = 1;
-    state.shop.most_played_planet_in_pack = true;
-
+    state
+        .add_consumable(Consumable::Planet(Planet::Mercury))
+        .unwrap();
+    state
+        .redeem_voucher(crate::core::enums::Vouchers::Telescope)
+        .unwrap();
     let pack = ShopPack::new(BoosterPackKind::Celestial, BoosterPackSize::Normal, 4);
     let opening = pack.open(&mut state);
-
-    assert!(opening.options().iter().all(|option| matches!(
+    assert!(matches!(
+        opening.options()[0],
+        PackOption::Consumable(Consumable::Planet(Planet::Mercury))
+    ));
+    assert!(opening.options()[1..].iter().all(|option| !matches!(
         option,
         PackOption::Consumable(Consumable::Planet(Planet::Mercury))
     )));

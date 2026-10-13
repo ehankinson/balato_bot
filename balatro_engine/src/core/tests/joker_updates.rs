@@ -16,7 +16,7 @@ fn operation_count(operation: &crate::core::joker::JokerOperation) -> u8 {
         | GenerateSealedCard { count }
         | CopyNegativeConsumable { count }
         | AddDoubleTag { count } => *count,
-        EnhancePlayedCard { .. } | UpgradeHand { .. } => 1,
+        AddPlayedCardChips { .. } | EnhancePlayedCard { .. } | UpgradeHand { .. } => 1,
     }
 }
 
@@ -153,7 +153,9 @@ fn lifecycle_updates_use_the_correct_boundaries() {
     let mut state = GameState::new(21);
     rocket.update(UpdateEvent::BossBlindCompleted, &mut state);
     assert_eq!(
-        rocket.update(UpdateEvent::RoundCompleted, &mut state).money,
+        rocket
+            .update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state)
+            .money,
         3
     );
 
@@ -265,13 +267,13 @@ fn perkeo_updates_at_shop_close_and_invisible_waits_two_rounds() {
 
     let mut invisible = Jokers::new();
     invisible.add(Joker::create_joker(JokerKind::Invisible));
-    invisible.update(UpdateEvent::RoundCompleted, &mut state);
+    invisible.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state);
     assert!(invisible.sell(0, &mut state).operations.is_empty());
 
     let mut invisible = Jokers::new();
     invisible.add(Joker::create_joker(JokerKind::Invisible));
-    invisible.update(UpdateEvent::RoundCompleted, &mut state);
-    invisible.update(UpdateEvent::RoundCompleted, &mut state);
+    invisible.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state);
+    invisible.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state);
     assert_eq!(
         invisible.sell(0, &mut state).operations[0],
         crate::core::joker::JokerOperation::CopyRandomOwnedJoker { count: 1 }
@@ -307,7 +309,7 @@ fn blueprint_and_brainstorm_delegate_economy_state_retrigger_and_generation_effe
     state.money = 0;
     let effect = game_state_copy.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
     assert_eq!(effect.hands, 6);
-    assert_eq!(effect.discards, -8);
+    assert_eq!(effect.discards, -4);
     assert_eq!(state.blind.hands_remaining, 10);
     assert_eq!(state.blind.discards_remaining, 0);
 
@@ -358,7 +360,7 @@ fn gift_card_increases_owned_joker_sell_values_at_round_end() {
     jokers.add(Joker::create_joker(JokerKind::Joker));
     let mut state = GameState::new(25);
 
-    let effect = jokers.update(UpdateEvent::RoundCompleted, &mut state);
+    let effect = jokers.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state);
 
     assert_eq!(effect.sell_value_bonus, 1);
     assert_eq!(jokers.jokers[1].sell_value(), 2);
@@ -523,9 +525,9 @@ fn scoring_updates_apply_thresholds_and_clamps() {
     popcorn.add(Joker::create_joker(JokerKind::Popcorn));
     let mut state = GameState::new(29);
     for _ in 0..5 {
-        popcorn.update(UpdateEvent::RoundCompleted, &mut state);
+        popcorn.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state);
     }
-    let effect = popcorn.update(UpdateEvent::RoundCompleted, &mut state);
+    let effect = popcorn.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state);
     assert_eq!(effect.add_mult, 0);
 
     let mut ice_cream = Jokers::new();
@@ -627,10 +629,14 @@ fn round_lifecycle_updates_apply_their_boundaries_in_place() {
     let mut state = GameState::new(31);
     assert_eq!(
         turtle_bean
-            .update(UpdateEvent::RoundCompleted, &mut state)
+            .update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state)
             .hand_size,
-        -1
+        0
     );
+    // Bean's remaining bonus belongs to its owned state, not a permanent
+    // adjustment to the deck's base hand size.
+    assert_eq!(state.deck.hand_size(), 8);
+    assert_eq!(turtle_bean.hand_size_modifier(), 4);
     assert_eq!(
         turtle_bean
             .update(UpdateEvent::BlindSelected { is_boss: false }, &mut state)
@@ -687,7 +693,7 @@ fn round_lifecycle_updates_apply_their_boundaries_in_place() {
     popcorn.add(Joker::create_joker(JokerKind::Popcorn));
     assert_eq!(
         popcorn
-            .update(UpdateEvent::RoundCompleted, &mut state)
+            .update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state)
             .add_mult,
         16
     );
@@ -865,7 +871,7 @@ fn debuffed_round_end_and_nonmatching_destroy_events_are_inactive() {
     golden.jokers[0].debuffed = true;
     let mut state = GameState::new(35);
     assert_eq!(
-        golden.update(UpdateEvent::RoundCompleted, &mut state),
+        golden.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state),
         JokerEffect::default()
     );
 
@@ -894,7 +900,7 @@ fn lifecycle_edges_are_safe_for_singletons_floors_and_expiration() {
     burglar.add(Joker::create_joker(JokerKind::Burglar));
     state.blind.discards_remaining = 1;
     let effect = burglar.update(UpdateEvent::BlindSelected { is_boss: false }, &mut state);
-    assert_eq!(effect.discards, -4);
+    assert_eq!(effect.discards, -1);
     assert_eq!(state.blind.discards_remaining, 0);
 
     let mut green = Jokers::new();
@@ -949,7 +955,10 @@ fn probability_and_removal_lifecycle_events_are_seeded_and_bounded() {
         gros.add(Joker::create_joker(JokerKind::GrosMichel));
         let mut gros_state = GameState::new(seed);
         if gros
-            .update(UpdateEvent::RoundCompleted, &mut gros_state)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut gros_state,
+            )
             .remove_self
         {
             saw_gros_failure = true;
@@ -961,7 +970,10 @@ fn probability_and_removal_lifecycle_events_are_seeded_and_bounded() {
         cavendish.add(Joker::create_joker(JokerKind::Cavendish));
         let mut cavendish_state = GameState::new(seed);
         if cavendish
-            .update(UpdateEvent::RoundCompleted, &mut cavendish_state)
+            .update(
+                UpdateEvent::RoundCompleted { held_cards: &[] },
+                &mut cavendish_state,
+            )
             .remove_self
         {
             saw_cavendish_failure = true;
@@ -994,7 +1006,7 @@ fn probability_and_removal_lifecycle_events_are_seeded_and_bounded() {
     hallucination.add(Joker::create_joker(JokerKind::Hallucination));
     let mut state = GameState::new(37);
     assert_eq!(
-        hallucination.update(UpdateEvent::RoundCompleted, &mut state),
+        hallucination.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state),
         JokerEffect::default()
     );
 }
@@ -1014,7 +1026,7 @@ fn target_rotation_and_unrelated_update_events_do_not_cross_trigger() {
         ancient.update(UpdateEvent::PlanetCardUsed, &mut state),
         JokerEffect::default()
     );
-    ancient.update(UpdateEvent::RoundCompleted, &mut state);
+    ancient.update(UpdateEvent::RoundCompleted { held_cards: &[] }, &mut state);
     let second_suit = match &ancient.jokers[0].structure {
         JokerStructure::Normal(JokerData::Scoring(data)) => data.suit,
         _ => panic!("Ancient Joker did not contain scoring data"),

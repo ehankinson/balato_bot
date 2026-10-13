@@ -144,7 +144,6 @@ fn telescope_and_consumable_slot_vouchers_update_game_state() {
     assert!(!state.has_voucher(Vouchers::Telescope));
     state.redeem_voucher(Vouchers::Telescope).unwrap();
     assert!(state.has_voucher(Vouchers::Telescope));
-    assert!(state.shop.most_played_planet_in_pack);
 
     state.redeem_voucher(Vouchers::CrystalBall).unwrap();
     state.redeem_voucher(Vouchers::OmenGlobe).unwrap();

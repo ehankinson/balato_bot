@@ -62,6 +62,7 @@ fn mail_in_rebate_triggers_for_matching_discarded_cards() {
 
     jokers.trigger(
         TriggerEvent::Discard {
+            is_discard_action: true,
             cards: &discarded_cards,
         },
         &mut game_state,

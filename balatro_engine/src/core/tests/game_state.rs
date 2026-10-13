@@ -1068,7 +1068,7 @@ fn delayed_gratification_pays_at_round_end_not_after_each_hand() {
     state.play_hand(&mut hand, vec![0]).unwrap();
     assert_eq!(state.money, money_before_play);
 
-    state.update_jokers(UpdateEvent::RoundCompleted);
+    state.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
     assert_eq!(state.money, money_before_play + 8);
 }
 
@@ -1459,8 +1459,8 @@ fn burnt_joker_levels_the_discarded_hand_and_diet_cola_materializes_a_double_tag
     invisible_state
         .jokers
         .add(Joker::create_joker(JokerKind::Jolly));
-    invisible_state.update_jokers(UpdateEvent::RoundCompleted);
-    invisible_state.update_jokers(UpdateEvent::RoundCompleted);
+    invisible_state.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
+    invisible_state.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
     invisible_state.sell_joker(0).unwrap();
     assert_eq!(invisible_state.jokers.as_slice().len(), 2);
     assert!(
@@ -1580,8 +1580,8 @@ fn generated_jokers_use_the_last_open_slot_and_invisible_needs_a_copy_source() {
     invisible_alone
         .jokers
         .add(Joker::create_joker(JokerKind::Invisible));
-    invisible_alone.update_jokers(UpdateEvent::RoundCompleted);
-    invisible_alone.update_jokers(UpdateEvent::RoundCompleted);
+    invisible_alone.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
+    invisible_alone.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
     invisible_alone.sell_joker(0).unwrap();
     assert!(invisible_alone.jokers.as_slice().is_empty());
 }
@@ -1648,7 +1648,7 @@ fn audit_followup_blueprint_does_not_copy_golden_round_payout() {
     state.jokers.add(Joker::create_joker(JokerKind::Blueprint));
     state.jokers.add(Joker::create_joker(JokerKind::Golden));
     let before = state.money;
-    state.update_jokers(UpdateEvent::RoundCompleted);
+    state.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
     assert_eq!(state.money, before + 4);
 }
 
@@ -1695,7 +1695,7 @@ fn copy_chains_and_brainstorm_reject_incompatible_payouts_and_can_retarget_scori
         for kind in kinds {
             state.jokers.add(Joker::create_joker(kind));
         }
-        state.update_jokers(UpdateEvent::RoundCompleted);
+        state.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
         assert_eq!(state.money, 4);
         let golden_index = state
             .jokers
@@ -1954,7 +1954,7 @@ fn independent_blueprint_does_not_copy_golden_round_payout() {
     state.jokers.add(Joker::create_joker(JokerKind::Blueprint));
     state.jokers.add(Joker::create_joker(JokerKind::Golden));
     let before = state.money;
-    state.update_jokers(UpdateEvent::RoundCompleted);
+    state.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
     assert_eq!(state.money, before + 4);
 }
 
@@ -2331,7 +2331,7 @@ fn dagger_growth_exceeds_one_byte_and_debuffed_dagger_does_not_consume() {
         state.jokers.add(dagger);
         state.jokers.add(Joker::create_joker(JokerKind::Egg));
         for _ in 0..90 {
-            state.update_jokers(UpdateEvent::RoundCompleted);
+            state.update_jokers(UpdateEvent::RoundCompleted { held_cards: &[] });
         }
         let growth = f32::from(state.jokers.get(1).unwrap().sell_value()) * 2.0;
         assert!(growth > 255.0);

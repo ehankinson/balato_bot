@@ -57,50 +57,41 @@ pub(crate) fn determine_poker_hand(
         }
     }
 
+    let required = if modifiers.four_fingers { 4 } else { 5 };
     let flush_suit = suit_counts
         .iter()
         .enumerate()
-        .filter(|(_, count)| **count >= 5)
+        .filter(|(_, count)| **count >= required)
         .max_by_key(|(suit, count)| (**count, std::cmp::Reverse(*suit)))
         .map(|(suit, _)| suit);
     let has_five = rank_counts.iter().any(|&count| count >= 5);
     let has_four = rank_counts.iter().any(|&count| count >= 4);
     let has_three = rank_counts.iter().any(|&count| count >= 3);
     let pair_count = rank_counts.iter().filter(|&&count| count >= 2).count();
-    let straight = straight_ranks(rank_mask, modifiers.straight_gaps);
-    let straight_flush = flush_suit.and_then(|suit| {
-        straight_ranks(suit_rank_masks[suit], modifiers.straight_gaps).map(|ranks| (suit, ranks))
-    });
+    let straight = straight_ranks(rank_mask, modifiers.straight_gaps, required);
+    let straight_flush = if modifiers.four_fingers {
+        flush_suit.and_then(|suit| straight.clone().map(|ranks| (suit, ranks)))
+    } else {
+        flush_suit.and_then(|suit| {
+            straight_ranks(suit_rank_masks[suit], modifiers.straight_gaps, required)
+                .map(|ranks| (suit, ranks))
+        })
+    };
 
-    let (hand, mut scoring_card_indices) = if let Some(suit) = flush_suit {
-        if has_five {
-            (
-                PokerHand::FlushFive,
-                rank_indices
-                    .iter()
-                    .find(|indices| indices.len() >= 5)
-                    .map(|indices| {
-                        indices
-                            .iter()
-                            .copied()
-                            .filter(|index| suit_indices[suit].contains(index))
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-            )
-        } else if has_three && pair_count >= 2 {
-            (
-                PokerHand::FlushHouse,
-                full_house_indices(&rank_indices, &rank_counts),
-            )
-        } else if let Some((_, ranks)) = straight_flush {
-            (
-                PokerHand::StraightFlush,
-                sequence_indices(&suit_indices[suit], &rank_indices, &ranks),
-            )
-        } else {
-            (PokerHand::Flush, suit_indices[suit].clone())
-        }
+    let (hand, mut scoring_card_indices) = if flush_suit.is_some() && has_five {
+        (
+            PokerHand::FlushFive,
+            rank_indices
+                .iter()
+                .find(|indices| indices.len() >= 5)
+                .cloned()
+                .unwrap_or_default(),
+        )
+    } else if flush_suit.is_some() && has_three && pair_count >= 2 {
+        (
+            PokerHand::FlushHouse,
+            full_house_indices(&rank_indices, &rank_counts),
+        )
     } else if has_five {
         (
             PokerHand::FiveOfAKind,
@@ -110,6 +101,16 @@ pub(crate) fn determine_poker_hand(
                 .cloned()
                 .unwrap_or_default(),
         )
+    } else if let Some((suit, ranks)) = straight_flush {
+        let mut indices = suit_indices[suit].clone();
+        indices.extend(sequence_indices(
+            &(0..card_ids.len()).collect::<Vec<_>>(),
+            &rank_indices,
+            &ranks,
+        ));
+        indices.sort_unstable();
+        indices.dedup();
+        (PokerHand::StraightFlush, indices)
     } else if has_four {
         (
             PokerHand::FourOfAKind,
@@ -124,6 +125,8 @@ pub(crate) fn determine_poker_hand(
             PokerHand::FullHouse,
             full_house_indices(&rank_indices, &rank_counts),
         )
+    } else if let Some(suit) = flush_suit {
+        (PokerHand::Flush, suit_indices[suit].clone())
     } else if let Some(ranks) = straight {
         (
             PokerHand::Straight,
@@ -188,20 +191,20 @@ fn full_house_indices(rank_indices: &[Vec<usize>; 15], rank_counts: &[u8; 15]) -
 fn sequence_indices(
     available_indices: &[usize],
     rank_indices: &[Vec<usize>; 15],
-    ranks: &[u8; 5],
+    ranks: &[u8],
 ) -> Vec<usize> {
     ranks
         .iter()
-        .filter_map(|rank| {
+        .flat_map(|rank| {
             rank_indices[*rank as usize]
                 .iter()
                 .copied()
-                .find(|index| available_indices.contains(index))
+                .filter(|index| available_indices.contains(index))
         })
         .collect()
 }
 
-fn straight_ranks(rank_mask: u16, allow_gaps: bool) -> Option<[u8; 5]> {
+pub(crate) fn straight_ranks(rank_mask: u16, allow_gaps: bool, required: u8) -> Option<Vec<u8>> {
     // Ace can end a high straight or start a low one, never wrap through King.
     let mut ranks = Vec::new();
     for rank in (2..=14).rev() {
@@ -213,18 +216,21 @@ fn straight_ranks(rank_mask: u16, allow_gaps: bool) -> Option<[u8; 5]> {
         ranks.push(1);
     }
     let maximum_step = if allow_gaps { 2 } else { 1 };
-    for window in ranks.windows(5) {
-        if window
-            .windows(2)
-            .all(|pair| pair[0] - pair[1] <= maximum_step)
-        {
-            return Some(std::array::from_fn(|index| {
-                if window[4 - index] == 1 {
-                    14
-                } else {
-                    window[4 - index]
-                }
-            }));
+    // Four Fingers lowers the minimum; it does not exclude a fifth card.
+    for length in (required..=5).rev() {
+        for window in ranks.windows(length as usize) {
+            if window
+                .windows(2)
+                .all(|pair| pair[0] - pair[1] <= maximum_step)
+            {
+                return Some(
+                    window
+                        .iter()
+                        .rev()
+                        .map(|&rank| if rank == 1 { 14 } else { rank })
+                        .collect(),
+                );
+            }
         }
     }
     None

@@ -302,11 +302,16 @@ impl GameState {
     }
 
     pub(crate) fn hand_size(&self) -> i8 {
-        self.deck.hand_size() + self.blind.hand_size_modifier
+        self.deck.hand_size() + self.blind.hand_size_modifier + self.jokers.hand_size_modifier()
     }
 
     pub(crate) fn consumable_capacity(&self) -> usize {
         self.consumable_capacity
+            + self
+                .consumables
+                .iter()
+                .filter(|owned| owned.negative)
+                .count()
     }
 
     pub(crate) fn joker_capacity(&self) -> usize {
@@ -482,8 +487,12 @@ impl GameState {
         if index >= self.tag_pack_openings.len() {
             return Err(PackError::InvalidSelection);
         }
-        let opening = self.tag_pack_openings.remove(index);
-        opening.choose(selections, self)
+        let mut opening = self.tag_pack_openings.remove(index);
+        let result = opening.choose(selections, self);
+        if opening.choices() > 0 {
+            self.tag_pack_openings.insert(index, opening);
+        }
+        result
     }
 
     pub(crate) fn finish_blind(&mut self, hand: &Hand) -> Option<BlindPayout> {
@@ -497,7 +506,9 @@ impl GameState {
         if is_boss {
             self.update_jokers(UpdateEvent::BossBlindCompleted);
         }
-        self.update_jokers(UpdateEvent::RoundCompleted);
+        self.update_jokers(UpdateEvent::RoundCompleted {
+            held_cards: hand.cards(),
+        });
         self.money -= self.jokers.finish_round_stickers();
         self.apply_held_round_effects(hand);
         let blind_reward = self.blind.reward();
@@ -692,7 +703,7 @@ impl GameState {
 
     pub(crate) fn select_pack_options(
         &mut self,
-        opening: crate::core::pack::PackOpening,
+        opening: &mut crate::core::pack::PackOpening,
         selections: &[usize],
     ) -> Result<(), PackError> {
         opening.choose(selections, self)
@@ -797,7 +808,7 @@ impl GameState {
         &mut self,
         mut consumable: OwnedConsumable,
     ) -> Result<(), ConsumableUseError> {
-        if self.consumables.len() >= self.consumable_capacity() {
+        if !consumable.negative && self.consumables.len() >= self.consumable_capacity() {
             return Err(ConsumableUseError::NoCapacity);
         }
         consumable.apply_discount(self.shop_discount_percent);
@@ -813,6 +824,9 @@ impl GameState {
     ) {
         for operation in operations {
             match *operation {
+                JokerOperation::AddPlayedCardChips { index, chips } => {
+                    played_cards[index].scoring_values_mut().chips += chips;
+                }
                 JokerOperation::CopyPlayedCard { index, count } => {
                     for _ in 0..count {
                         if let Some(card) = played_cards.get(index) {
@@ -938,16 +952,13 @@ impl GameState {
                 }
                 JokerOperation::CopyNegativeConsumable { count } => {
                     for _ in 0..count {
-                        if self.consumables.len() < self.consumable_capacity() {
-                            if let Some(consumable) =
-                                self.consumables.choose(&mut self.rng).copied()
-                            {
-                                let negative = OwnedConsumable::negative(
-                                    consumable.consumable,
-                                    consumable.original_price,
-                                );
-                                let _ = self.add_owned_consumable(negative);
-                            }
+                        if let Some(consumable) = self.consumables.choose(&mut self.rng).copied() {
+                            let negative = OwnedConsumable::negative(
+                                consumable.consumable,
+                                consumable.original_price,
+                            );
+                            self.add_owned_consumable(negative)
+                                .expect("Negative consumables provide their own slot");
                         }
                     }
                 }
@@ -1137,6 +1148,20 @@ impl GameState {
         owned.consumable.apply(self, hand, &target)?;
 
         let used = self.consumables.remove(index);
+        self.record_consumable_use(used);
+        Ok(())
+    }
+
+    pub(crate) fn use_pack_consumable(
+        &mut self,
+        consumable: Consumable,
+    ) -> Result<(), ConsumableUseError> {
+        consumable.apply(self, &mut Hand::new(), &ConsumableTarget::default())?;
+        self.record_consumable_use(OwnedConsumable::new(consumable, DEFAULT_CONSUMABLE_PRICE));
+        Ok(())
+    }
+
+    fn record_consumable_use(&mut self, used: OwnedConsumable) {
         match used.consumable {
             Consumable::Tarot(Tarot::Fool) => {}
             Consumable::Tarot(_) | Consumable::Planet(_) => {
@@ -1159,7 +1184,6 @@ impl GameState {
             }
             Consumable::Spectral(_) => {}
         }
-        Ok(())
     }
 
     pub(crate) fn apply_shop_discount_to_owned_items(&mut self) {
@@ -1257,9 +1281,18 @@ impl GameState {
                 );
             }
         }
-        self.deck.discard_cards(discarded.clone());
         self.update_jokers(UpdateEvent::CardsDiscarded { cards: &discarded });
-        self.trigger_jokers(TriggerEvent::Discard { cards: &discarded });
+        let effect = self.trigger_jokers(TriggerEvent::Discard {
+            cards: &discarded,
+            is_discard_action: counts_as_discard,
+        });
+        if effect.destroy_discarded_card {
+            self.update_jokers(UpdateEvent::CardDestroyed {
+                card: &discarded[0],
+            });
+        } else {
+            self.deck.discard_cards(discarded.clone());
+        }
         self.update_jokers(UpdateEvent::DiscardActionCompleted);
         if counts_as_discard {
             self.blind.record_discard();
@@ -1594,12 +1627,19 @@ impl Game {
                 if self.decision_point != DecisionPoint::PackSelection {
                     return Err(ActionError::InvalidPhase);
                 }
-                let pending = self.pending_pack.take().ok_or(ActionError::InvalidAction)?;
-                self.state
-                    .select_pack_options(pending.opening, &selections)
+                let pending = self
+                    .pending_pack
+                    .as_mut()
+                    .ok_or(ActionError::InvalidAction)?;
+                pending
+                    .opening
+                    .choose(&selections, &mut self.state)
                     .map_err(ActionError::Pack)?;
-                self.decision_point = pending.previous_state;
-                self.open_next_tag_pack();
+                if pending.opening.choices() == 0 {
+                    self.decision_point = pending.previous_state;
+                    self.pending_pack = None;
+                    self.open_next_tag_pack();
+                }
             }
             GameAction::UseConsumable { index, target } => {
                 if !matches!(
@@ -1814,3 +1854,15 @@ mod joker_economy_flow_tests;
 #[cfg(test)]
 #[path = "tests/run_rules.rs"]
 mod run_rules_tests;
+
+#[cfg(test)]
+#[path = "tests/catalogue_scoring.rs"]
+mod catalogue_scoring_tests;
+
+#[cfg(test)]
+#[path = "tests/catalogue_ownership.rs"]
+mod catalogue_ownership_tests;
+
+#[cfg(test)]
+#[path = "tests/catalogue_packs.rs"]
+mod catalogue_packs_tests;

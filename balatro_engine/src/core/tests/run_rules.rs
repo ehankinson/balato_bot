@@ -596,7 +596,7 @@ fn buffoon_packs_share_sticker_rules_and_keep_stickers_on_acquisition() {
     }
     assert_eq!(seen, [true; 3]);
     let mut state = GameState::with_rules(722, Decks::Red, Stakes::Gold);
-    let opening =
+    let mut opening =
         ShopPack::new(BoosterPackKind::Buffoon, BoosterPackSize::Normal, 4).open(&mut state);
     let PackOption::Joker(expected) = &opening.options()[0] else {
         panic!()
@@ -607,7 +607,7 @@ fn buffoon_packs_share_sticker_rules_and_keep_stickers_on_acquisition() {
         expected.perishable_rounds(),
         expected.is_rental(),
     );
-    state.select_pack_options(opening, &[0]).unwrap();
+    state.select_pack_options(&mut opening, &[0]).unwrap();
     let joker = state.jokers.get(0).unwrap();
     assert_eq!(
         (
