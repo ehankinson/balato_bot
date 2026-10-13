@@ -700,7 +700,7 @@ fn obelisk_and_spare_trousers_use_hand_boundaries() {
     let mut obelisk = Jokers::new();
     obelisk.add(Joker::create_joker(JokerKind::Obelisk));
     let mut state = GameState::new(32);
-    state.most_played_hand = Some(PokerHand::Pair);
+    state.counters.poker_hands_played[PokerHand::Pair as usize - 1] = 1;
     let played = card(Rank::Seven, Enhancement::None);
     assert_eq!(
         obelisk

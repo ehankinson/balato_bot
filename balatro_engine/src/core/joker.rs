@@ -23,6 +23,7 @@ pub struct Joker {
     discount_percent: u8,
     sell_value_bonus: u8,
     debuffed: bool,
+    face_down: bool,
     update_mask: u32,
     rounds_completed: u8,
     active_hands: u8,
@@ -82,6 +83,14 @@ impl Joker {
 
     pub(crate) fn rarity(&self) -> JokerRarity {
         self.rarity
+    }
+
+    pub(crate) fn is_face_down(&self) -> bool {
+        self.face_down
+    }
+
+    pub(crate) fn set_face_down(&mut self, face_down: bool) {
+        self.face_down = face_down;
     }
 
     pub(crate) fn is_debuffed(&self) -> bool {
@@ -2151,6 +2160,7 @@ impl Joker {
             discount_percent: 0,
             sell_value_bonus: 0,
             debuffed: false,
+            face_down: false,
             update_mask,
             rounds_completed: 0,
             active_hands: 0,

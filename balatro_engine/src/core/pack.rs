@@ -362,7 +362,7 @@ fn random_planet_card(state: &mut GameState, generated_consumables: &[Consumable
     let targeted_planet = state
         .shop
         .most_played_planet_in_pack
-        .then(|| state.most_played_hand.map(planet_for_hand))
+        .then(|| state.most_played_hand().map(planet_for_hand))
         .flatten()
         .filter(|planet| {
             consumable_available_in_pack(state, Consumable::Planet(*planet), generated_consumables)

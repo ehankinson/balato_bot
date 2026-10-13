@@ -4,7 +4,7 @@ use rand::rngs::StdRng;
 use crate::core::blind::BlindState;
 use crate::core::card::Card;
 use crate::core::deck::Deck;
-use crate::core::enums::{ALL_RANKS, ALL_SUITS, Enhancement, PokerHand, Rank, Suit};
+use crate::core::enums::{ALL_RANKS, ALL_SUITS, BossBlinds, Enhancement, PokerHand, Rank, Suit};
 use crate::core::game::{GameCounters, GameState};
 use crate::core::joker::{Joker, JokerData, JokerStructure};
 use crate::core::joker_types::JokerUpdate::*;
@@ -32,12 +32,13 @@ impl<'a> JokerContext<'a> {
         joker_capacity: usize,
         modifiers: JokerModifiers,
     ) -> Self {
+        let most_played_hand = state.most_played_hand();
         Self::from_parts(
             &mut state.blind,
             &mut state.deck,
             &mut state.money,
             &mut state.counters,
-            state.most_played_hand,
+            most_played_hand,
             &mut state.rng,
             joker_count,
             joker_capacity,
@@ -112,7 +113,10 @@ pub enum TriggerEvent<'a> {
         discards_remaining: u8,
         joker_count: u8,
     },
-    BossBlindAbilityTriggered,
+    BossBlindAbilityTriggered {
+        boss: BossBlinds,
+        during_hand_scoring: bool,
+    },
 }
 
 /// Persistent events. `JokerUpdate` is the compact bitmask discriminant; this
@@ -521,6 +525,11 @@ impl Jokers {
                     modifiers.probability_multiplier *= 2.0
                 }
                 Some(GameStateModifications::FreePlanetCards) => modifiers.free_planets = true,
+                Some(GameStateModifications::DisableBossBlind)
+                    if joker.kind == JokerKind::Chicot =>
+                {
+                    modifiers.disable_boss = true
+                }
                 _ => {}
             }
         }
@@ -568,17 +577,20 @@ impl Jokers {
     }
 
     pub(crate) fn disable_random(&mut self, rng: &mut StdRng) -> Option<usize> {
+        let index = (0..self.jokers.len())
+            .filter(|&index| self.jokers.len() == 1 || !self.jokers[index].debuffed)
+            .choose(rng)?;
         for joker in &mut self.jokers {
             joker.set_debuffed(false);
         }
-        let index = (0..self.jokers.len()).choose(rng)?;
         self.jokers[index].set_debuffed(true);
         Some(index)
     }
 
-    pub(crate) fn clear_debuffs(&mut self) {
+    pub(crate) fn clear_blind_effects(&mut self) {
         for joker in &mut self.jokers {
             joker.set_debuffed(false);
+            joker.set_face_down(false);
         }
     }
 
@@ -716,13 +728,13 @@ impl Jokers {
                 let joker_count = state.jokers.as_slice().len();
                 let joker_capacity = state.jokers.capacity();
                 let modifiers = state.jokers.modifiers();
+                let most_played_hand = state.most_played_hand();
                 let GameState {
                     blind,
                     deck,
                     jokers,
                     money,
                     counters,
-                    most_played_hand,
                     rng,
                     ..
                 } = state;
@@ -731,7 +743,7 @@ impl Jokers {
                     deck,
                     money,
                     counters,
-                    *most_played_hand,
+                    most_played_hand,
                     rng,
                     joker_count,
                     joker_capacity,
@@ -769,13 +781,13 @@ impl Jokers {
             let joker_count = state.jokers.as_slice().len();
             let joker_capacity = state.jokers.capacity();
             let modifiers = state.jokers.modifiers();
+            let most_played_hand = state.most_played_hand();
             let GameState {
                 blind,
                 deck,
                 jokers,
                 money,
                 counters,
-                most_played_hand,
                 rng,
                 ..
             } = state;
@@ -784,7 +796,7 @@ impl Jokers {
                 deck,
                 money,
                 counters,
-                *most_played_hand,
+                most_played_hand,
                 rng,
                 joker_count,
                 joker_capacity,
@@ -814,7 +826,7 @@ fn apply_game_effect(effect: &JokerEffect, context: &mut JokerContext<'_>, joker
     context.counters.life += game_state_effect.life;
     if game_state_effect.disable_boss_blind {
         context.blind.disable_boss_ability();
-        jokers.clear_debuffs();
+        jokers.clear_blind_effects();
         context.deck.clear_debuffs();
     }
     context.blind.prevent_death |= game_state_effect.prevent_death;
@@ -952,8 +964,8 @@ impl Joker {
             (TriggerEvent::AfterHand { .. }, JokerTrigger::AfterHand) => {
                 self.on_after_hand(event, context, joker_count)
             }
-            (TriggerEvent::BossBlindAbilityTriggered, JokerTrigger::OnBossBlindAbility) => {
-                self.on_boss_blind_ability()
+            (TriggerEvent::BossBlindAbilityTriggered { .. }, JokerTrigger::OnBossBlindAbility) => {
+                self.on_boss_blind_ability(event)
             }
             _ => JokerEffect::default(),
         }
@@ -1440,8 +1452,32 @@ impl Joker {
         }
     }
 
-    fn on_boss_blind_ability(&mut self) -> JokerEffect {
-        if self.kind == JokerKind::Matador {
+    fn on_boss_blind_ability(&mut self, event: &TriggerEvent<'_>) -> JokerEffect {
+        let TriggerEvent::BossBlindAbilityTriggered {
+            boss,
+            during_hand_scoring: true,
+        } = event
+        else {
+            return JokerEffect::default();
+        };
+        if self.kind == JokerKind::Matador
+            && matches!(
+                boss,
+                BossBlinds::Club
+                    | BossBlinds::Goad
+                    | BossBlinds::Window
+                    | BossBlinds::Head
+                    | BossBlinds::Plante
+                    | BossBlinds::Pillar
+                    | BossBlinds::Flint
+                    | BossBlinds::Eye
+                    | BossBlinds::Mouth
+                    | BossBlinds::Psychich
+                    | BossBlinds::Arm
+                    | BossBlinds::Ox
+                    | BossBlinds::VerdantLeaf
+            )
+        {
             JokerEffect {
                 money: 8,
                 ..JokerEffect::default()
@@ -1453,6 +1489,22 @@ impl Joker {
 
     fn update(&mut self, event: &UpdateEvent<'_>, context: &mut JokerContext<'_>) -> JokerEffect {
         if self.debuffed {
+            return JokerEffect::default();
+        }
+
+        // These abilities normally update before scoring, which a whole-hand
+        // boss debuff skips. After-play decay (Ice Cream/Seltzer) still runs.
+        if matches!(event, UpdateEvent::HandCompleted { scoring_card_indices, .. } if scoring_card_indices.is_empty())
+            && matches!(
+                self.kind,
+                JokerKind::RideTheBus
+                    | JokerKind::Runner
+                    | JokerKind::SquareJoker
+                    | JokerKind::Green
+                    | JokerKind::Obelisk
+                    | JokerKind::SpareTrousers
+            )
+        {
             return JokerEffect::default();
         }
 
@@ -1729,7 +1781,9 @@ impl Joker {
                     required_chips,
                 },
                 JokerKind::MrBones,
-            ) if chips_scored.saturating_mul(4) >= *required_chips => {
+            ) if !context.blind.prevent_death
+                && chips_scored.saturating_mul(4) >= *required_chips =>
+            {
                 effect.prevent_death = true;
                 effect.remove_self = true;
             }

@@ -89,7 +89,13 @@ fn matador_pays_only_when_a_boss_ability_triggers() {
     );
     assert_eq!(state.money, 0);
 
-    jokers.trigger(TriggerEvent::BossBlindAbilityTriggered, &mut state);
+    jokers.trigger(
+        TriggerEvent::BossBlindAbilityTriggered {
+            boss: crate::core::enums::BossBlinds::Flint,
+            during_hand_scoring: true,
+        },
+        &mut state,
+    );
     assert_eq!(state.money, 8);
 }
 

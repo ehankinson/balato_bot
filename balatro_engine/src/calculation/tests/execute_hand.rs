@@ -48,6 +48,7 @@ fn played_card_retriggers_repeat_card_scoring() {
         &[0],
         PokerHand::HighCard,
         scoring_data,
+        false,
     );
 
     assert_eq!(result.chips, 38);
@@ -95,6 +96,7 @@ fn mime_retriggers_all_held_scoring_jokers() {
         &[0],
         PokerHand::HighCard,
         scoring_data,
+        false,
     );
 
     assert_eq!(result.chips, 16);
@@ -138,6 +140,7 @@ fn steel_is_the_only_held_card_score_without_joker_intervention() {
         &[0],
         PokerHand::HighCard,
         scoring_data,
+        false,
     );
 
     assert_eq!(result.chips, 16);
@@ -171,6 +174,7 @@ fn after_hand_scoring_jokers_apply_after_held_cards() {
         &[0],
         PokerHand::HighCard,
         scoring_data,
+        false,
     );
 
     assert_eq!(result.chips, 16);
@@ -206,6 +210,7 @@ fn joker_editions_are_applied_in_the_after_hand_phase() {
         &[0],
         PokerHand::HighCard,
         scoring_data,
+        false,
     );
 
     assert_eq!(result.chips, 25);
@@ -261,6 +266,7 @@ fn copy_jokers_delegate_without_replacing_their_collection_entries() {
         &hand_indices,
         hand_type,
         scoring_data,
+        false,
     );
 
     let after = state
@@ -317,6 +323,7 @@ fn score_scenario(played: &[Card], held: &[Card], jokers: &[Joker]) -> f32 {
         &hand_indices,
         hand_type,
         scoring_data,
+        false,
     )
     .score
 }

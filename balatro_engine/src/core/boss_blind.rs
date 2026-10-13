@@ -1,7 +1,7 @@
 use crate::consts::ante_scores::score_requirements;
 use crate::core::blind::{BlindKind, BlindState};
 use crate::core::card::Card;
-use crate::core::enums::{BossBlinds, PokerHand, Stakes, Suit};
+use crate::core::enums::{BossBlinds, Enhancement, PokerHand, Stakes, Suit};
 use crate::core::joker_types::JokerModifiers;
 use rand::prelude::RngExt;
 use rand::rngs::StdRng;
@@ -68,9 +68,7 @@ pub(crate) struct BossBlindRule {
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum BlindPlayError {
     NoHandsRemaining,
-    TooFewCards,
     TooManyCards,
-    HandTypeNotAllowed,
     ForcedCardNotSelected,
 }
 
@@ -195,13 +193,18 @@ impl BlindState {
         };
 
         match boss {
-            BossBlinds::Water => self.discards_remaining = 0,
+            BossBlinds::Water => {
+                self.boss_removed_discards = self.discards_remaining;
+                self.discards_remaining = 0;
+            }
             BossBlinds::Manacle => self.hand_size_modifier = -1,
-            BossBlinds::Needle => self.hands_remaining = 1,
+            BossBlinds::Needle => {
+                self.boss_removed_hands = self.hands_remaining.saturating_sub(1);
+                self.hands_remaining = 1;
+            }
             BossBlinds::House => self.face_down_draws = true,
             BossBlinds::Mark => self.face_down_face_cards = true,
             BossBlinds::VerdantLeaf => self.verdant_leaf_active = true,
-            BossBlinds::CeruleanBell => self.forced_card_index = Some(0),
             _ => {}
         }
     }
@@ -209,7 +212,6 @@ impl BlindState {
     pub(crate) fn validate_boss_play(
         &self,
         selected_indices: &[usize],
-        hand_type: PokerHand,
     ) -> Result<(), BlindPlayError> {
         let BlindKind::Boss(boss) = self.kind else {
             return Ok(());
@@ -219,19 +221,6 @@ impl BlindState {
         }
 
         match boss {
-            BossBlinds::Psychich if selected_indices.len() != 5 => Err(BlindPlayError::TooFewCards),
-            BossBlinds::Eye if self.played_hand_types.contains(&hand_type) => {
-                Err(BlindPlayError::HandTypeNotAllowed)
-            }
-            BossBlinds::Mouth
-                if self
-                    .played_hand_types
-                    .first()
-                    .is_some_and(|first| *first != hand_type) =>
-            {
-                Err(BlindPlayError::HandTypeNotAllowed)
-            }
-            BossBlinds::Needle if self.hands_played > 0 => Err(BlindPlayError::NoHandsRemaining),
             BossBlinds::CeruleanBell
                 if self
                     .forced_card_index
@@ -243,12 +232,34 @@ impl BlindState {
         }
     }
 
+    pub(crate) fn hand_is_debuffed(&self, selected_count: usize, hand: PokerHand) -> bool {
+        if self.boss_ability_disabled {
+            return false;
+        }
+        match self.kind {
+            BlindKind::Boss(BossBlinds::Psychich) => selected_count < 5,
+            BlindKind::Boss(BossBlinds::Eye) => self.played_hand_types.contains(&hand),
+            BlindKind::Boss(BossBlinds::Mouth) => self
+                .played_hand_types
+                .first()
+                .is_some_and(|first| *first != hand),
+            _ => false,
+        }
+    }
+
     pub(crate) fn record_boss_play(&mut self) {
+        if self.boss_ability_disabled {
+            return;
+        }
+        self.crimson_heart_prepped = matches!(self.kind, BlindKind::Boss(BossBlinds::CrimsonHeart));
         self.face_down_draws = matches!(self.kind, BlindKind::Boss(BossBlinds::Fish));
         self.serpent_draws = matches!(self.kind, BlindKind::Boss(BossBlinds::Serpent));
     }
 
     pub(crate) fn record_boss_discard(&mut self) {
+        if self.boss_ability_disabled {
+            return;
+        }
         self.face_down_draws = false;
         self.serpent_draws = matches!(self.kind, BlindKind::Boss(BossBlinds::Serpent));
     }
@@ -284,6 +295,10 @@ impl BlindState {
         modifiers: JokerModifiers,
     ) {
         card.set_debuffed(self.card_is_debuffed(card, modifiers));
+        if self.boss_ability_disabled {
+            card.set_face_down(false);
+            return;
+        }
         let face_down = match self.kind {
             BlindKind::Boss(BossBlinds::House) => !self.first_action_taken,
             BlindKind::Boss(BossBlinds::Wheel) => {
@@ -297,6 +312,12 @@ impl BlindState {
     }
 
     pub(crate) fn choose_forced_card(&mut self, hand_size: usize, rng: &mut StdRng) {
+        if self
+            .forced_card_index
+            .is_some_and(|index| index < hand_size)
+        {
+            return;
+        }
         self.forced_card_index = match self.kind {
             BlindKind::Boss(BossBlinds::CeruleanBell) if !self.boss_ability_disabled => {
                 (hand_size > 0).then(|| rng.random_range(0..hand_size))
@@ -317,12 +338,22 @@ impl BlindState {
         if self.boss_ability_disabled {
             return;
         }
+        self.hands_remaining = self.hands_remaining.saturating_add(self.boss_removed_hands);
+        self.discards_remaining = self
+            .discards_remaining
+            .saturating_add(self.boss_removed_discards);
+        self.boss_removed_hands = 0;
+        self.boss_removed_discards = 0;
+        if matches!(self.kind, BlindKind::Boss(BossBlinds::Manacle)) {
+            self.hand_size_modifier += 1;
+        }
         self.boss_ability_disabled = true;
         self.score_requirement = self.kind.score_requirement(self.stake, self.ante, true);
         self.forced_card_index = None;
         self.face_down_draws = false;
         self.face_down_face_cards = false;
         self.serpent_draws = false;
+        self.crimson_heart_prepped = false;
         self.verdant_leaf_active = false;
     }
 
@@ -335,16 +366,21 @@ impl BlindState {
             BlindKind::Boss(boss) => boss,
             _ => return false,
         };
-        let boss_debuffs_card = match boss {
-            BossBlinds::Club => modifiers.suits_match(card.suit(), Suit::Clubs),
-            BossBlinds::Goad => modifiers.suits_match(card.suit(), Suit::Spades),
-            BossBlinds::Window => modifiers.suits_match(card.suit(), Suit::Diamonds),
-            BossBlinds::Head => modifiers.suits_match(card.suit(), Suit::Hearts),
+        let matches_suit = |suit| {
+            card.enhancement() != Enhancement::Stone
+                && (card.enhancement() == Enhancement::Wild
+                    || modifiers.suits_match(card.suit(), suit))
+        };
+        match boss {
+            BossBlinds::Club => matches_suit(Suit::Clubs),
+            BossBlinds::Goad => matches_suit(Suit::Spades),
+            BossBlinds::Window => matches_suit(Suit::Diamonds),
+            BossBlinds::Head => matches_suit(Suit::Hearts),
             BossBlinds::Plante => modifiers.is_face(card),
+            BossBlinds::Pillar => card.was_played_in_ante(self.ante),
             BossBlinds::VerdantLeaf => self.verdant_leaf_active,
             _ => false,
-        };
-        boss_debuffs_card
+        }
     }
 
     pub(crate) fn arm_active(&self) -> bool {

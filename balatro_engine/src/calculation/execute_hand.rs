@@ -1,4 +1,4 @@
-use crate::core::blind::{ScoringCard, ScoringData};
+use crate::core::blind::{BlindKind, ScoringCard, ScoringData};
 use crate::core::card::{Card, ScoringValues};
 use crate::core::enums::{Enhancement, PokerHand};
 use crate::core::game::GameState;
@@ -47,11 +47,12 @@ pub(crate) fn execute_hand(
     hand_indices: &[usize],
     hand_type: PokerHand,
     mut scoring_data: ScoringData,
+    boss_ability_triggered: bool,
 ) -> ScoreResult {
     let mut hand_score = state.hand_score(hand_type);
     if state.blind.flint_active() {
-        hand_score.chips = hand_score.chips.saturating_add(1) / 2;
-        hand_score.mult = hand_score.mult.saturating_add(1) / 2;
+        hand_score.chips = hand_score.chips.div_ceil(2);
+        hand_score.mult = hand_score.mult.div_ceil(2);
         hand_score.mult = hand_score.mult.max(1);
     }
     let joker_count = state.jokers.as_slice().len() as u8;
@@ -207,6 +208,18 @@ pub(crate) fn execute_hand(
         };
         score.apply(effect.chips, effect.add_mult, effect.x_mult);
         state.apply_scoring_joker_effect(&effect, played_cards, held_hand);
+
+        if boss_ability_triggered && !state.blind.boss_ability_disabled {
+            if let BlindKind::Boss(boss) = state.blind.kind {
+                let event = TriggerEvent::BossBlindAbilityTriggered {
+                    boss,
+                    during_hand_scoring: true,
+                };
+                let effect = state.trigger_joker_at(joker_index, &event, joker_count);
+                score.apply(effect.chips, effect.add_mult, effect.x_mult);
+                state.apply_scoring_joker_effect(&effect, played_cards, held_hand);
+            }
+        }
 
         let edition = state
             .jokers

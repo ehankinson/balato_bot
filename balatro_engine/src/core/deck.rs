@@ -50,10 +50,9 @@ impl Deck {
         (0..amount).filter_map(|_| self.draw_card()).collect()
     }
 
-    pub(crate) fn deal_cards(&mut self, hand: &mut Hand, hand_size: u8, rng: &mut StdRng) {
+    pub(crate) fn deal_cards(&mut self, hand: &mut Hand, amount: usize, rng: &mut StdRng) {
         self.shuffle(rng);
-        let add_card_amount = hand_size.saturating_sub(hand.hand_size());
-        for _ in 0..add_card_amount {
+        for _ in 0..amount {
             if let Some(card) = self.draw_card() {
                 hand.add_card(card);
             }
@@ -102,6 +101,12 @@ impl Deck {
         }
         for card in &mut self.discarded_cards {
             card.set_debuffed(false);
+        }
+    }
+
+    pub(crate) fn clear_play_history(&mut self) {
+        for card in self.cards.iter_mut().chain(&mut self.discarded_cards) {
+            card.clear_play_history();
         }
     }
 

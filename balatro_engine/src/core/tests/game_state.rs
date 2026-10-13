@@ -135,7 +135,7 @@ fn suit_boss_debuffs_cards_without_changing_hand_detection() {
 }
 
 #[test]
-fn psychic_rejects_a_play_with_fewer_than_five_cards() {
+fn psychic_consumes_a_non_scoring_play_with_fewer_than_five_cards() {
     let mut state = GameState::new(13);
     state.begin_blind_as(BlindKind::Boss(BossBlinds::Psychich));
     let mut hand = Hand::new();
@@ -149,11 +149,16 @@ fn psychic_rejects_a_play_with_fewer_than_five_cards() {
         ));
     }
 
-    assert!(execute_hand(&mut state, &mut hand, &[0, 1, 2, 3]).is_none());
+    assert_eq!(
+        execute_hand(&mut state, &mut hand, &[0, 1, 2, 3])
+            .unwrap()
+            .score,
+        0.0
+    );
 }
 
 #[test]
-fn eye_rejects_repeating_a_hand_type() {
+fn eye_consumes_a_repeated_hand_type_without_scoring() {
     let mut state = GameState::new(14);
     state.begin_blind_as(BlindKind::Boss(BossBlinds::Eye));
     let mut hand = Hand::new();
@@ -165,8 +170,8 @@ fn eye_rejects_repeating_a_hand_type() {
         Seal::None,
     ));
 
-    assert!(execute_hand(&mut state, &mut hand, &[0]).is_some());
-    assert!(execute_hand(&mut state, &mut hand, &[0]).is_none());
+    state.play_hand(&mut hand, vec![0]).unwrap();
+    assert_eq!(state.play_hand(&mut hand, vec![0]).unwrap().score, 0.0);
 }
 
 #[test]
@@ -323,7 +328,11 @@ fn completing_a_boss_pays_its_reward_and_clears_pillar_marks() {
     let mut state = GameState::new(20);
     state.begin_blind_as(BlindKind::Boss(BossBlinds::Hook));
     state.money = 10;
-    state.pillar_card_ids.push(123);
+    state
+        .deck
+        .card_mut(0)
+        .unwrap()
+        .mark_played(state.counters.ante);
     state.blind.chips_scored = state.blind.score_requirement;
 
     assert_eq!(
@@ -335,7 +344,13 @@ fn completing_a_boss_pays_its_reward_and_clears_pillar_marks() {
         }
     );
     assert_eq!(state.money, 17);
-    assert!(state.pillar_card_ids.is_empty());
+    assert!(
+        !state
+            .deck
+            .card(0)
+            .unwrap()
+            .was_played_in_ante(state.counters.ante)
+    );
 }
 
 #[test]

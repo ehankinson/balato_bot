@@ -321,7 +321,7 @@ pub(crate) fn random_base_item(kind: ShopOfferKind, state: &mut GameState) -> Sh
         }
         ShopOfferKind::Planet => {
             let targeted_planet = state
-                .most_played_hand
+                .most_played_hand()
                 .filter(|_| state.shop.most_played_planet_in_pack)
                 .map(planet_for_hand)
                 .filter(|planet| {

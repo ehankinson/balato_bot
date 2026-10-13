@@ -91,7 +91,7 @@ fn shop_pack_weights_match_the_configured_distribution() {
 fn telescope_uses_the_most_played_hand_for_celestial_pack_planets() {
     let mut state = GameState::new(28);
     state.jokers.add(Joker::create_joker(JokerKind::Showman));
-    state.most_played_hand = Some(PokerHand::Pair);
+    state.counters.poker_hands_played[PokerHand::Pair as usize - 1] = 1;
     state.shop.most_played_planet_in_pack = true;
 
     let pack = ShopPack::new(BoosterPackKind::Celestial, BoosterPackSize::Normal, 4);

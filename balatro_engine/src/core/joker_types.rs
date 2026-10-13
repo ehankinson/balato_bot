@@ -460,6 +460,7 @@ pub(crate) struct JokerModifiers {
     pub(crate) smeared_suits: bool,
     pub(crate) showman: bool,
     pub(crate) free_planets: bool,
+    pub(crate) disable_boss: bool,
     pub(crate) probability_multiplier: f32,
 }
 
@@ -472,6 +473,7 @@ impl Default for JokerModifiers {
             smeared_suits: false,
             showman: false,
             free_planets: false,
+            disable_boss: false,
             probability_multiplier: 1.0,
         }
     }
@@ -479,7 +481,8 @@ impl Default for JokerModifiers {
 
 impl JokerModifiers {
     pub(crate) fn is_face(self, card: &crate::core::card::Card) -> bool {
-        self.all_faces || card.is_face_card()
+        self.all_faces
+            || (card.enhancement() != crate::core::enums::Enhancement::Stone && card.is_face_card())
     }
 
     pub(crate) fn suits_match(

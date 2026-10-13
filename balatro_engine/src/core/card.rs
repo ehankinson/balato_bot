@@ -26,6 +26,7 @@ pub struct Card {
     edition: Edition,
     debuffed: bool,
     face_down: bool,
+    last_played_ante: Option<u8>,
     scoring_values: ScoringValues,
     id: u16,
 }
@@ -48,6 +49,7 @@ impl Card {
             seal: seal,
             debuffed: false,
             face_down: false,
+            last_played_ante: None,
             scoring_values: ScoringValues::default(),
             id: id,
         }
@@ -85,6 +87,18 @@ impl Card {
 
     pub(crate) fn edition(&self) -> Edition {
         self.edition
+    }
+
+    pub(crate) fn was_played_in_ante(&self, ante: u8) -> bool {
+        self.last_played_ante == Some(ante)
+    }
+
+    pub(crate) fn mark_played(&mut self, ante: u8) {
+        self.last_played_ante = Some(ante);
+    }
+
+    pub(crate) fn clear_play_history(&mut self) {
+        self.last_played_ante = None;
     }
 
     pub(crate) fn is_debuffed(&self) -> bool {

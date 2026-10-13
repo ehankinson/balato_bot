@@ -92,51 +92,84 @@ pub(crate) fn execute_hand(
 ) -> Option<ScoreResult> {
     let (hand_type, mut scoring_data) =
         score_played_hand(hand, selected_indices, state.jokers.modifiers())?;
-    state
-        .blind
-        .validate_play(selected_indices, hand_type)
-        .ok()?;
+    state.blind.validate_play(selected_indices).ok()?;
 
+    state.counters.poker_hands_played[hand_type as usize - 1] += 1;
+    let hand_debuffed = state
+        .blind
+        .hand_is_debuffed(selected_indices.len(), hand_type);
+    let mut boss_triggered = hand_debuffed || state.blind.flint_active();
     if state.blind.arm_active() {
-        state.downgrade_hand_score(hand_type);
+        boss_triggered |= state.downgrade_hand_score(hand_type);
     }
-    if state.blind.ox_active() && state.most_played_hand == Some(hand_type) {
+    if state.blind.ox_active() && state.ox_target_hand == hand_type {
         state.money = 0;
+        boss_triggered = true;
     }
     if state.blind.tooth_active() {
         state.money = state.money.saturating_sub(selected_indices.len() as i16);
+        state.notify_boss_ability(false);
     }
 
+    let old_forced = state.blind.forced_card_index;
     let mut played_cards =
         hand.select_cards(selected_indices.iter().map(|&index| index as u8).collect());
-    for card in &mut played_cards {
-        let pillar_debuffed = matches!(state.blind.kind, BlindKind::Boss(BossBlinds::Pillar))
-            && state.pillar_card_ids.contains(&card.id());
-        card.set_debuffed(
-            state.blind.card_is_debuffed(card, state.jokers.modifiers()) || pillar_debuffed,
-        );
+    state.blind.forced_card_index = old_forced
+        .filter(|index| !selected_indices.contains(index))
+        .map(|index| {
+            index
+                - selected_indices
+                    .iter()
+                    .filter(|&&selected| selected < index)
+                    .count()
+        });
+    for (index, card) in played_cards.iter_mut().enumerate() {
+        card.set_debuffed(state.blind.card_is_debuffed(card, state.jokers.modifiers()));
+        if card.is_debuffed()
+            && scoring_data
+                .scoring_played_cards
+                .iter()
+                .any(|scoring| scoring.index == selected_indices[index])
+        {
+            boss_triggered = true;
+        }
+        card.set_face_down(false);
+        card.mark_played(state.counters.ante);
     }
     for card in hand.cards_mut() {
         card.set_debuffed(state.blind.card_is_debuffed(card, state.jokers.modifiers()));
     }
     scoring_data.scoring_held_cards = scoring_cards(&card_ids(hand.cards()));
-    let result = execute_hand_impl(
-        state,
-        &mut played_cards,
-        hand,
-        selected_indices,
-        hand_type,
-        scoring_data,
-    );
-    state
-        .pillar_card_ids
-        .extend(played_cards.iter().map(Card::id));
+    let result = if hand_debuffed {
+        scoring_data
+            .non_scoring_played_cards
+            .append(&mut scoring_data.scoring_played_cards);
+        scoring_data
+            .non_scoring_played_cards
+            .sort_unstable_by_key(|card| card.index);
+        scoring_data
+            .non_scoring_held_cards
+            .append(&mut scoring_data.scoring_held_cards);
+        state.notify_boss_ability(true);
+        ScoreResult {
+            hand: hand_type,
+            chips: 0,
+            mult: 0.0,
+            score: 0.0,
+            scoring_data,
+        }
+    } else {
+        execute_hand_impl(
+            state,
+            &mut played_cards,
+            hand,
+            selected_indices,
+            hand_type,
+            scoring_data,
+            boss_triggered,
+        )
+    };
     state.blind.record_play(hand_type);
-    if matches!(state.blind.kind, BlindKind::Boss(BossBlinds::CrimsonHeart))
-        && !state.blind.boss_ability_disabled
-    {
-        state.jokers.disable_random(&mut state.rng);
-    }
     *played_cards_out = played_cards;
     Some(result)
 }
@@ -189,6 +222,8 @@ pub(crate) struct BlindState {
     pub(crate) finished: bool,
     pub(crate) boss_ability_disabled: bool,
     pub(crate) prevent_death: bool,
+    pub(crate) boss_removed_hands: u8,
+    pub(crate) boss_removed_discards: u8,
     pub(crate) current_hand: Option<PokerHand>,
     pub(crate) target_suit: Option<Suit>,
     pub(crate) hand_size_modifier: i8,
@@ -198,6 +233,7 @@ pub(crate) struct BlindState {
     pub(crate) face_down_draws: bool,
     pub(crate) face_down_face_cards: bool,
     pub(crate) serpent_draws: bool,
+    pub(crate) crimson_heart_prepped: bool,
     pub(crate) verdant_leaf_active: bool,
     pub(crate) ante: u8,
 }
@@ -218,6 +254,8 @@ impl BlindState {
             finished: false,
             boss_ability_disabled: false,
             prevent_death: false,
+            boss_removed_hands: 0,
+            boss_removed_discards: 0,
             current_hand: None,
             target_suit: None,
             hand_size_modifier: 0,
@@ -227,6 +265,7 @@ impl BlindState {
             face_down_draws: false,
             face_down_face_cards: false,
             serpent_draws: false,
+            crimson_heart_prepped: false,
             verdant_leaf_active: false,
             ante: 1,
         }
@@ -244,6 +283,8 @@ impl BlindState {
         self.chips_scored = 0;
         self.boss_ability_disabled = false;
         self.prevent_death = false;
+        self.boss_removed_hands = 0;
+        self.boss_removed_discards = 0;
         self.current_hand = None;
         self.target_suit = None;
         self.hand_size_modifier = 0;
@@ -253,16 +294,13 @@ impl BlindState {
         self.face_down_draws = false;
         self.face_down_face_cards = false;
         self.serpent_draws = false;
+        self.crimson_heart_prepped = false;
         self.verdant_leaf_active = false;
 
         self.apply_boss_start_rules();
     }
 
-    pub(crate) fn validate_play(
-        &self,
-        selected_indices: &[usize],
-        hand_type: PokerHand,
-    ) -> Result<(), BlindPlayError> {
+    pub(crate) fn validate_play(&self, selected_indices: &[usize]) -> Result<(), BlindPlayError> {
         if self.hands_remaining == 0 {
             return Err(BlindPlayError::NoHandsRemaining);
         }
@@ -270,7 +308,7 @@ impl BlindState {
             return Err(BlindPlayError::TooManyCards);
         }
 
-        self.validate_boss_play(selected_indices, hand_type)?;
+        self.validate_boss_play(selected_indices)?;
         Ok(())
     }
 
@@ -284,6 +322,7 @@ impl BlindState {
     }
 
     pub(crate) fn record_discard(&mut self) {
+        self.discards_used += 1;
         self.first_action_taken = true;
         self.discards_remaining = self.discards_remaining.saturating_sub(1);
         self.record_boss_discard();
