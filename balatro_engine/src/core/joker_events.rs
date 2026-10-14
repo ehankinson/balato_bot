@@ -1,5 +1,5 @@
+use chacha20::ChaCha12Rng;
 use rand::prelude::{IndexedRandom, IteratorRandom, RngExt, SliceRandom};
-use rand::rngs::StdRng;
 
 use crate::core::blind::BlindState;
 use crate::core::card::Card;
@@ -9,8 +9,8 @@ use crate::core::game::{GameCounters, GameState};
 use crate::core::joker::{Joker, JokerData, JokerStructure};
 use crate::core::joker_types::JokerUpdate::*;
 use crate::core::joker_types::{
-    CopyType, GameStateModifications, GenerateType, JokerKind, JokerModifiers, JokerRarity,
-    JokerTrigger, JokerUpdate, RetriggerTarget,
+    CopyType, GameStateModifications, GenerateType, JokerEdition, JokerKind, JokerModifiers,
+    JokerRarity, JokerTrigger, JokerUpdate, RetriggerTarget,
 };
 
 pub(crate) struct JokerContext<'a> {
@@ -19,7 +19,7 @@ pub(crate) struct JokerContext<'a> {
     pub(crate) money: &'a mut i16,
     pub(crate) counters: &'a mut GameCounters,
     pub(crate) most_played_hand: Option<PokerHand>,
-    pub(crate) rng: &'a mut StdRng,
+    pub(crate) rng: &'a mut ChaCha12Rng,
     joker_count: usize,
     joker_capacity: usize,
     consumable_slots: usize,
@@ -80,7 +80,7 @@ impl<'a> JokerContext<'a> {
         money: &'a mut i16,
         counters: &'a mut GameCounters,
         most_played_hand: Option<PokerHand>,
-        rng: &'a mut StdRng,
+        rng: &'a mut ChaCha12Rng,
         joker_count: usize,
         joker_capacity: usize,
         consumable_slots: usize,
@@ -603,6 +603,49 @@ impl Jokers {
 
     pub(crate) fn capacity(&self) -> usize {
         self.capacity
+            + self
+                .jokers
+                .iter()
+                .filter(|joker| joker.edition() == JokerEdition::Negative)
+                .count()
+    }
+
+    pub(crate) fn can_add(&self, joker: &Joker) -> bool {
+        self.jokers.len() < self.capacity() + usize::from(joker.edition() == JokerEdition::Negative)
+    }
+
+    pub(crate) fn can_duplicate_after_destroy_others(&self, index: usize) -> bool {
+        if index >= self.jokers.len() {
+            return false;
+        }
+        let survivors = self
+            .jokers
+            .iter()
+            .enumerate()
+            .filter(|(position, joker)| *position == index || joker.is_eternal())
+            .map(|(_, joker)| joker)
+            .collect::<Vec<_>>();
+        let negative_slots = survivors
+            .iter()
+            .filter(|joker| joker.edition() == JokerEdition::Negative)
+            .count();
+        survivors.len() < self.capacity + negative_slots
+    }
+
+    pub(crate) fn reorder(state: &mut GameState, order: &[usize]) -> bool {
+        if !crate::core::selection::valid_permutation(order, state.jokers.jokers.len()) {
+            return false;
+        }
+        let mut old = std::mem::take(&mut state.jokers.jokers)
+            .into_iter()
+            .map(Some)
+            .collect::<Vec<_>>();
+        state.jokers.jokers = order
+            .iter()
+            .map(|&index| old[index].take().unwrap())
+            .collect();
+        state.update_jokers(UpdateEvent::JokerOrderChanged);
+        true
     }
 
     pub(crate) fn decrease_capacity(&mut self, amount: usize) {
@@ -646,11 +689,11 @@ impl Jokers {
         true
     }
 
-    pub(crate) fn shuffle(&mut self, rng: &mut StdRng) {
+    pub(crate) fn shuffle(&mut self, rng: &mut ChaCha12Rng) {
         self.jokers.shuffle(rng);
     }
 
-    pub(crate) fn disable_random(&mut self, rng: &mut StdRng) -> Option<usize> {
+    pub(crate) fn disable_random(&mut self, rng: &mut ChaCha12Rng) -> Option<usize> {
         let index = (0..self.jokers.len())
             .filter(|&index| self.jokers.len() == 1 || !self.jokers[index].is_debuffed())
             .choose(rng)?;

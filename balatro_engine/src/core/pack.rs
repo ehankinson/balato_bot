@@ -1,9 +1,10 @@
 use crate::core::card::Card;
-use crate::core::consumable::ConsumableUseError;
+use crate::core::consumable::{ConsumableTarget, ConsumableUseError};
 use crate::core::enums::{
     ALL_RANKS, ALL_SUITS, Consumable, Edition, Enhancement, Planet, Seal, Spectral, Tarot,
 };
 use crate::core::game::GameState;
+use crate::core::hand::Hand;
 use crate::core::joker::{Joker, UpdateEvent};
 use crate::core::joker_types::{JokerKind, JokerRarity};
 use crate::core::shop::ShopItem;
@@ -99,6 +100,8 @@ impl ShopPack {
         }
         state.update_jokers(UpdateEvent::BoosterPackOpened);
         PackOpening {
+            kind: self.kind,
+            size: self.size,
             options,
             choices: self.choices(),
         }
@@ -113,6 +116,8 @@ pub(crate) enum PackOption {
 }
 
 pub(crate) struct PackOpening {
+    kind: BoosterPackKind,
+    size: BoosterPackSize,
     options: Vec<PackOption>,
     choices: usize,
 }
@@ -126,46 +131,92 @@ impl PackOpening {
         self.choices
     }
 
-    pub(crate) fn choose(
-        &mut self,
-        selections: &[usize],
-        state: &mut GameState,
-    ) -> Result<(), PackError> {
-        validate_selections(&self, selections, state)?;
+    pub(crate) fn kind(&self) -> BoosterPackKind {
+        self.kind
+    }
+    pub(crate) fn size(&self) -> BoosterPackSize {
+        self.size
+    }
+    pub(crate) fn has_hand(&self) -> bool {
+        matches!(
+            self.kind,
+            BoosterPackKind::Arcana | BoosterPackKind::Spectral
+        )
+    }
 
-        if selections.is_empty() {
-            state.update_jokers(UpdateEvent::BoosterPackSkipped);
-            self.choices = 0;
-            return Ok(());
-        }
-        for index in selections {
-            match self.options.get(*index).expect("validated pack selection") {
-                PackOption::Joker(joker) => {
-                    state.jokers.add(joker.clone());
-                    state.update_jokers(UpdateEvent::JokerOrderChanged);
-                }
-                PackOption::Consumable(consumable @ Consumable::Planet(_)) => {
-                    state
-                        .use_pack_consumable(*consumable)
-                        .map_err(PackError::Consumable)?;
-                }
-                PackOption::Consumable(consumable) => state
-                    .add_consumable(*consumable)
-                    .map_err(PackError::Consumable)?,
-                PackOption::PlayingCard(card) => {
-                    state.deck.add_card_to_deck(card.clone());
-                    state.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
-                }
+    pub(crate) fn validate_select(&self, index: usize, state: &GameState) -> Result<(), PackError> {
+        match self.option(index)? {
+            PackOption::Joker(joker) if !state.jokers.can_add(joker) => {
+                Err(PackError::InventoryFull)
             }
+            PackOption::Joker(_) | PackOption::PlayingCard(_) => Ok(()),
+            PackOption::Consumable(_) => Err(PackError::InvalidSelection),
         }
+    }
 
-        let mut removed = selections.to_vec();
-        removed.sort_unstable();
-        for index in removed.into_iter().rev() {
-            self.options.remove(index);
+    pub(crate) fn option(&self, index: usize) -> Result<&PackOption, PackError> {
+        if self.choices == 0 {
+            return Err(PackError::InvalidSelection);
         }
-        self.choices -= selections.len();
+        self.options.get(index).ok_or(PackError::InvalidSelection)
+    }
+
+    pub(crate) fn select(&mut self, index: usize, state: &mut GameState) -> Result<(), PackError> {
+        self.validate_select(index, state)?;
+        match self.options.remove(index) {
+            PackOption::Joker(joker) => {
+                state.jokers.add(joker);
+                state.update_jokers(UpdateEvent::JokerOrderChanged);
+            }
+            PackOption::PlayingCard(card) => {
+                state.deck.add_card_to_deck(card);
+                state.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
+            }
+            PackOption::Consumable(_) => unreachable!("validated acquisition"),
+        }
+        self.choices -= 1;
         Ok(())
+    }
+
+    pub(crate) fn use_consumable(
+        &mut self,
+        index: usize,
+        target: &ConsumableTarget,
+        state: &mut GameState,
+        hand: &mut Hand,
+    ) -> Result<(), PackError> {
+        let PackOption::Consumable(consumable) = self.option(index)? else {
+            return Err(PackError::InvalidSelection);
+        };
+        state
+            .use_pack_consumable(*consumable, hand, target)
+            .map_err(PackError::Consumable)?;
+        self.options.remove(index);
+        self.choices -= 1;
+        Ok(())
+    }
+
+    pub(crate) fn skip(&mut self, state: &mut GameState) -> Result<(), PackError> {
+        if self.choices == 0 {
+            return Err(PackError::InvalidSelection);
+        }
+        state.update_jokers(UpdateEvent::BoosterPackSkipped);
+        self.choices = 0;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_options(
+        kind: BoosterPackKind,
+        size: BoosterPackSize,
+        options: Vec<PackOption>,
+    ) -> Self {
+        Self {
+            kind,
+            size,
+            options,
+            choices: usize::from(size == BoosterPackSize::Mega) + 1,
+        }
     }
 }
 
@@ -192,48 +243,6 @@ pub(crate) enum PackError {
     InvalidSelection,
     InventoryFull,
     Consumable(ConsumableUseError),
-}
-
-fn validate_selections(
-    opening: &PackOpening,
-    selections: &[usize],
-    state: &GameState,
-) -> Result<(), PackError> {
-    if opening.choices == 0
-        || selections.len() > opening.choices
-        || selections
-            .iter()
-            .any(|index| *index >= opening.options.len())
-        || selections
-            .iter()
-            .enumerate()
-            .any(|(position, index)| selections[..position].contains(index))
-    {
-        return Err(PackError::InvalidSelection);
-    }
-
-    let joker_count = selections
-        .iter()
-        .filter(|index| matches!(opening.options[**index], PackOption::Joker(_)))
-        .count();
-    if state.jokers.as_slice().len() + joker_count > state.joker_capacity() {
-        return Err(PackError::InventoryFull);
-    }
-
-    let consumable_count = selections
-        .iter()
-        .filter(|index| {
-            matches!(
-                opening.options[**index],
-                PackOption::Consumable(Consumable::Tarot(_) | Consumable::Spectral(_))
-            )
-        })
-        .count();
-    if state.consumables.len() + consumable_count > state.consumable_capacity() {
-        return Err(PackError::InventoryFull);
-    }
-
-    Ok(())
 }
 
 pub(crate) fn random_shop_pack(state: &mut GameState) -> ShopPack {

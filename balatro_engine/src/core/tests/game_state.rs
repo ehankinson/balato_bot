@@ -2258,7 +2258,7 @@ fn photograph_ignores_excluded_faces_and_boosts_only_first_scoring_face() {
             ));
         }
         let result = state
-            .play_hand(&mut hand, (0..ranks.len() as u8).collect())
+            .play_hand(&mut hand, (0..ranks.len()).collect())
             .unwrap();
         assert_eq!(result.mult, expected_mult);
     }

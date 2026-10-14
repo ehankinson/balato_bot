@@ -1,8 +1,8 @@
 use crate::core::card::Card;
 use crate::core::enums::{ALL_RANKS, ALL_SUITS, Decks, Edition, Enhancement, Rank, Seal};
 use crate::core::hand::Hand;
+use chacha20::ChaCha12Rng;
 use rand::prelude::IndexedRandom;
-use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 
 const DECK_SIZE: u8 = 52;
@@ -17,7 +17,7 @@ pub(crate) struct Deck {
 }
 
 impl Deck {
-    pub(crate) fn new(deck_type: Decks, rng: &mut StdRng) -> Deck {
+    pub(crate) fn new(deck_type: Decks, rng: &mut ChaCha12Rng) -> Deck {
         let cards = Deck::build_cards(&deck_type, rng);
         let hand_size_modifier = match deck_type {
             Decks::Painted => 2,
@@ -37,7 +37,7 @@ impl Deck {
         self.cards.push(card);
     }
 
-    pub(crate) fn shuffle(&mut self, rng: &mut StdRng) {
+    pub(crate) fn shuffle(&mut self, rng: &mut ChaCha12Rng) {
         self.cards.shuffle(rng);
     }
 
@@ -49,7 +49,7 @@ impl Deck {
         (0..amount).filter_map(|_| self.draw_card()).collect()
     }
 
-    pub(crate) fn deal_cards(&mut self, hand: &mut Hand, amount: usize, rng: &mut StdRng) {
+    pub(crate) fn deal_cards(&mut self, hand: &mut Hand, amount: usize, rng: &mut ChaCha12Rng) {
         self.shuffle(rng);
         for _ in 0..amount {
             if let Some(card) = self.draw_card() {
@@ -166,7 +166,7 @@ impl Deck {
         self.cards.truncate(new_length);
     }
 
-    fn build_cards(deck_type: &Decks, rng: &mut StdRng) -> Vec<Card> {
+    fn build_cards(deck_type: &Decks, rng: &mut ChaCha12Rng) -> Vec<Card> {
         let mut vec = Vec::with_capacity(64);
         if deck_type == &Decks::Erratic {
             for _ in 0..DECK_SIZE {

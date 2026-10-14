@@ -71,6 +71,10 @@ impl BlindSelector {
         self.boss
     }
 
+    pub(crate) fn set_boss(&mut self, boss: BossBlinds) {
+        self.boss.kind = BlindKind::Boss(boss);
+    }
+
     #[cfg(test)]
     pub(crate) fn set_small_skip_tag(&mut self, tag: SkipTag) {
         self.small.skip_tag = Some(tag);

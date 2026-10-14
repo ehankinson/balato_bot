@@ -40,75 +40,126 @@ impl PyGame {
         self.game.decision_point().code()
     }
 
-    #[pyo3(signature = (action, index=None, positions=None, selections=None))]
+    #[pyo3(signature = (action, source=None, targets=None, order=None))]
     fn apply_action(
         &mut self,
         action: ActionKind,
-        index: Option<usize>,
-        positions: Option<Vec<u8>>,
-        selections: Option<Vec<usize>>,
+        source: Option<&Bound<'_, PyAny>>,
+        targets: Option<&Bound<'_, PyAny>>,
+        order: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<u8> {
-        let blind_kind = |index: Option<usize>| -> PyResult<BlindKind> {
+        let error = |message: &str| pyo3::exceptions::PyValueError::new_err(message.to_owned());
+        let source = source.map(selected_index).transpose()?;
+        let targets = targets.map(selected_indices).transpose()?;
+        let order = order.map(selected_indices).transpose()?;
+        if source.is_some() != action.has_source() {
+            return Err(error("action requires exactly its source field"));
+        }
+        let is_reorder = matches!(action, ActionKind::ReorderHand | ActionKind::ReorderJokers);
+        if order.is_some() != is_reorder {
+            return Err(error("only reorder actions require order"));
+        }
+        let uses_targets = matches!(
+            action,
+            ActionKind::PlayCards
+                | ActionKind::DiscardCards
+                | ActionKind::UseConsumable
+                | ActionKind::UsePackConsumable
+        );
+        if targets.is_some() && !uses_targets {
+            return Err(error("action does not accept targets"));
+        }
+        if matches!(action, ActionKind::PlayCards | ActionKind::DiscardCards) && targets.is_none() {
+            return Err(error("card actions require targets"));
+        }
+        if matches!(
+            action,
+            ActionKind::UseConsumable | ActionKind::UsePackConsumable
+        ) {
+            let card = if action == ActionKind::UseConsumable {
+                self.game
+                    .state()
+                    .consumables
+                    .get(source.unwrap())
+                    .map(|owned| owned.consumable)
+            } else {
+                self.game
+                    .pending_pack()
+                    .and_then(|pending| pending.opening.options().get(source.unwrap()))
+                    .and_then(|option| match option {
+                        crate::core::pack::PackOption::Consumable(card) => Some(*card),
+                        _ => None,
+                    })
+            };
+            if let Some(card) = card {
+                if targets.is_some() != (card.targets().maximum > 0) {
+                    return Err(error("consumable requires exactly its target fields"));
+                }
+            }
+        }
+        let blind_kind = |index: usize| -> PyResult<BlindKind> {
             let selector = self.game.state().blind_selector;
-            match index.unwrap_or(0) {
+            match index {
                 0 => Ok(selector.small().kind),
                 1 => Ok(selector.big().kind),
                 2 => Ok(selector.boss().kind),
-                _ => Err(pyo3::exceptions::PyValueError::new_err(
-                    "blind index must be 0, 1, or 2",
-                )),
+                _ => Err(error("blind source must be 0, 1, or 2")),
             }
         };
-        let action = match action {
-            ActionKind::SelectBlind => GameAction::SelectBlind(blind_kind(index)?),
-            ActionKind::SkipBlind => GameAction::SkipBlind(blind_kind(index)?),
-            ActionKind::PlayCards => GameAction::PlayCards(positions.ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err("play actions require positions")
-            })?),
-            ActionKind::DiscardCards => GameAction::DiscardCards(positions.ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err("discard actions require positions")
-            })?),
-            ActionKind::BuyShopItem => GameAction::BuyShopItem(index.ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err("shop item actions require an index")
-            })?),
-            ActionKind::BuyVoucher => GameAction::BuyVoucher(index.ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err("voucher actions require an index")
-            })?),
+        let command = match action {
+            ActionKind::SelectBlind => GameAction::SelectBlind(blind_kind(source.unwrap())?),
+            ActionKind::SkipBlind => GameAction::SkipBlind(blind_kind(source.unwrap())?),
+            ActionKind::PlayCards => GameAction::PlayCards(targets.unwrap()),
+            ActionKind::DiscardCards => GameAction::DiscardCards(targets.unwrap()),
+            ActionKind::BuyShopItem => GameAction::BuyShopItem(source.unwrap()),
+            ActionKind::BuyVoucher => GameAction::BuyVoucher(source.unwrap()),
             ActionKind::RerollShop => GameAction::RerollShop,
-            ActionKind::BuyPack => GameAction::BuyPack(index.ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err("pack actions require an index")
-            })?),
-            ActionKind::SelectPackOptions => {
-                GameAction::SelectPackOptions(selections.ok_or_else(|| {
-                    pyo3::exceptions::PyValueError::new_err("pack choices require selections")
-                })?)
-            }
+            ActionKind::BuyPack => GameAction::BuyPack(source.unwrap()),
+            ActionKind::SelectPackOption => GameAction::SelectPackOption(source.unwrap()),
             ActionKind::UseConsumable => GameAction::UseConsumable {
-                index: index.ok_or_else(|| {
-                    pyo3::exceptions::PyValueError::new_err("consumable actions require an index")
-                })?,
-                target: positions
-                    .map(|indices| {
-                        ConsumableTarget::hand(
-                            indices.into_iter().map(usize::from).collect::<Vec<_>>(),
-                        )
-                    })
-                    .unwrap_or_default(),
+                index: source.unwrap(),
+                target: ConsumableTarget::hand(targets.unwrap_or_default()),
             },
-            ActionKind::SellJoker => GameAction::SellJoker(index.ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err("selling a Joker requires an index")
-            })?),
-            ActionKind::SellConsumable => GameAction::SellConsumable(index.ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err("selling a consumable requires an index")
-            })?),
+            ActionKind::SellJoker => GameAction::SellJoker(source.unwrap()),
+            ActionKind::SellConsumable => GameAction::SellConsumable(source.unwrap()),
             ActionKind::LeaveShop => GameAction::LeaveShop,
+            ActionKind::SkipPack => GameAction::SkipPack,
+            ActionKind::UsePackConsumable => GameAction::UsePackConsumable {
+                index: source.unwrap(),
+                target: ConsumableTarget::hand(targets.unwrap_or_default()),
+            },
+            ActionKind::ReorderJokers => GameAction::ReorderJokers(order.unwrap()),
+            ActionKind::ReorderHand => GameAction::ReorderHand(order.unwrap()),
+            ActionKind::RerollBoss => GameAction::RerollBoss,
         };
-
         self.game
-            .apply_action(action)
+            .apply_action(command)
             .map(|point| point.code())
             .map_err(|error| pyo3::exceptions::PyValueError::new_err(format!("{error:?}")))
     }
+}
+
+// Stage 2 keeps selected values as strict Python ints/lists. Stage 4 supplies
+// the contiguous int32-array boundary without moving validation into Python.
+fn selected_index(value: &Bound<'_, PyAny>) -> PyResult<usize> {
+    if !value.is_instance_of::<pyo3::types::PyInt>()
+        || value.is_instance_of::<pyo3::types::PyBool>()
+    {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "indices must be integers, not bools or floats",
+        ));
+    }
+    let index = value.extract::<i32>()?;
+    usize::try_from(index)
+        .map_err(|_| pyo3::exceptions::PyValueError::new_err("indices must be nonnegative"))
+}
+
+fn selected_indices(value: &Bound<'_, PyAny>) -> PyResult<Vec<usize>> {
+    value
+        .cast::<pyo3::types::PyList>()?
+        .iter()
+        .map(|value| selected_index(&value))
+        .collect()
 }
 
 #[pyfunction]

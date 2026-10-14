@@ -84,7 +84,10 @@ fn pk08_full_inventory_celestial_option_is_used_and_grows_constellation_once() {
     pack(&mut g, BoosterPackKind::Celestial, BoosterPackSize::Normal);
     assert_eq!(g.state.counters.planet_cards_used, 0);
     assert_eq!(
-        g.apply_action(GameAction::SelectPackOptions(vec![0])),
+        g.apply_action(GameAction::UsePackConsumable {
+            index: 0,
+            target: ConsumableTarget::default()
+        }),
         Ok(DecisionPoint::Shop)
     );
     assert_eq!(g.state.consumables.len(), 2);
@@ -131,8 +134,7 @@ fn pk09_hallucination_opens_once_with_normal_or_tag_pack_and_respects_capacity()
                 .filter(|c| matches!(c.consumable, Consumable::Tarot(_)))
                 .count();
             assert_eq!(tarots, usize::from(!full));
-            g.apply_action(GameAction::SelectPackOptions(vec![0]))
-                .unwrap();
+            g.apply_action(GameAction::SelectPackOption(0)).unwrap();
             assert_eq!(
                 g.state
                     .consumables
@@ -150,11 +152,11 @@ fn pk10_mega_can_take_one_option_then_skip_remaining_choice_once() {
     let mut g = shop_game(&[JokerKind::RedCard]);
     pack(&mut g, BoosterPackKind::Standard, BoosterPackSize::Mega);
     assert_eq!(
-        g.apply_action(GameAction::SelectPackOptions(vec![0])),
+        g.apply_action(GameAction::SelectPackOption(0)),
         Ok(DecisionPoint::PackSelection)
     );
     assert_eq!(
-        g.apply_action(GameAction::SelectPackOptions(vec![])),
+        g.apply_action(GameAction::SkipPack),
         Ok(DecisionPoint::Shop)
     );
     assert_eq!(score_mult(&mut g), 4.0);
@@ -166,12 +168,12 @@ fn pk10_whole_pack_skip_grows_red_card_once_but_both_choices_and_unopened_do_not
         let mut g = shop_game(&[JokerKind::RedCard]);
         if condition < 2 {
             pack(&mut g, BoosterPackKind::Standard, BoosterPackSize::Mega);
-            g.apply_action(GameAction::SelectPackOptions(if condition == 0 {
-                vec![]
+            if condition == 0 {
+                g.apply_action(GameAction::SkipPack).unwrap();
             } else {
-                vec![0, 1]
-            }))
-            .unwrap();
+                g.apply_action(GameAction::SelectPackOption(0)).unwrap();
+                g.apply_action(GameAction::SelectPackOption(0)).unwrap();
+            }
         }
         assert_eq!(score_mult(&mut g), if condition == 0 { 4.0 } else { 1.0 });
     }
@@ -187,8 +189,7 @@ fn ge01_perkeo_full_inventory_generates_on_shop_exit_not_pack_close() {
         .add_consumable(Consumable::Planet(Planet::Mercury))
         .unwrap();
     pack(&mut g, BoosterPackKind::Standard, BoosterPackSize::Normal);
-    g.apply_action(GameAction::SelectPackOptions(vec![0]))
-        .unwrap();
+    g.apply_action(GameAction::SelectPackOption(0)).unwrap();
     assert_eq!(g.state.consumables.len(), 2);
     g.apply_action(GameAction::LeaveShop).unwrap();
     assert_eq!(
@@ -238,29 +239,27 @@ fn invalid_pack_selections_preserve_the_open_pack_and_its_remaining_choices() {
     let mut g = shop_game(&[JokerKind::RedCard]);
     pack(&mut g, BoosterPackKind::Standard, BoosterPackSize::Mega);
     let owned = g.state.deck.size();
-    for choices in [vec![0, 0], vec![99], vec![0, 1, 2]] {
+    for index in [99, usize::MAX] {
         assert_eq!(
-            g.apply_action(GameAction::SelectPackOptions(choices)),
+            g.apply_action(GameAction::SelectPackOption(index)),
             Err(ActionError::Pack(PackError::InvalidSelection))
         );
         assert_eq!(g.decision_point, DecisionPoint::PackSelection);
         assert_eq!(g.pending_pack.as_ref().unwrap().opening.choices(), 2);
         assert_eq!(g.state.deck.size(), owned);
     }
-    g.apply_action(GameAction::SelectPackOptions(vec![0]))
-        .unwrap();
+    g.apply_action(GameAction::SelectPackOption(0)).unwrap();
     assert_eq!(g.pending_pack.as_ref().unwrap().opening.choices(), 1);
     assert_eq!(g.pending_pack.as_ref().unwrap().opening.options().len(), 4);
     assert_eq!(g.state.deck.size(), owned + 1);
-    g.apply_action(GameAction::SelectPackOptions(vec![0]))
-        .unwrap();
+    g.apply_action(GameAction::SelectPackOption(0)).unwrap();
     assert_eq!(
         g.state.deck.size(),
         owned + 2,
         "index zero now selects a different remaining card"
     );
     assert_eq!(
-        g.apply_action(GameAction::SelectPackOptions(vec![])),
+        g.apply_action(GameAction::SkipPack),
         Err(ActionError::InvalidPhase)
     );
     assert_eq!(
@@ -309,12 +308,18 @@ fn full_inventory_mega_celestial_pack_uses_both_planets_one_choice_at_a_time() {
         .unwrap();
     pack(&mut g, BoosterPackKind::Celestial, BoosterPackSize::Mega);
     assert_eq!(
-        g.apply_action(GameAction::SelectPackOptions(vec![0])),
+        g.apply_action(GameAction::UsePackConsumable {
+            index: 0,
+            target: ConsumableTarget::default()
+        }),
         Ok(DecisionPoint::PackSelection)
     );
     assert_eq!(g.state.counters.planet_cards_used, 1);
     assert_eq!(
-        g.apply_action(GameAction::SelectPackOptions(vec![0])),
+        g.apply_action(GameAction::UsePackConsumable {
+            index: 0,
+            target: ConsumableTarget::default()
+        }),
         Ok(DecisionPoint::Shop)
     );
     assert_eq!(g.state.counters.planet_cards_used, 2);
@@ -332,13 +337,12 @@ fn failed_buffoon_capacity_check_retains_pack_until_a_slot_is_freed() {
     ]);
     pack(&mut g, BoosterPackKind::Buffoon, BoosterPackSize::Normal);
     assert_eq!(
-        g.apply_action(GameAction::SelectPackOptions(vec![0])),
+        g.apply_action(GameAction::SelectPackOption(0)),
         Err(ActionError::Pack(PackError::InventoryFull))
     );
     assert_eq!(g.pending_pack.as_ref().unwrap().opening.options().len(), 2);
     // Free a slot through the owned collection's sale entry point.
     g.state.sell_joker(0).unwrap();
-    g.apply_action(GameAction::SelectPackOptions(vec![0]))
-        .unwrap();
+    g.apply_action(GameAction::SelectPackOption(0)).unwrap();
     assert_eq!(g.state.jokers.as_slice().len(), 5);
 }

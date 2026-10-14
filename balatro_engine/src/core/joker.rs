@@ -3,9 +3,9 @@ use crate::core::joker_types::{
     CopyType, GameStateModifications, GenerateType, JokerEdition, JokerKind, JokerRarity,
     JokerTrigger, RetriggerTarget,
 };
+use chacha20::ChaCha12Rng;
 use rand::RngExt;
 use rand::prelude::IndexedRandom;
-use rand::rngs::StdRng;
 
 #[path = "joker_events.rs"]
 mod events;
@@ -128,7 +128,11 @@ impl Joker {
         self.apply_discount(self.discount_percent);
     }
 
-    pub(crate) fn roll_stickers(&mut self, stake: crate::core::enums::Stakes, rng: &mut StdRng) {
+    pub(crate) fn roll_stickers(
+        &mut self,
+        stake: crate::core::enums::Stakes,
+        rng: &mut ChaCha12Rng,
+    ) {
         use crate::core::enums::Stakes;
         if stake as u8 >= Stakes::Black as u8 {
             let roll = rng.random_range(0..100u8);
@@ -211,7 +215,7 @@ impl Joker {
         }
     }
 
-    pub(crate) fn random_with_rarity(rarity: JokerRarity, rng: &mut StdRng) -> Option<Joker> {
+    pub(crate) fn random_with_rarity(rarity: JokerRarity, rng: &mut ChaCha12Rng) -> Option<Joker> {
         let kinds = JokerKind::ALL
             .iter()
             .copied()
@@ -220,7 +224,7 @@ impl Joker {
         kinds.choose(rng).copied().map(Joker::create_joker)
     }
 
-    pub(crate) fn random_shop_joker(rng: &mut StdRng) -> Joker {
+    pub(crate) fn random_shop_joker(rng: &mut ChaCha12Rng) -> Joker {
         let kinds = JokerKind::ALL
             .iter()
             .copied()

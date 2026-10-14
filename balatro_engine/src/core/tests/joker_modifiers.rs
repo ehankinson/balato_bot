@@ -26,7 +26,7 @@ fn play(state: &mut GameState, cards: &[Card]) -> ScoreResult {
         hand.add_card(card.clone());
     }
     state
-        .play_hand(&mut hand, (0..cards.len() as u8).collect())
+        .play_hand(&mut hand, (0..cards.len()).collect())
         .unwrap()
 }
 

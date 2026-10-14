@@ -63,8 +63,8 @@ fn copied_business_card_pays_per_activation_and_non_faces_do_not_roll() {
             JokerKind::OopsAll6s,
         ]);
         state.blind.hands_remaining = 1;
-        state.rng = StdRng::seed_from_u64(611);
-        let mut expected_rng = StdRng::seed_from_u64(611);
+        state.rng = ChaCha12Rng::seed_from_u64(611);
+        let mut expected_rng = ChaCha12Rng::seed_from_u64(611);
         let mut hand = hand_of([card(
             if face { Rank::Queen } else { Rank::Seven },
             Suit::Clubs,
@@ -90,8 +90,8 @@ fn business_card_seeded_rolls_repeat_and_oops_changes_the_odds() {
                 &[JokerKind::BusinessCard]
             });
             state.blind.hands_remaining = 1;
-            state.rng = StdRng::seed_from_u64(seed);
-            let mut oracle = StdRng::seed_from_u64(seed);
+            state.rng = ChaCha12Rng::seed_from_u64(seed);
+            let mut oracle = ChaCha12Rng::seed_from_u64(seed);
             let successes = if doubled {
                 2
             } else {
@@ -208,8 +208,8 @@ fn reserved_parking_seeded_retrigger_rolls_are_independent() {
     for seed in 0..30 {
         let mut state = state_with(&[JokerKind::ReservedParking, JokerKind::Mime]);
         state.blind.hands_remaining = 1;
-        state.rng = StdRng::seed_from_u64(seed);
-        let mut oracle = StdRng::seed_from_u64(seed);
+        state.rng = ChaCha12Rng::seed_from_u64(seed);
+        let mut oracle = ChaCha12Rng::seed_from_u64(seed);
         let successes = (0..3).filter(|_| oracle.random_bool(0.5)).count();
         let mut hand = hand_of([
             card(Rank::Ace, Suit::Clubs, Enhancement::None, Seal::None),
@@ -394,8 +394,8 @@ fn eight_ball_skips_non_eights_stone_kickers_debuffs_and_full_capacity() {
             cards.push(card(Rank::Ace, Suit::Hearts, Enhancement::None, Seal::None));
         }
         let mut hand = hand_of(cards);
-        state.rng = StdRng::seed_from_u64(612);
-        let mut oracle = StdRng::seed_from_u64(612);
+        state.rng = ChaCha12Rng::seed_from_u64(612);
+        let mut oracle = ChaCha12Rng::seed_from_u64(612);
         let positions = (0..hand.hand_size()).collect();
         state.play_hand(&mut hand, positions).unwrap();
         assert!(state.consumables.is_empty());
@@ -410,8 +410,8 @@ fn eight_ball_seeded_probability_and_generation_are_repeatable() {
     for seed in 0..30 {
         let mut state = state_with(&[JokerKind::EightBall]);
         state.blind.hands_remaining = 1;
-        state.rng = StdRng::seed_from_u64(seed);
-        let mut oracle = StdRng::seed_from_u64(seed);
+        state.rng = ChaCha12Rng::seed_from_u64(seed);
+        let mut oracle = ChaCha12Rng::seed_from_u64(seed);
         let success = oracle.random_bool(0.25);
         let mut hand = hand_of([card(
             Rank::Eight,
@@ -612,8 +612,8 @@ fn eight_ball_oops_doubles_its_generation_probability() {
                 &[JokerKind::EightBall]
             });
             state.blind.hands_remaining = 1;
-            state.rng = StdRng::seed_from_u64(seed);
-            let mut oracle = StdRng::seed_from_u64(seed);
+            state.rng = ChaCha12Rng::seed_from_u64(seed);
+            let mut oracle = ChaCha12Rng::seed_from_u64(seed);
             let success = oracle.random_bool(if doubled { 0.5 } else { 0.25 });
             let mut hand = hand_of([card(
                 Rank::Eight,

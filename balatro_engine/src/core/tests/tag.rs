@@ -123,8 +123,13 @@ fn double_and_ethereal_skips_open_packs_without_leaving_blind_selection() {
     assert_eq!(state.tag_pack_openings().len(), 2);
     assert_eq!(state.tag_pack_openings()[0].options().len(), 2);
 
-    state.choose_tag_pack(0, &[0]).unwrap();
-    assert_eq!(state.tag_pack_openings().len(), 1);
+    let mut game = Game::new(0);
+    game.state = state;
+    assert_eq!(game.next_step(), DecisionPoint::PackSelection);
+    game.apply_action(GameAction::SkipPack).unwrap();
+    assert_eq!(game.decision_point(), DecisionPoint::PackSelection);
+    assert!(game.state.tag_pack_openings().is_empty());
+    assert!(game.pending_pack().is_some());
 }
 
 #[test]

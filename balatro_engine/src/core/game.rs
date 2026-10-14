@@ -3,8 +3,8 @@ use crate::core::blind_selector::BlindSelector;
 use crate::core::boss_blind::{FinisherBossBlindHistory, RegularBossBlindHistory};
 use crate::core::card::{Card, ScoringValues};
 use crate::core::consumable::{
-    ConsumableTarget, ConsumableUseError, DEFAULT_CONSUMABLE_PRICE, DEFAULT_CONSUMABLE_SLOTS,
-    OwnedConsumable,
+    ConsumableTarget, ConsumableUseError, ConsumableUseSource, DEFAULT_CONSUMABLE_PRICE,
+    DEFAULT_CONSUMABLE_SLOTS, OwnedConsumable,
 };
 use crate::core::deck::Deck;
 use crate::core::enums::{
@@ -20,8 +20,8 @@ use crate::core::pack::{PackError, PackOpening};
 use crate::core::shop::{ShopError, ShopState};
 use crate::core::tag::TagState;
 use crate::core::voucher::VoucherError;
+use chacha20::ChaCha12Rng;
 use rand::prelude::{IndexedRandom, SliceRandom};
-use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +75,7 @@ pub(crate) struct GameCounters {
     pub(crate) tarot_cards_used: u32,
     pub(crate) planet_cards_used: u32,
     pub(crate) shop_rerolls: u32,
+    pub(crate) boss_rerolls_used: u32,
     pub(crate) blinds_skipped: u32,
     pub(crate) used_planets: u16,
     pub(crate) sell_value_bonus: u8,
@@ -91,6 +92,7 @@ impl GameCounters {
             tarot_cards_used: 0,
             planet_cards_used: 0,
             shop_rerolls: 0,
+            boss_rerolls_used: 0,
             blinds_skipped: 0,
             used_planets: 0,
             sell_value_bonus: 0,
@@ -123,7 +125,7 @@ pub struct GameState {
     pub(crate) tag_pack_openings: Vec<crate::core::pack::PackOpening>,
     regular_boss_blinds: RegularBossBlindHistory,
     finisher_boss_blinds: FinisherBossBlindHistory,
-    pub(crate) rng: StdRng,
+    pub(crate) rng: ChaCha12Rng,
 }
 
 /// The point where the game is waiting for the next player or model decision.
@@ -158,31 +160,36 @@ pub(crate) enum DecisionError {
 #[pyo3::pyclass(name = "Action", from_py_object)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum ActionKind {
-    SelectBlind,
-    SkipBlind,
-    PlayCards,
-    DiscardCards,
-    BuyShopItem,
-    BuyVoucher,
-    RerollShop,
-    BuyPack,
-    SelectPackOptions,
-    UseConsumable,
-    SellJoker,
-    SellConsumable,
-    LeaveShop,
+    SelectBlind = 0,
+    SkipBlind = 1,
+    PlayCards = 2,
+    DiscardCards = 3,
+    BuyShopItem = 4,
+    BuyVoucher = 5,
+    RerollShop = 6,
+    BuyPack = 7,
+    SelectPackOption = 8,
+    UseConsumable = 9,
+    SellJoker = 10,
+    SellConsumable = 11,
+    LeaveShop = 12,
+    SkipPack = 13,
+    UsePackConsumable = 14,
+    ReorderJokers = 15,
+    ReorderHand = 16,
+    RerollBoss = 17,
 }
 
 pub(crate) enum GameAction {
     SelectBlind(BlindKind),
     SkipBlind(BlindKind),
-    PlayCards(Vec<u8>),
-    DiscardCards(Vec<u8>),
+    PlayCards(Vec<usize>),
+    DiscardCards(Vec<usize>),
     BuyShopItem(usize),
     BuyVoucher(usize),
     RerollShop,
     BuyPack(usize),
-    SelectPackOptions(Vec<usize>),
+    SelectPackOption(usize),
     UseConsumable {
         index: usize,
         target: ConsumableTarget,
@@ -190,6 +197,14 @@ pub(crate) enum GameAction {
     SellJoker(usize),
     SellConsumable(usize),
     LeaveShop,
+    SkipPack,
+    UsePackConsumable {
+        index: usize,
+        target: ConsumableTarget,
+    },
+    ReorderJokers(Vec<usize>),
+    ReorderHand(Vec<usize>),
+    RerollBoss,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -213,7 +228,7 @@ impl GameState {
     }
 
     pub(crate) fn with_rules(seed: u64, deck_type: Decks, stake: Stakes) -> GameState {
-        let mut rng = StdRng::seed_from_u64(seed);
+        let mut rng = ChaCha12Rng::seed_from_u64(seed);
 
         let deck = Deck::new(deck_type, &mut rng);
         let consumable_capacity =
@@ -436,6 +451,7 @@ impl GameState {
 
     pub(crate) fn begin_next_ante(&mut self) {
         self.counters.ante = self.counters.ante.saturating_add(1);
+        self.counters.boss_rerolls_used = 0;
         self.deck.clear_play_history();
         self.regenerate_blind_selector();
         self.roll_ante_voucher();
@@ -477,22 +493,6 @@ impl GameState {
 
     pub(crate) fn tag_pack_openings(&self) -> &[crate::core::pack::PackOpening] {
         &self.tag_pack_openings
-    }
-
-    pub(crate) fn choose_tag_pack(
-        &mut self,
-        index: usize,
-        selections: &[usize],
-    ) -> Result<(), PackError> {
-        if index >= self.tag_pack_openings.len() {
-            return Err(PackError::InvalidSelection);
-        }
-        let mut opening = self.tag_pack_openings.remove(index);
-        let result = opening.choose(selections, self);
-        if opening.choices() > 0 {
-            self.tag_pack_openings.insert(index, opening);
-        }
-        result
     }
 
     pub(crate) fn finish_blind(&mut self, hand: &Hand) -> Option<BlindPayout> {
@@ -658,7 +658,7 @@ impl GameState {
         crate::core::voucher::redeem(self, voucher)
     }
 
-    pub(crate) fn buy_voucher(&mut self, index: usize) -> Result<(), ShopError> {
+    pub(crate) fn validate_voucher_purchase(&self, index: usize) -> Result<(), ShopError> {
         let (voucher, price) = if index == 0 {
             let offer = self.shop.voucher.as_ref().ok_or(ShopError::InvalidOffer)?;
             (offer.voucher, offer.price)
@@ -674,9 +674,22 @@ impl GameState {
             return Err(ShopError::VoucherAlreadyOwned);
         }
         let price = self.shop_price(price);
-        if self.money < price as i16 {
-            return Err(ShopError::InsufficientFunds);
+        crate::core::shop::require_funds(self, price)?;
+        if !self.can_redeem_voucher(voucher) {
+            return Err(ShopError::VoucherPrerequisiteMissing);
         }
+        Ok(())
+    }
+
+    pub(crate) fn buy_voucher(&mut self, index: usize) -> Result<(), ShopError> {
+        self.validate_voucher_purchase(index)?;
+        let offer = if index == 0 {
+            self.shop.voucher.as_ref().unwrap()
+        } else {
+            &self.shop.extra_vouchers[index - 1]
+        };
+        let voucher = offer.voucher;
+        let price = self.shop_price(offer.price);
 
         self.redeem_voucher(voucher).map_err(|error| match error {
             VoucherError::AlreadyOwned => ShopError::VoucherAlreadyOwned,
@@ -699,14 +712,6 @@ impl GameState {
 
     pub(crate) fn can_redeem_voucher(&self, voucher: Vouchers) -> bool {
         crate::core::voucher::can_redeem(self, voucher)
-    }
-
-    pub(crate) fn select_pack_options(
-        &mut self,
-        opening: &mut crate::core::pack::PackOpening,
-        selections: &[usize],
-    ) -> Result<(), PackError> {
-        opening.choose(selections, self)
     }
 
     pub(crate) fn deck_size(&self) -> u16 {
@@ -1100,19 +1105,6 @@ impl GameState {
         self.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
     }
 
-    pub(crate) fn add_consumable_during_use(
-        &mut self,
-        consumable: Consumable,
-    ) -> Result<(), ConsumableUseError> {
-        if self.consumables.len() >= self.consumable_capacity().saturating_add(1) {
-            return Err(ConsumableUseError::NoCapacity);
-        }
-        let mut owned = OwnedConsumable::new(consumable, DEFAULT_CONSUMABLE_PRICE);
-        owned.apply_discount(self.shop_discount_percent);
-        self.consumables.push(owned);
-        Ok(())
-    }
-
     pub(crate) fn sell_joker(&mut self, index: usize) -> Option<u16> {
         let joker = self.jokers.get(index)?;
         if joker.is_eternal() {
@@ -1120,7 +1112,7 @@ impl GameState {
         }
         let sell_value = joker.sell_value();
         Jokers::dispatch_sale(self, index);
-        self.money += sell_value as i16;
+        self.money = self.money.saturating_add(sell_value as i16);
         self.update_jokers(UpdateEvent::AfterCardSold);
         Some(sell_value as u16)
     }
@@ -1129,7 +1121,7 @@ impl GameState {
         let consumable = self.consumables.get(index).copied()?;
         let sell_value = consumable.sell_value();
         self.consumables.remove(index);
-        self.money += sell_value as i16;
+        self.money = self.money.saturating_add(sell_value as i16);
         self.update_jokers(UpdateEvent::AfterCardSold);
         Some(sell_value)
     }
@@ -1145,7 +1137,14 @@ impl GameState {
             .get(index)
             .copied()
             .ok_or(ConsumableUseError::ConsumableNotFound)?;
-        owned.consumable.apply(self, hand, &target)?;
+        owned.consumable.apply(
+            self,
+            hand,
+            &target,
+            ConsumableUseSource {
+                inventory_index: Some(index),
+            },
+        )?;
 
         let used = self.consumables.remove(index);
         self.record_consumable_use(used);
@@ -1155,8 +1154,10 @@ impl GameState {
     pub(crate) fn use_pack_consumable(
         &mut self,
         consumable: Consumable,
+        hand: &mut Hand,
+        target: &ConsumableTarget,
     ) -> Result<(), ConsumableUseError> {
-        consumable.apply(self, &mut Hand::new(), &ConsumableTarget::default())?;
+        consumable.apply(self, hand, target, ConsumableUseSource::default())?;
         self.record_consumable_use(OwnedConsumable::new(consumable, DEFAULT_CONSUMABLE_PRICE));
         Ok(())
     }
@@ -1239,7 +1240,7 @@ impl GameState {
     pub(crate) fn discard_selected_cards(
         &mut self,
         hand: &mut Hand,
-        positions: Vec<u8>,
+        positions: Vec<usize>,
     ) -> Option<Vec<Card>> {
         if self.blind.discards_remaining == 0 || positions.len() > 5 {
             return None;
@@ -1250,7 +1251,7 @@ impl GameState {
     fn discard_selected_cards_with_action(
         &mut self,
         hand: &mut Hand,
-        positions: Vec<u8>,
+        positions: Vec<usize>,
         counts_as_discard: bool,
     ) -> Option<Vec<Card>> {
         let old_forced = self.blind.forced_card_index;
@@ -1261,12 +1262,12 @@ impl GameState {
         }
 
         self.blind.forced_card_index = old_forced
-            .filter(|index| !removed_positions.contains(&(*index as u8)))
+            .filter(|index| !removed_positions.contains(index))
             .map(|index| {
                 index
                     - removed_positions
                         .iter()
-                        .filter(|&&position| usize::from(position) < index)
+                        .filter(|&&position| position < index)
                         .count()
             });
         for card in &discarded {
@@ -1314,31 +1315,21 @@ impl GameState {
         positions.shuffle(&mut self.rng);
         positions.truncate(amount);
         positions.sort_unstable();
-        self.discard_selected_cards_with_action(
-            hand,
-            positions
-                .into_iter()
-                .map(|position| position as u8)
-                .collect(),
-            false,
-        )
-        .map(|discarded| {
-            self.notify_boss_ability(false);
-            discarded
-        })
-        .unwrap_or_default()
+        self.discard_selected_cards_with_action(hand, positions, false)
+            .map(|discarded| {
+                self.notify_boss_ability(false);
+                discarded
+            })
+            .unwrap_or_default()
     }
 
     pub(crate) fn play_hand(
         &mut self,
         hand: &mut Hand,
-        mut selected_positions: Vec<u8>,
+        mut selected_positions: Vec<usize>,
     ) -> Option<ScoreResult> {
         selected_positions.sort_unstable();
-        let selected_indices = selected_positions
-            .iter()
-            .map(|&position| position as usize)
-            .collect::<Vec<_>>();
+        let selected_indices = selected_positions.iter().copied().collect::<Vec<_>>();
         let mut played_cards = Vec::new();
         let score =
             crate::core::blind::execute_hand(self, hand, &selected_indices, &mut played_cards)?;
@@ -1471,6 +1462,8 @@ enum BlindStage {
     Boss,
 }
 
+pub(crate) const BOSS_REROLL_COST: u16 = 10;
+
 pub struct Game {
     pub(crate) state: GameState,
     pub(crate) hand: Hand,
@@ -1480,9 +1473,9 @@ pub struct Game {
     blind_stage: BlindStage,
 }
 
-struct PendingPack {
-    opening: PackOpening,
-    previous_state: DecisionPoint,
+pub(crate) struct PendingPack {
+    pub(crate) opening: PackOpening,
+    pub(crate) previous_state: DecisionPoint,
 }
 
 impl Game {
@@ -1529,10 +1522,7 @@ impl Game {
     fn open_next_tag_pack(&mut self) {
         if self.pending_pack.is_none() && !self.state.tag_pack_openings.is_empty() {
             let opening = self.state.tag_pack_openings.remove(0);
-            self.pending_pack = Some(PendingPack {
-                opening,
-                previous_state: DecisionPoint::BlindSelection,
-            });
+            self.begin_pack(opening, DecisionPoint::BlindSelection);
         }
 
         if self.pending_pack.is_some() {
@@ -1544,6 +1534,7 @@ impl Game {
         &mut self,
         action: GameAction,
     ) -> Result<DecisionPoint, ActionError> {
+        self.validate_action(&action)?;
         match action {
             GameAction::SelectBlind(kind) => {
                 self.select_blind(kind).map_err(ActionError::Decision)?;
@@ -1604,9 +1595,8 @@ impl Game {
             GameAction::RerollShop => {
                 self.require_shop()?;
                 let reroll_cost = self.state.shop.reroll_cost;
-                if self.state.money < reroll_cost as i16 {
-                    return Err(ActionError::Shop(ShopError::InsufficientFunds));
-                }
+                crate::core::shop::require_funds(&self.state, reroll_cost)
+                    .map_err(ActionError::Shop)?;
                 let mut shop = std::mem::replace(&mut self.state.shop, ShopState::new());
                 let result = shop.reroll(&mut self.state);
                 self.state.shop = shop;
@@ -1617,44 +1607,61 @@ impl Game {
                 let mut shop = std::mem::replace(&mut self.state.shop, ShopState::new());
                 let result = shop.buy_and_open_pack(index, &mut self.state);
                 self.state.shop = shop;
-                self.pending_pack = Some(PendingPack {
-                    opening: result.map_err(ActionError::Shop)?,
-                    previous_state: DecisionPoint::Shop,
-                });
-                self.decision_point = DecisionPoint::PackSelection;
+                self.begin_pack(result.map_err(ActionError::Shop)?, DecisionPoint::Shop);
             }
-            GameAction::SelectPackOptions(selections) => {
-                if self.decision_point != DecisionPoint::PackSelection {
-                    return Err(ActionError::InvalidPhase);
-                }
-                let pending = self
-                    .pending_pack
+            GameAction::SelectPackOption(index) => {
+                self.pending_pack
                     .as_mut()
-                    .ok_or(ActionError::InvalidAction)?;
+                    .unwrap()
+                    .opening
+                    .select(index, &mut self.state)
+                    .map_err(ActionError::Pack)?;
+                self.finish_pack_if_done();
+            }
+            GameAction::UsePackConsumable { index, target } => {
+                let pending = self.pending_pack.as_mut().unwrap();
+                let mut empty = Hand::new();
+                let hand = if pending.opening.has_hand() {
+                    &mut self.hand
+                } else {
+                    &mut empty
+                };
                 pending
                     .opening
-                    .choose(&selections, &mut self.state)
+                    .use_consumable(index, &target, &mut self.state, hand)
                     .map_err(ActionError::Pack)?;
-                if pending.opening.choices() == 0 {
-                    self.decision_point = pending.previous_state;
-                    self.pending_pack = None;
-                    self.open_next_tag_pack();
-                }
+                self.finish_pack_if_done();
+            }
+            GameAction::SkipPack => {
+                self.pending_pack
+                    .as_mut()
+                    .unwrap()
+                    .opening
+                    .skip(&mut self.state)
+                    .map_err(ActionError::Pack)?;
+                self.finish_pack_if_done();
             }
             GameAction::UseConsumable { index, target } => {
-                if !matches!(
-                    self.decision_point,
-                    DecisionPoint::Shop | DecisionPoint::PlayingHand
-                ) {
-                    return Err(ActionError::InvalidPhase);
+                if self.has_active_hand() {
+                    self.state
+                        .use_consumable(index, &mut self.hand, target)
+                        .map_err(ActionError::Consumable)?;
+                } else {
+                    self.state
+                        .use_consumable(index, &mut Hand::new(), target)
+                        .map_err(ActionError::Consumable)?;
                 }
-                self.state
-                    .use_consumable(index, &mut self.hand, target)
-                    .map_err(ActionError::Consumable)?;
                 if self.decision_point == DecisionPoint::PlayingHand {
                     if self.hand.cards().is_empty() && self.state.blind.hands_remaining > 0 {
                         self.state.deal_cards(&mut self.hand);
                     }
+                    let modifiers = self.state.jokers.modifiers();
+                    for card in self.hand.cards_mut() {
+                        card.set_debuffed(self.state.blind.card_is_debuffed(card, modifiers));
+                    }
+                    self.state
+                        .blind
+                        .choose_forced_card(self.hand.cards().len(), &mut self.state.rng);
                     self.state.resolve_blind_end(&mut self.hand);
                     if self.state.blind.finished {
                         self.enter_shop().map_err(ActionError::Shop)?;
@@ -1666,12 +1673,6 @@ impl Game {
                 }
             }
             GameAction::SellJoker(index) => {
-                if !matches!(
-                    self.decision_point,
-                    DecisionPoint::Shop | DecisionPoint::PlayingHand
-                ) {
-                    return Err(ActionError::InvalidPhase);
-                }
                 self.state
                     .sell_joker(index)
                     .ok_or(ActionError::InvalidAction)?;
@@ -1681,14 +1682,13 @@ impl Game {
                         card.set_debuffed(self.state.blind.card_is_debuffed(card, modifiers));
                     }
                     if self.state.blind.boss_ability_disabled
-                        && self.hand.hand_size() < self.state.hand_size().max(0) as u8
+                        && self.hand.hand_size() < self.state.hand_size().max(0) as usize
                     {
                         self.state.deal_cards(&mut self.hand);
                     }
                 }
             }
             GameAction::SellConsumable(index) => {
-                self.require_shop()?;
                 self.state
                     .sell_consumable(index)
                     .ok_or(ActionError::InvalidAction)?;
@@ -1696,9 +1696,101 @@ impl Game {
             GameAction::LeaveShop => {
                 self.leave_shop().ok_or(ActionError::InvalidPhase)?;
             }
+            GameAction::ReorderJokers(order) => {
+                assert!(
+                    Jokers::reorder(&mut self.state, &order),
+                    "validated permutation"
+                );
+            }
+            GameAction::ReorderHand(order) => {
+                let forced = self.state.blind.forced_card_index;
+                assert!(self.hand.reorder(&order), "validated permutation");
+                if self.decision_point == DecisionPoint::PlayingHand {
+                    self.state.blind.forced_card_index =
+                        forced.and_then(|index| order.iter().position(|old| *old == index));
+                }
+            }
+            GameAction::RerollBoss => {
+                let boss = self.state.random_boss_blind();
+                self.state.blind_selector.set_boss(boss);
+                self.state.money -= BOSS_REROLL_COST as i16;
+                self.state.counters.boss_rerolls_used =
+                    self.state.counters.boss_rerolls_used.saturating_add(1);
+            }
         }
 
         Ok(self.decision_point)
+    }
+
+    pub(crate) fn pending_pack(&self) -> Option<&PendingPack> {
+        self.pending_pack.as_ref()
+    }
+
+    pub(crate) fn has_active_hand(&self) -> bool {
+        self.decision_point == DecisionPoint::PlayingHand
+            || (self.decision_point == DecisionPoint::PackSelection
+                && self
+                    .pending_pack
+                    .as_ref()
+                    .is_some_and(|pending| pending.opening.has_hand()))
+    }
+
+    pub(crate) fn active_hand(&self) -> Option<&Hand> {
+        self.has_active_hand().then_some(&self.hand)
+    }
+
+    fn reconcile_hand(&mut self) {
+        let mut cards = self.hand.take_cards();
+        for card in &mut cards {
+            card.set_face_down(false);
+            card.set_debuffed(false);
+        }
+        self.state.deck.discard_cards(cards);
+        self.state.deck.reset_deck();
+    }
+
+    fn begin_pack(&mut self, opening: PackOpening, previous_state: DecisionPoint) {
+        if opening.has_hand() {
+            self.reconcile_hand();
+            let size = (self.state.deck.hand_size() + self.state.jokers.hand_size_modifier()).max(0)
+                as usize;
+            self.state
+                .deck
+                .deal_cards(&mut self.hand, size, &mut self.state.rng);
+        }
+        self.pending_pack = Some(PendingPack {
+            opening,
+            previous_state,
+        });
+        self.decision_point = DecisionPoint::PackSelection;
+    }
+
+    fn finish_pack_if_done(&mut self) {
+        let pending = self.pending_pack.as_ref().expect("active pack");
+        if pending.opening.choices() != 0 {
+            return;
+        }
+        let previous = pending.previous_state;
+        if pending.opening.has_hand() {
+            self.reconcile_hand();
+        }
+        self.pending_pack = None;
+        self.decision_point = previous;
+        if previous == DecisionPoint::BlindSelection {
+            self.open_next_tag_pack();
+        }
+    }
+
+    pub(crate) fn validate_boss_reroll(&self) -> Result<(), ActionError> {
+        if self.decision_point != DecisionPoint::BlindSelection {
+            return Err(ActionError::InvalidPhase);
+        }
+        if !self.state.boss_reroll_unlimited
+            && self.state.counters.boss_rerolls_used >= u32::from(self.state.boss_rerolls_per_ante)
+        {
+            return Err(ActionError::InvalidAction);
+        }
+        crate::core::shop::require_funds(&self.state, BOSS_REROLL_COST).map_err(ActionError::Shop)
     }
 
     fn require_shop(&self) -> Result<(), ActionError> {
@@ -1737,7 +1829,7 @@ impl Game {
             return Err(DecisionError::InvalidBlindChoice);
         }
 
-        let retained = self.hand.select_cards((0..self.hand.hand_size()).collect());
+        let retained = self.hand.take_cards();
         self.state.deck.discard_cards(retained);
         self.state.deck.reset_deck();
         self.state.begin_blind_as(kind);
@@ -1775,11 +1867,12 @@ impl Game {
     }
 
     pub(crate) fn shop(&self) -> Option<&ShopState> {
-        self.shop_active.then_some(&self.state.shop)
+        (self.shop_active && self.decision_point == DecisionPoint::Shop).then_some(&self.state.shop)
     }
 
     pub(crate) fn shop_mut(&mut self) -> Option<&mut ShopState> {
-        self.shop_active.then_some(&mut self.state.shop)
+        (self.shop_active && self.decision_point == DecisionPoint::Shop)
+            .then_some(&mut self.state.shop)
     }
 
     pub(crate) fn leave_shop(&mut self) -> Option<()> {
@@ -1834,6 +1927,10 @@ mod tag_tests;
 #[cfg(test)]
 #[path = "tests/game_flow.rs"]
 mod game_flow_tests;
+
+#[cfg(test)]
+#[path = "tests/action_interface.rs"]
+mod action_interface_tests;
 
 #[cfg(test)]
 #[path = "tests/joker_modifiers.rs"]

@@ -3,8 +3,8 @@ use crate::core::blind::{BlindKind, BlindState};
 use crate::core::card::Card;
 use crate::core::enums::{BossBlinds, Enhancement, PokerHand, Stakes, Suit};
 use crate::core::joker_types::JokerModifiers;
+use chacha20::ChaCha12Rng;
 use rand::prelude::RngExt;
-use rand::rngs::StdRng;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct RegularBossBlindHistory {
@@ -291,7 +291,7 @@ impl BlindState {
     pub(crate) fn prepare_drawn_card(
         &self,
         card: &mut Card,
-        rng: &mut StdRng,
+        rng: &mut ChaCha12Rng,
         modifiers: JokerModifiers,
     ) {
         card.set_debuffed(self.card_is_debuffed(card, modifiers));
@@ -311,7 +311,7 @@ impl BlindState {
         card.set_face_down(face_down);
     }
 
-    pub(crate) fn choose_forced_card(&mut self, hand_size: usize, rng: &mut StdRng) {
+    pub(crate) fn choose_forced_card(&mut self, hand_size: usize, rng: &mut ChaCha12Rng) {
         if self
             .forced_card_index
             .is_some_and(|index| index < hand_size)

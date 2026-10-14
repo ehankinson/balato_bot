@@ -40,7 +40,7 @@ fn winning_hand(game: &mut Game) {
     let indices = if game.state.blind.kind == BlindKind::Boss(BossBlinds::Psychich) {
         vec![0, 1, 2, 3, 4]
     } else {
-        vec![game.state.blind.forced_card_index.unwrap_or(0) as u8]
+        vec![game.state.blind.forced_card_index.unwrap_or(0)]
     };
     game.apply_action(GameAction::PlayCards(indices)).unwrap();
     assert_eq!(game.decision_point(), DecisionPoint::Shop);
@@ -607,7 +607,7 @@ fn buffoon_packs_share_sticker_rules_and_keep_stickers_on_acquisition() {
         expected.perishable_rounds(),
         expected.is_rental(),
     );
-    state.select_pack_options(&mut opening, &[0]).unwrap();
+    opening.select(0, &mut state).unwrap();
     let joker = state.jokers.get(0).unwrap();
     assert_eq!(
         (
@@ -833,7 +833,7 @@ fn ante_eight_finisher_shop_advances_to_endless_ante_nine() {
     for hand in std::iter::once(PokerHand::HighCard).chain(PokerHand::DISCARD_HANDS) {
         game.state.upgrade_hand_score(hand, 60000, 60000);
     }
-    let forced = game.state.blind.forced_card_index.unwrap_or(0) as u8;
+    let forced = game.state.blind.forced_card_index.unwrap_or(0);
     game.apply_action(GameAction::PlayCards(vec![forced]))
         .unwrap();
     assert_eq!(game.decision_point(), DecisionPoint::Shop);

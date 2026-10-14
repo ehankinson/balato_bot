@@ -246,9 +246,9 @@ fn every_boss_has_normal_gameplay_behavior() {
                 state.deal_cards(&mut hand);
                 let forced = state.blind.forced_card_index.unwrap();
                 let other = (forced + 1) % hand.cards().len();
-                assert!(state.play_hand(&mut hand, vec![other as u8]).is_none());
+                assert!(state.play_hand(&mut hand, vec![other]).is_none());
                 assert_eq!(state.blind.hands_remaining, 4);
-                assert!(state.play_hand(&mut hand, vec![forced as u8]).is_some());
+                assert!(state.play_hand(&mut hand, vec![forced]).is_some());
                 assert_eq!(state.money, before);
             }
         }
@@ -729,17 +729,17 @@ fn cerulean_bell_preserves_a_retained_forced_card_across_index_shifts() {
     let forced_id = hand.cards()[forced].id();
     let discard = if forced > 0 { forced - 1 } else { forced + 1 };
     state
-        .discard_selected_cards(&mut hand, vec![discard as u8])
+        .discard_selected_cards(&mut hand, vec![discard])
         .unwrap();
     let shifted = state.blind.forced_card_index.unwrap();
     assert_eq!(shifted, forced - usize::from(discard < forced));
     assert_eq!(hand.cards()[shifted].id(), forced_id);
     assert!(
         state
-            .play_hand(&mut hand, vec![((shifted + 1) % 8) as u8])
+            .play_hand(&mut hand, vec![((shifted + 1) % 8)])
             .is_none()
     );
-    state.play_hand(&mut hand, vec![shifted as u8]).unwrap();
+    state.play_hand(&mut hand, vec![shifted]).unwrap();
     assert!(state.blind.forced_card_index.is_some());
 }
 

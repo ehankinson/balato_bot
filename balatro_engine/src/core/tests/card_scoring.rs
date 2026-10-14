@@ -400,9 +400,9 @@ fn lucky_rolls_are_independent_seeded_and_repeat_per_red_activation() {
     let mut saw = [false; 4];
     for seed in 0..200 {
         let mut state = state_with(&[JokerKind::LuckyCat]);
-        state.rng = StdRng::seed_from_u64(seed);
+        state.rng = ChaCha12Rng::seed_from_u64(seed);
         state.blind.hands_remaining = 1;
-        let mut expected_rng = StdRng::seed_from_u64(seed);
+        let mut expected_rng = ChaCha12Rng::seed_from_u64(seed);
         let mut mult = 1.0;
         let mut money = 0;
         let mut cat = 1.0;
@@ -481,8 +481,8 @@ fn glass_roll_is_seeded_and_oops_doubles_probability() {
                 &[]
             });
             state.blind.hands_remaining = 1;
-            state.rng = StdRng::seed_from_u64(seed);
-            let mut expected_rng = StdRng::seed_from_u64(seed);
+            state.rng = ChaCha12Rng::seed_from_u64(seed);
+            let mut expected_rng = ChaCha12Rng::seed_from_u64(seed);
             let expected_break = expected_rng.random_bool(if doubled { 0.5 } else { 0.25 });
             let mut hand = hand_of([card(Enhancement::Glass, Edition::None, Seal::Red)]);
             state.play_hand(&mut hand, vec![0]).unwrap();
@@ -502,8 +502,8 @@ fn glass_non_scoring_and_whole_hand_debuff_do_not_roll_destruction() {
     state.blind.hands_remaining = 1;
     let mut hand = hand_of([card(Enhancement::Glass, Edition::None, Seal::Red)]);
     let seed = 503;
-    state.rng = StdRng::seed_from_u64(seed);
-    let mut expected_rng = StdRng::seed_from_u64(seed);
+    state.rng = ChaCha12Rng::seed_from_u64(seed);
+    let mut expected_rng = ChaCha12Rng::seed_from_u64(seed);
     assert_eq!(state.play_hand(&mut hand, vec![0]).unwrap().score, 0.0);
     assert_eq!(state.deck.discarded_cards().len(), 1);
     assert_eq!(state.rng.random::<u64>(), expected_rng.random::<u64>());
@@ -704,8 +704,8 @@ fn lucky_base_and_doubled_odds_consume_two_independent_rolls() {
                 &[]
             });
             state.blind.hands_remaining = 1;
-            state.rng = StdRng::seed_from_u64(seed);
-            let mut oracle = StdRng::seed_from_u64(seed);
+            state.rng = ChaCha12Rng::seed_from_u64(seed);
+            let mut oracle = ChaCha12Rng::seed_from_u64(seed);
             let factor = if doubled { 2.0 } else { 1.0 };
             let mult_success = oracle.random_bool(factor / 5.0);
             let money_success = oracle.random_bool(factor / 15.0);
@@ -775,7 +775,7 @@ fn purple_uses_showman_eligibility_and_exhausted_tarot_pool_fallback() {
                     state.add_consumable(Consumable::Tarot(tarot)).unwrap();
                 }
             }
-            state.rng = StdRng::seed_from_u64(seed);
+            state.rng = ChaCha12Rng::seed_from_u64(seed);
             let mut hand = hand_of([card(Enhancement::None, Edition::None, Seal::Purple)]);
             state.discard_selected_cards(&mut hand, vec![0]).unwrap();
             let generated = state.consumables.last().unwrap().consumable;

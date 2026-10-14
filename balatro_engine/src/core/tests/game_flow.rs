@@ -237,7 +237,7 @@ fn skipped_tag_packs_use_the_same_selection_with_a_blind_return_point() {
     assert_eq!(game.next_step(), DecisionPoint::PackSelection);
 
     assert_eq!(
-        game.apply_action(GameAction::SelectPackOptions(vec![0])),
+        game.apply_action(GameAction::SkipPack),
         Ok(DecisionPoint::BlindSelection)
     );
     assert!(game.state.tag_pack_openings.is_empty());
@@ -268,7 +268,7 @@ fn shop_packs_store_shop_as_the_previous_state() {
     );
 
     assert_eq!(
-        game.apply_action(GameAction::SelectPackOptions(vec![0])),
+        game.apply_action(GameAction::SelectPackOption(0)),
         Ok(DecisionPoint::Shop)
     );
 }
@@ -352,7 +352,7 @@ fn action_dispatch_covers_shop_and_pack_decisions() {
         Ok(DecisionPoint::PackSelection)
     );
     assert_eq!(
-        game.apply_action(GameAction::SelectPackOptions(vec![0])),
+        game.apply_action(GameAction::SelectPackOption(0)),
         Ok(DecisionPoint::Shop)
     );
     assert_eq!(

@@ -135,8 +135,7 @@ pub(crate) fn execute_hand(
     }
 
     let old_forced = state.blind.forced_card_index;
-    let mut played_cards =
-        hand.select_cards(selected_indices.iter().map(|&index| index as u8).collect());
+    let mut played_cards = hand.select_cards(selected_indices.to_vec());
     state.blind.forced_card_index = old_forced
         .filter(|index| !selected_indices.contains(index))
         .map(|index| {

@@ -1,8 +1,8 @@
 use crate::core::card::Card;
 use crate::core::deck::Deck;
 use crate::core::enums::{Decks, Edition, Enhancement, Rank, Seal, Suit};
+use chacha20::ChaCha12Rng;
 use rand::SeedableRng;
-use rand::rngs::StdRng;
 
 #[test]
 fn card_mutations_update_card_identity_and_values() {
@@ -31,7 +31,7 @@ fn card_mutations_update_card_identity_and_values() {
 
 #[test]
 fn deck_draw_discard_reset_and_remove_operations_mutate_the_deck() {
-    let mut rng = StdRng::seed_from_u64(1);
+    let mut rng = ChaCha12Rng::seed_from_u64(1);
     let mut deck = Deck::new(Decks::Red, &mut rng);
 
     let drawn = deck.draw_cards(2);

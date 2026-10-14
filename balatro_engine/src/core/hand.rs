@@ -9,8 +9,8 @@ impl Hand {
         Hand { cards: Vec::new() }
     }
 
-    pub fn hand_size(&self) -> u8 {
-        self.cards.len() as u8
+    pub fn hand_size(&self) -> usize {
+        self.cards.len()
     }
 
     pub(crate) fn cards(&self) -> &[Card] {
@@ -37,22 +37,37 @@ impl Hand {
         self.cards.push(card);
     }
 
-    pub fn select_cards(&mut self, mut positions: Vec<u8>) -> Vec<Card> {
+    pub fn select_cards(&mut self, mut positions: Vec<usize>) -> Vec<Card> {
         positions.sort_unstable();
 
-        if positions.windows(2).any(|pair| pair[0] == pair[1])
-            || positions
-                .iter()
-                .any(|&position| position as usize >= self.cards.len())
-        {
+        if !crate::core::selection::valid_indices(&positions, self.cards.len()) {
             return Vec::new();
         }
 
         let mut selected = Vec::with_capacity(positions.len());
         for &position in positions.iter().rev() {
-            selected.push(self.cards.remove(position as usize));
+            selected.push(self.cards.remove(position));
         }
         selected.reverse();
         selected
+    }
+
+    pub(crate) fn reorder(&mut self, order: &[usize]) -> bool {
+        if !crate::core::selection::valid_permutation(order, self.cards.len()) {
+            return false;
+        }
+        let mut old = std::mem::take(&mut self.cards)
+            .into_iter()
+            .map(Some)
+            .collect::<Vec<_>>();
+        self.cards = order
+            .iter()
+            .map(|&index| old[index].take().unwrap())
+            .collect();
+        true
+    }
+
+    pub(crate) fn take_cards(&mut self) -> Vec<Card> {
+        std::mem::take(&mut self.cards)
     }
 }

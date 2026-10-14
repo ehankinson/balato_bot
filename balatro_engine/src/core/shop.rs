@@ -5,8 +5,8 @@ use crate::core::game::GameState;
 use crate::core::joker::{Joker, UpdateEvent};
 use crate::core::joker_types::JokerKind;
 use crate::core::pack::{PackOpening, ShopPack, random_shop_pack, random_shop_playing_card};
+use chacha20::ChaCha12Rng;
 use rand::prelude::{IndexedRandom, RngExt};
-use rand::rngs::StdRng;
 
 pub(crate) const DEFAULT_REROLL_COST: u16 = 5;
 pub(crate) const SPECTRAL_CONSUMABLE_PRICE: u16 = 4;
@@ -67,7 +67,7 @@ impl ShopOfferWeights {
         }
     }
 
-    pub(crate) fn roll(self, rng: &mut StdRng) -> ShopOfferKind {
+    pub(crate) fn roll(self, rng: &mut ChaCha12Rng) -> ShopOfferKind {
         self.kind_for_roll(rng.random_range(0..self.total()))
     }
 }
@@ -96,6 +96,21 @@ pub(crate) enum ShopItem {
 }
 
 impl ShopItem {
+    pub(crate) fn validate_purchase(&self, state: &GameState) -> Result<(), ShopError> {
+        require_funds(state, self.price(state))?;
+        match self {
+            ShopItem::Joker { joker, .. } if !state.jokers.can_add(joker) => {
+                Err(ShopError::InventoryFull)
+            }
+            ShopItem::Consumable { .. }
+                if state.consumables.len() >= state.consumable_capacity() =>
+            {
+                Err(ShopError::InventoryFull)
+            }
+            _ => Ok(()),
+        }
+    }
+
     pub(crate) fn price(&self, state: &GameState) -> u16 {
         if state.jokers.modifiers().free_planets
             && matches!(
@@ -233,20 +248,7 @@ impl ShopState {
     ) -> Result<(), ShopError> {
         let item = self.items.get(index).ok_or(ShopError::InvalidOffer)?;
         let price = item.price(state);
-        require_funds(state, price)?;
-
-        match item {
-            ShopItem::Joker { .. } if !state.joker_has_room() => {
-                return Err(ShopError::InventoryFull);
-            }
-            ShopItem::Consumable { .. }
-                if state.consumables.len() >= state.consumable_capacity() =>
-            {
-                return Err(ShopError::InventoryFull);
-            }
-            ShopItem::Joker { .. } | ShopItem::Consumable { .. } | ShopItem::PlayingCard { .. } => {
-            }
-        }
+        item.validate_purchase(state)?;
 
         let item = self.items.remove(index);
         state.money -= price as i16;
@@ -420,8 +422,8 @@ fn available_spectral_cards(state: &GameState) -> Vec<Spectral> {
         .collect()
 }
 
-fn require_funds(state: &GameState, price: u16) -> Result<(), ShopError> {
-    if state.money >= price as i16 {
+pub(crate) fn require_funds(state: &GameState, price: u16) -> Result<(), ShopError> {
+    if i32::from(state.money) >= i32::from(price) {
         Ok(())
     } else {
         Err(ShopError::InsufficientFunds)

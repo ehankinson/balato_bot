@@ -8,8 +8,8 @@ use crate::core::game::GameState;
 use crate::core::hand::Hand;
 use crate::core::joker::{Joker, UpdateEvent};
 use crate::core::joker_types::{JokerEdition, JokerRarity};
+use chacha20::ChaCha12Rng;
 use rand::prelude::{IndexedRandom, IteratorRandom, RngExt};
-use rand::rngs::StdRng;
 
 pub(crate) const DEFAULT_CONSUMABLE_SLOTS: usize = 2;
 pub(crate) const DEFAULT_CONSUMABLE_PRICE: u16 = 3;
@@ -61,31 +61,43 @@ pub(crate) enum ConsumableUseError {
 #[derive(Default)]
 pub(crate) struct ConsumableTarget {
     pub(crate) hand_indices: Vec<usize>,
-    pub(crate) deck_indices: Vec<usize>,
-    pub(crate) joker_index: Option<usize>,
 }
 
 impl ConsumableTarget {
     pub(crate) fn hand(indices: impl Into<Vec<usize>>) -> ConsumableTarget {
         ConsumableTarget {
             hand_indices: indices.into(),
-            ..ConsumableTarget::default()
         }
+    }
+}
+
+/// The source stays owned until success; a normal owned source releases one
+/// slot, while a Negative source releases both an object and its extra slot.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct ConsumableUseSource {
+    pub(crate) inventory_index: Option<usize>,
+}
+
+impl ConsumableUseSource {
+    fn released_slots(self, state: &GameState) -> usize {
+        self.inventory_index
+            .and_then(|index| state.consumables.get(index))
+            .map_or(0, |owned| usize::from(!owned.negative))
     }
 
-    pub(crate) fn deck(indices: impl Into<Vec<usize>>) -> ConsumableTarget {
-        ConsumableTarget {
-            deck_indices: indices.into(),
-            ..ConsumableTarget::default()
-        }
+    pub(crate) fn room(self, state: &GameState) -> usize {
+        state
+            .consumable_capacity()
+            .saturating_add(self.released_slots(state))
+            .saturating_sub(state.consumables.len())
     }
+}
 
-    pub(crate) fn joker(index: usize) -> ConsumableTarget {
-        ConsumableTarget {
-            joker_index: Some(index),
-            ..ConsumableTarget::default()
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ConsumableTargets {
+    pub(crate) minimum: usize,
+    pub(crate) maximum: usize,
+    pub(crate) ordered: bool,
 }
 
 pub(crate) fn planet_upgrade_values(hand: PokerHand) -> (u16, u16) {
@@ -124,14 +136,101 @@ pub(crate) fn judgement_edition(roll: u16) -> JokerEdition {
 }
 
 impl Consumable {
+    pub(crate) fn targets(self) -> ConsumableTargets {
+        let (minimum, maximum, ordered) = match self {
+            Consumable::Tarot(Magician | Empress | Hierophant | Strength | HangedMan) => {
+                (1, 2, false)
+            }
+            Consumable::Tarot(Lovers | Chariot | Justice | Devil | Tower)
+            | Consumable::Spectral(Talisman | Aura | DejaVu | Trance | Medium | Cryptid) => {
+                (1, 1, false)
+            }
+            Consumable::Tarot(Star | Moon | Sun | World) => (1, 3, false),
+            Consumable::Tarot(Death) => (2, 2, true),
+            _ => (0, 0, false),
+        };
+        ConsumableTargets {
+            minimum,
+            maximum,
+            ordered,
+        }
+    }
+
+    pub(crate) fn validate_use(
+        self,
+        state: &GameState,
+        hand: &Hand,
+        target: &ConsumableTarget,
+        source: ConsumableUseSource,
+    ) -> Result<(), ConsumableUseError> {
+        let limits = self.targets();
+        validate_hand_target(hand, target, limits.maximum, limits.minimum)?;
+        self.validate_availability(state, hand, source)
+    }
+
+    /// Read-only rule checks. Random outcomes are never sampled here.
+    pub(crate) fn validate_availability(
+        self,
+        state: &GameState,
+        hand: &Hand,
+        source: ConsumableUseSource,
+    ) -> Result<(), ConsumableUseError> {
+        if hand.cards().len() < self.targets().minimum {
+            return Err(ConsumableUseError::NoAvailableTarget);
+        }
+        match self {
+            Consumable::Tarot(Fool) => {
+                let previous = state
+                    .last_consumable
+                    .ok_or(ConsumableUseError::NoPreviousConsumable)?;
+                if !previous.negative && source.room(state) == 0 {
+                    return Err(ConsumableUseError::NoCapacity);
+                }
+            }
+            Consumable::Tarot(HighPriestess | Emperor) if source.room(state) == 0 => {
+                return Err(ConsumableUseError::NoCapacity);
+            }
+            Consumable::Tarot(Judgement) | Consumable::Spectral(Wraith | Soul) => {
+                require_joker_room(state)?
+            }
+            Consumable::Tarot(WheelOfFortune) | Consumable::Spectral(Ectoplasm | Hex) => {
+                if state.jokers.as_slice().is_empty() {
+                    return Err(ConsumableUseError::NoAvailableTarget);
+                }
+            }
+            Consumable::Spectral(Ankh) => {
+                if state.jokers.as_slice().is_empty() {
+                    return Err(ConsumableUseError::NoAvailableTarget);
+                }
+                if !(0..state.jokers.as_slice().len())
+                    .any(|index| state.jokers.can_duplicate_after_destroy_others(index))
+                {
+                    return Err(ConsumableUseError::NoCapacity);
+                }
+            }
+            Consumable::Spectral(Familiar | Grim | Incantation | Sigil | Ouija)
+                if hand.cards().is_empty() =>
+            {
+                return Err(ConsumableUseError::NoAvailableTarget);
+            }
+            Consumable::Spectral(Immolate) if hand.cards().len() < 5 => {
+                return Err(ConsumableUseError::NoAvailableTarget);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub(crate) fn apply(
         self,
         state: &mut GameState,
         hand: &mut Hand,
         target: &ConsumableTarget,
+        source: ConsumableUseSource,
     ) -> Result<(), ConsumableUseError> {
+        self.validate_use(state, hand, target, source)?;
         match self {
-            Consumable::Tarot(card) => apply_tarot(card, state, hand, target),
+            Consumable::Tarot(card) => apply_tarot(card, state, hand, target, source),
             Consumable::Planet(card) => apply_planet(card, state),
             Consumable::Spectral(card) => apply_spectral(card, state, hand, target),
         }
@@ -143,20 +242,20 @@ fn apply_tarot(
     state: &mut GameState,
     hand: &mut Hand,
     target: &ConsumableTarget,
+    source: ConsumableUseSource,
 ) -> Result<(), ConsumableUseError> {
     match card {
         Fool => {
             if state.last_consumable.is_none() {
                 return Err(ConsumableUseError::NoPreviousConsumable);
             }
-            require_consumable_room(state, 1)?;
             state
                 .consumables
                 .push(state.last_consumable.expect("checked above"));
         }
         Magician => apply_hand_enhancement(state, hand, target, 2, Enhancement::Lucky)?,
-        HighPriestess => add_random_consumables(state, 2, ConsumableKind::Planet)?,
-        Emperor => add_random_consumables(state, 2, ConsumableKind::Tarot)?,
+        HighPriestess => add_random_consumables(state, 2, ConsumableKind::Planet, source)?,
+        Emperor => add_random_consumables(state, 2, ConsumableKind::Tarot, source)?,
         Empress => apply_hand_enhancement(state, hand, target, 2, Enhancement::Mult)?,
         Hierophant => apply_hand_enhancement(state, hand, target, 2, Enhancement::Bonus)?,
         Lovers => apply_hand_enhancement(state, hand, target, 1, Enhancement::Wild)?,
@@ -250,12 +349,14 @@ fn apply_spectral(
                     &[Rank::Jack, Rank::Queen, Rank::King],
                     &mut state.rng,
                 ));
+                state.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
             }
         }
         Grim => {
             destroy_random_hand_card(state, hand)?;
             for _ in 0..2 {
                 hand.add_card(random_card(&[Rank::Ace], &mut state.rng));
+                state.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
             }
         }
         Incantation => {
@@ -275,6 +376,7 @@ fn apply_spectral(
                     ],
                     &mut state.rng,
                 ));
+                state.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
             }
         }
         Talisman => apply_hand_seal(hand, target, Seal::Gold)?,
@@ -336,32 +438,21 @@ fn apply_spectral(
             state.money = state.money.saturating_add(20);
         }
         Ankh => {
-            let index = random_joker_index(state)?;
+            // No effects have been applied yet. Rewind only this random choice
+            // if its survivor capacity check rejects the command.
+            let position = state.rng.get_word_pos();
+            let index = (0..state.jokers.as_slice().len())
+                .choose(&mut state.rng)
+                .ok_or(ConsumableUseError::NoAvailableTarget)?;
+            if !state.jokers.can_duplicate_after_destroy_others(index) {
+                state.rng.set_word_pos(position);
+                return Err(ConsumableUseError::NoCapacity);
+            }
             let mut joker = state
                 .jokers
                 .clone_at(index)
                 .expect("validated Joker target");
             joker.clear_negative_edition();
-            let survivors = state
-                .jokers
-                .as_slice()
-                .iter()
-                .enumerate()
-                .filter(|(position, entry)| *position == index || entry.is_eternal())
-                .count();
-            let surviving_negative_slots = state
-                .jokers
-                .as_slice()
-                .iter()
-                .enumerate()
-                .filter(|(position, entry)| {
-                    (*position == index || entry.is_eternal())
-                        && entry.edition() == JokerEdition::Negative
-                })
-                .count();
-            if survivors >= state.jokers.capacity() + surviving_negative_slots {
-                return Err(ConsumableUseError::NoCapacity);
-            }
             state.jokers.destroy_other_jokers(index);
             state.jokers.add(joker);
         }
@@ -383,8 +474,10 @@ fn apply_spectral(
                 .card(indices[0])
                 .cloned()
                 .expect("validated hand target");
-            hand.add_card(card.clone());
-            hand.add_card(card);
+            for card in [card.clone(), card] {
+                hand.add_card(card);
+                state.update_jokers(UpdateEvent::DeckChanged { cards_added: 1 });
+            }
         }
         Soul => {
             require_joker_room(state)?;
@@ -407,11 +500,9 @@ fn add_random_consumables(
     state: &mut GameState,
     maximum: usize,
     kind: ConsumableKind,
+    source: ConsumableUseSource,
 ) -> Result<(), ConsumableUseError> {
-    let room = state
-        .consumable_capacity()
-        .saturating_add(1)
-        .saturating_sub(state.consumables.len());
+    let room = source.room(state);
     if room == 0 {
         return Err(ConsumableUseError::NoCapacity);
     }
@@ -468,17 +559,11 @@ fn add_random_consumables(
                 .expect("planet choices are non-empty"),
             ),
         };
-        state.add_consumable_during_use(consumable)?;
+        let mut owned = OwnedConsumable::new(consumable, DEFAULT_CONSUMABLE_PRICE);
+        owned.apply_discount(state.shop_discount_percent);
+        state.consumables.push(owned);
     }
     Ok(())
-}
-
-fn require_consumable_room(state: &GameState, amount: usize) -> Result<(), ConsumableUseError> {
-    if state.consumables.len() + amount > state.consumable_capacity().saturating_add(1) {
-        Err(ConsumableUseError::NoCapacity)
-    } else {
-        Ok(())
-    }
 }
 
 fn require_joker_room(state: &GameState) -> Result<(), ConsumableUseError> {
@@ -506,7 +591,7 @@ fn validate_hand_target(
         return Err(ConsumableUseError::InvalidTarget);
     }
     if indices.iter().enumerate().any(|(position, index)| {
-        *index >= hand.hand_size() as usize || indices[..position].contains(index)
+        *index >= hand.cards().len() || indices[..position].contains(index)
     }) {
         return Err(ConsumableUseError::InvalidTarget);
     }
@@ -605,7 +690,7 @@ fn next_rank(rank: Rank) -> Rank {
     }
 }
 
-fn random_card(ranks: &[Rank], rng: &mut StdRng) -> Card {
+fn random_card(ranks: &[Rank], rng: &mut ChaCha12Rng) -> Card {
     let rank = ranks
         .choose(rng)
         .copied()
@@ -634,9 +719,10 @@ fn destroy_random_hand_card(
     state: &mut GameState,
     hand: &mut Hand,
 ) -> Result<(), ConsumableUseError> {
-    let index = (0..hand.hand_size() as usize)
+    let index = (0..hand.cards().len())
         .choose(&mut state.rng)
         .ok_or(ConsumableUseError::NoAvailableTarget)?;
+    remap_destroyed_target(state, &[index]);
     let card = hand
         .remove_card_at(index)
         .expect("validated random hand target");
@@ -645,10 +731,19 @@ fn destroy_random_hand_card(
 }
 
 fn destroy_hand_cards(state: &mut GameState, hand: &mut Hand, mut indices: Vec<usize>) {
+    remap_destroyed_target(state, &indices);
     indices.sort_unstable_by(|left, right| right.cmp(left));
     for index in indices {
         if let Some(card) = hand.remove_card_at(index) {
             state.update_jokers(UpdateEvent::CardDestroyed { card: &card });
         }
     }
+}
+
+fn remap_destroyed_target(state: &mut GameState, removed: &[usize]) {
+    state.blind.forced_card_index = state
+        .blind
+        .forced_card_index
+        .filter(|index| !removed.contains(index))
+        .map(|index| index - removed.iter().filter(|&&removed| removed < index).count());
 }
