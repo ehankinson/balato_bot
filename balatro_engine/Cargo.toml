@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 chacha20 = { version = "0.10.2", default-features = false, features = ["rng"] }
 itertools = "0.15.0"
+numpy = "0.29.0"
 pyo3 = { version = "0.29.0", features = ["extension-module"] }
 rand = "0.10.3"
 use-combinatorics = "0.0.6"

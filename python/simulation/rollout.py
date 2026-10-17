@@ -1,537 +1,183 @@
-import random
+"""Retained variable-length snapshots and exact conditional decoding traces."""
+
 from dataclasses import dataclass
-from multiprocessing import get_context
-from multiprocessing.connection import Connection
-from time import perf_counter
 
 import torch
 
-from calculation.poker_discards import generate_discard_table
-from calculation.poker_eval import find_best_hand_type
-from calculation.score import get_best_scoring_hand
-from core.enums import HandAction
-from core.models import Card, Deck, GameState
-from simulation.blind_env import ActionMasks
-from simulation.blind_trainer import BlindModel
-from simulation.decoder import build_mask, model_decoder_batch
-from simulation.encoder import encode_game_state
-from simulation.reward import (
-    calculate_hand_value_reward,
-    calculate_score_progress_reward,
-    calculate_terminal_reward,
-)
+from simulation.decoder import ActionTrace, decode_action
 
 
-@dataclass(slots=True)
-class GameSlot:
-    deck: Deck
-    game_state: GameState
-    hand: list[Card]
-    steps: int = 0
-    active: bool = True
+@dataclass(frozen=True)
+class Transition:
+    observation: dict
+    next_observation: dict
+    trace: ActionTrace
+    old_log_prob: float
+    old_value: float
+    reward: float
+    accepted: bool
+    terminated: bool
+    truncated: bool
+    error: str | None
 
 
-@dataclass(slots=True)
-class SharedRolloutBuffers:
-    """Fixed shared-memory storage indexed by [round, episode]."""
-
-    observations: torch.Tensor
-    mode_masks: torch.Tensor
-    count_masks: torch.Tensor
-    card_masks: torch.Tensor
-    valid: torch.Tensor
-    modes: torch.Tensor
-    counts: torch.Tensor
-    cards: torch.Tensor
-    card_valid: torch.Tensor
-    played_hand_types: torch.Tensor
-    old_log_probs: torch.Tensor
-    old_values: torch.Tensor
-    rewards: torch.Tensor
-    won: torch.Tensor
-    final_scores: torch.Tensor
-    final_targets: torch.Tensor
-    hands_used: torch.Tensor
-    score_seconds: torch.Tensor
-    discard_seconds: torch.Tensor
-    encode_seconds: torch.Tensor
-    env_seconds: torch.Tensor
-
-    @classmethod
-    def create(
-        cls,
-        rollout_rounds: int,
-        episode_count: int,
-        input_size: int,
-    ) -> "SharedRolloutBuffers":
-        def shared(*shape: int, dtype: torch.dtype) -> torch.Tensor:
-            return torch.zeros(shape, dtype=dtype).share_memory_()
-
-        prefix = (rollout_rounds, episode_count)
-        return cls(
-            observations=shared(*prefix, input_size, dtype=torch.float32),
-            mode_masks=shared(*prefix, 2, dtype=torch.float32),
-            count_masks=shared(*prefix, 5, dtype=torch.float32),
-            card_masks=shared(*prefix, 8, dtype=torch.float32),
-            valid=shared(*prefix, dtype=torch.bool),
-            modes=shared(*prefix, dtype=torch.long),
-            counts=shared(*prefix, dtype=torch.long),
-            cards=shared(*prefix, 5, dtype=torch.long),
-            card_valid=shared(*prefix, 5, dtype=torch.float32),
-            played_hand_types=shared(*prefix, dtype=torch.long),
-            old_log_probs=shared(*prefix, dtype=torch.float32),
-            old_values=shared(*prefix, dtype=torch.float32),
-            rewards=shared(*prefix, dtype=torch.float32),
-            won=shared(*prefix, dtype=torch.bool),
-            final_scores=shared(*prefix, dtype=torch.float64),
-            final_targets=shared(*prefix, dtype=torch.float64),
-            hands_used=shared(*prefix, dtype=torch.long),
-            score_seconds=shared(*prefix, dtype=torch.float64),
-            discard_seconds=shared(*prefix, dtype=torch.float64),
-            encode_seconds=shared(*prefix, dtype=torch.float64),
-            env_seconds=shared(*prefix, dtype=torch.float64),
-        )
-
-    def clear(self) -> None:
-        self.valid.zero_()
-        self.rewards.zero_()
-        self.won.zero_()
-        self.played_hand_types.fill_(-1)
-        self.final_scores.zero_()
-        self.final_targets.zero_()
-        self.hands_used.zero_()
-        self.score_seconds.zero_()
-        self.discard_seconds.zero_()
-        self.encode_seconds.zero_()
-        self.env_seconds.zero_()
-
-
-@dataclass(frozen=True, slots=True)
-class RolloutTimings:
-    rollout_seconds: float
-    inference_seconds: float
-    inference_batches: int
-
-
-@dataclass(slots=True)
-class RolloutBatch:
-    observations: torch.Tensor
-    modes: torch.Tensor
-    counts: torch.Tensor
-    cards: torch.Tensor
-    card_valid: torch.Tensor
-    played_hand_types: torch.Tensor
-    old_log_probs: torch.Tensor
-    old_values: torch.Tensor
-    rewards: torch.Tensor
-    mode_masks: torch.Tensor
-    count_masks: torch.Tensor
-    card_masks: torch.Tensor
-    episode_ids: torch.Tensor
-    terminal_scores: torch.Tensor
-    terminal_targets: torch.Tensor
-    terminal_wins: torch.Tensor
-    terminal_hands_used: torch.Tensor
-    score_seconds: float
-    discard_seconds: float
-    encoding_seconds: float
-    environment_seconds: float
-
-    @classmethod
-    def from_buffers(
-        cls,
-        buffers: SharedRolloutBuffers,
-        episode_count: int,
-        max_steps: int,
-    ) -> "RolloutBatch":
-        valid = buffers.valid
-        episode_grid = torch.arange(episode_count).expand(max_steps, -1)
-        terminal_mask = buffers.final_targets > 0
-        return cls(
-            observations=buffers.observations[valid],
-            modes=buffers.modes[valid],
-            counts=buffers.counts[valid],
-            cards=buffers.cards[valid],
-            card_valid=buffers.card_valid[valid],
-            played_hand_types=buffers.played_hand_types[valid],
-            old_log_probs=buffers.old_log_probs[valid],
-            old_values=buffers.old_values[valid],
-            rewards=buffers.rewards[valid],
-            mode_masks=buffers.mode_masks[valid],
-            count_masks=buffers.count_masks[valid],
-            card_masks=buffers.card_masks[valid],
-            episode_ids=episode_grid[valid],
-            terminal_scores=buffers.final_scores[terminal_mask],
-            terminal_targets=buffers.final_targets[terminal_mask],
-            terminal_wins=buffers.won[terminal_mask],
-            terminal_hands_used=buffers.hands_used[terminal_mask],
-            score_seconds=float(buffers.score_seconds[valid].sum()),
-            discard_seconds=float(buffers.discard_seconds[valid].sum()),
-            encoding_seconds=float(buffers.encode_seconds[valid].sum()),
-            environment_seconds=float(buffers.env_seconds[valid].sum()),
-        )
+@dataclass(frozen=True)
+class Episode:
+    transitions: tuple[Transition, ...]
+    bootstrap_value: float
+    end_reason: str
+    accepted_commands: int
 
     @property
-    def total_steps(self) -> int:
-        return len(self.rewards)
-
-    @property
-    def completed_episodes(self) -> int:
-        return len(self.terminal_scores)
+    def final_observation(self):
+        return self.transitions[-1].next_observation
 
 
-def worker_distribution(
-    episode_count: int,
-    worker_count: int,
-) -> tuple[list[int], list[int]]:
-    base, remainder = divmod(episode_count, worker_count)
-    counts = [base + int(worker < remainder) for worker in range(worker_count)]
-    offsets: list[int] = []
-    offset = 0
-    for count in counts:
-        offsets.append(offset)
-        offset += count
-    return counts, offsets
-
-
-def _write_observations(
-    slots: list[GameSlot],
-    buffers: SharedRolloutBuffers,
-    round_index: int,
-    episode_offset: int,
-    profile: bool,
-) -> int:
-    active_count = 0
-    with torch.inference_mode():
-        for local_episode, slot in enumerate(slots):
-            if not slot.active:
-                continue
-
-            episode = episode_offset + local_episode
-            started = perf_counter()
-            best_hand = get_best_scoring_hand(slot.hand, [], slot.game_state)
-            scored = perf_counter()
-            discard_table = generate_discard_table(slot.deck, slot.hand)
-            discarded = perf_counter()
-            observation = encode_game_state(
-                slot.hand,
-                slot.game_state,
-                best_hand,
-                discard_table,
-            )
-            masks = build_mask(slot.game_state, slot.hand, torch.device("cpu"))
-            encoded = perf_counter()
-
-            if profile:
-                buffers.score_seconds[round_index, episode] = scored - started
-                buffers.discard_seconds[round_index, episode] = discarded - scored
-                buffers.encode_seconds[round_index, episode] = encoded - discarded
-
-            buffers.observations[round_index, episode].copy_(observation)
-            buffers.mode_masks[round_index, episode].copy_(masks.mode)
-            buffers.count_masks[round_index, episode].copy_(masks.count)
-            buffers.card_masks[round_index, episode].copy_(masks.card)
-            buffers.valid[round_index, episode] = True
-            active_count += 1
-
-    return active_count
-
-
-def _create_game_slots(
-    episode_count: int,
-    episode_offset: int,
-    batch_seed: int,
-    score_to_beat: int,
-) -> list[GameSlot]:
-    slots: list[GameSlot] = []
-    for local_episode in range(episode_count):
-        random.seed(batch_seed + episode_offset + local_episode)
-        deck = Deck()
-        game_state = GameState(score_to_beat=score_to_beat)
-        hand = deck.draw(game_state.hand_size)
-        slots.append(GameSlot(deck=deck, game_state=game_state, hand=hand))
-    return slots
-
-
-def _apply_shared_actions(
-    slots: list[GameSlot],
-    buffers: SharedRolloutBuffers,
-    round_index: int,
-    episode_offset: int,
-    max_steps: int,
-    profile: bool,
-) -> bool:
-    for local_episode, slot in enumerate(slots):
-        if not slot.active:
-            continue
-
-        episode = episode_offset + local_episode
-        started = perf_counter()
-        mode = HandAction(int(buffers.modes[round_index, episode]))
-        count = int(buffers.counts[round_index, episode])
-        card_indices = [
-            int(index) for index in buffers.cards[round_index, episode, :count]
-        ]
-        selected_cards = [slot.hand[index] for index in card_indices]
-        for selected_card in selected_cards:
-            slot.hand.remove(selected_card)
-
-        score_before = slot.game_state.current_score
-        has_won = slot.game_state.execute_hand_action(
-            mode,
-            selected_cards,
-            slot.hand,
-            slot.deck,
-        )
-        slot.steps += 1
-
-        if mode == HandAction.PLAY_HAND:
-            hand_stats, _scored_cards = find_best_hand_type(selected_cards)
-            buffers.played_hand_types[round_index, episode] = int(hand_stats.name)
-            buffers.rewards[round_index, episode] += calculate_score_progress_reward(
-                score_before,
-                slot.game_state,
-            )
-            buffers.rewards[round_index, episode] += calculate_hand_value_reward(
-                hand_stats.name
-            )
-
-        is_terminal = has_won or slot.game_state.hands == 0 or slot.steps >= max_steps
-        if is_terminal:
-            buffers.rewards[round_index, episode] += calculate_terminal_reward(
-                slot.game_state
-            )
-            slot.active = False
-            buffers.won[round_index, episode] = has_won
-            buffers.final_scores[round_index, episode] = (
-                slot.game_state.current_score
-            )
-            buffers.final_targets[round_index, episode] = (
-                slot.game_state.score_to_beat
-            )
-            buffers.hands_used[round_index, episode] = (
-                slot.game_state.hands_played
-            )
-
-        if profile:
-            buffers.env_seconds[round_index, episode] = perf_counter() - started
-
-    return any(slot.active for slot in slots)
-
-
-def _expect(connection: Connection, *commands: str) -> tuple[str, object]:
-    """Receive the next message, asserting it is one of the expected commands."""
-    command, payload = connection.recv()
-    if command not in commands:
-        raise RuntimeError(f"unexpected actor command: {command}")
-    return command, payload
-
-
-def rollout_actor(
-    connection: Connection,
-    buffers: SharedRolloutBuffers,
-    episode_count: int,
-    episode_offset: int,
-    score_to_beat: int,
-    max_steps: int,
-    profile: bool,
-) -> None:
-    """Own a group of games while the main process performs GPU inference."""
-    torch.set_num_threads(1)
+def collect_episode(model, env, seed, stochastic=True):
+    observation = env.reset(seed)
+    transitions = []
+    was_training = model.training
+    model.eval()
     try:
-        while True:
-            command, payload = _expect(connection, "start", "close")
-            if command == "close":
-                return
-
-            slots = _create_game_slots(
-                episode_count,
-                episode_offset,
-                int(payload),
-                score_to_beat,
+        with torch.no_grad():
+            while not env.done:
+                output = model([observation])
+                decoded = decode_action(
+                    model, output, env.game, observation, stochastic
+                )
+                result = env.step(decoded.trace.command)
+                if not result.accepted and decoded.trace.source_known:
+                    raise RuntimeError(
+                        f"Rust rejected a guaranteed-legal decoded command: {result.error}"
+                    )
+                transitions.append(
+                    Transition(
+                        observation,
+                        result.observation,
+                        decoded.trace,
+                        float(decoded.log_prob),
+                        float(output.value[0]),
+                        result.reward,
+                        result.accepted,
+                        result.terminated,
+                        result.truncated,
+                        result.error,
+                    )
+                )
+                observation = result.observation
+            bootstrap = (
+                0.0 if result.terminated else float(model([observation]).value[0])
             )
-            for round_index in range(max_steps):
-                active_count = _write_observations(
-                    slots,
-                    buffers,
-                    round_index,
-                    episode_offset,
-                    profile,
-                )
-                connection.send(("observations_ready", active_count))
-
-                command, _action_payload = _expect(
-                    connection, "actions_ready", "close"
-                )
-                if command == "close":
-                    return
-
-                still_active = _apply_shared_actions(
-                    slots,
-                    buffers,
-                    round_index,
-                    episode_offset,
-                    max_steps,
-                    profile,
-                )
-                connection.send(("results_ready", still_active))
-                if not still_active:
-                    break
     finally:
-        connection.close()
+        model.train(was_training)
+    return Episode(
+        tuple(transitions), bootstrap, result.end_reason, env.accepted_commands
+    )
 
 
-class RolloutPool:
-    def __init__(
-        self,
-        episode_count: int,
-        worker_count: int,
-        worker_targets: list[int],
-        max_steps: int,
-        input_size: int,
-        profile: bool,
-    ) -> None:
-        self.episode_count = episode_count
-        self.worker_count = worker_count
-        self.max_steps = max_steps
-        self.profile = profile
-        self.buffers = SharedRolloutBuffers.create(
-            max_steps,
-            episode_count,
-            input_size,
+def collect_episodes(model, env, stochastic=True):
+    """Advance live slots together. Finished observations survive until explicit reset."""
+    from simulation.decoder import decode_action_batch
+
+    transitions = [[] for _ in env.states]
+    completed = [None for _ in env.states]
+    was_training = model.training
+    model.eval()
+    try:
+        with torch.no_grad():
+            while env.active.any():
+                observations = env.snapshots
+                active = env.active
+                output = model(observations)
+                decoded = decode_action_batch(
+                    model, output, env.games, observations, active, stochastic
+                )
+                # Transfer statistics together, rather than reading a GPU scalar per slot.
+                stats = (
+                    torch.stack((decoded.log_probs, output.value), -1)
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
+                results = env.step(decoded.commands)
+                for index, result in enumerate(results.results):
+                    if result is None:
+                        continue
+                    trace = decoded.traces[index]
+                    if not result.accepted and trace.source_known:
+                        raise RuntimeError(
+                            f"Rust rejected a guaranteed-legal decoded command: {result.error}"
+                        )
+                    transitions[index].append(
+                        Transition(
+                            observations[index],
+                            result.observation,
+                            trace,
+                            float(stats[index, 0]),
+                            float(stats[index, 1]),
+                            result.reward,
+                            result.accepted,
+                            result.terminated,
+                            result.truncated,
+                            result.error,
+                        )
+                    )
+                finished = [
+                    index
+                    for index, result in enumerate(results.results)
+                    if result is not None and (result.terminated or result.truncated)
+                ]
+                truncated = [
+                    index for index in finished if results.results[index].truncated
+                ]
+                bootstrap = {}
+                if truncated:
+                    values = (
+                        model([env.snapshots[index] for index in truncated])
+                        .value.detach()
+                        .cpu()
+                        .numpy()
+                    )
+                    bootstrap = dict(zip(truncated, values.tolist()))
+                for index in finished:
+                    completed[index] = Episode(
+                        tuple(transitions[index]),
+                        bootstrap.get(index, 0.0),
+                        results.results[index].end_reason,
+                        env.states[index].accepted_commands,
+                    )
+    finally:
+        model.train(was_training)
+    return completed
+
+
+def collect_runs(
+    model,
+    seeds,
+    decks,
+    stakes,
+    horizon,
+    batch_size=16,
+    max_consecutive_rejections=32,
+    rewards=None,
+    stochastic=True,
+):
+    from simulation.env import BatchEnv
+
+    if batch_size <= 0:
+        raise ValueError("rollout batch size must be positive")
+    if not (len(seeds) == len(decks) == len(stakes)):
+        raise ValueError("run configuration lengths differ")
+    episodes = []
+    for start in range(0, len(seeds), batch_size):
+        stop = start + batch_size
+        env = BatchEnv(
+            seeds[start:stop],
+            decks[start:stop],
+            stakes[start:stop],
+            horizon,
+            max_consecutive_rejections,
+            rewards,
         )
-        worker_counts, worker_offsets = worker_distribution(
-            episode_count,
-            worker_count,
-        )
-        context = get_context("spawn")
-        self.connections: list[Connection] = []
-        self.processes = []
-        for worker in range(worker_count):
-            parent_connection, child_connection = context.Pipe()
-            process = context.Process(
-                target=rollout_actor,
-                args=(
-                    child_connection,
-                    self.buffers,
-                    worker_counts[worker],
-                    worker_offsets[worker],
-                    worker_targets[worker],
-                    max_steps,
-                    profile,
-                ),
-            )
-            process.start()
-            child_connection.close()
-            self.connections.append(parent_connection)
-            self.processes.append(process)
-
-    def _await_observations(self, active_workers: list[int]) -> None:
-        for worker in active_workers:
-            _expect(self.connections[worker], "observations_ready")
-
-    def _run_inference(
-        self,
-        round_index: int,
-        model: BlindModel,
-        device: torch.device,
-    ) -> float:
-        """Batch every live episode into one GPU call, write actions back."""
-        inference_started = perf_counter()
-        active_mask = self.buffers.valid[round_index]
-        observations = self.buffers.observations[round_index, active_mask].to(
-            device
-        )
-        masks = ActionMasks(
-            mode=self.buffers.mode_masks[round_index, active_mask].to(device),
-            count=self.buffers.count_masks[round_index, active_mask].to(device),
-            card=self.buffers.card_masks[round_index, active_mask].to(device),
-        )
-        model.eval()
-        with torch.inference_mode():
-            outputs = model(observations)
-            (
-                modes,
-                counts,
-                cards,
-                card_valid,
-                log_probs,
-                _entropies,
-            ) = model_decoder_batch(outputs, masks, stochastic=True)
-            values = outputs["value"]
-
-        self.buffers.modes[round_index, active_mask] = modes.cpu()
-        self.buffers.counts[round_index, active_mask] = counts.cpu()
-        self.buffers.cards[round_index, active_mask] = cards.cpu()
-        self.buffers.card_valid[round_index, active_mask] = card_valid.cpu()
-        self.buffers.old_log_probs[round_index, active_mask] = log_probs.cpu()
-        self.buffers.old_values[round_index, active_mask] = values.cpu()
-
-        elapsed = perf_counter() - inference_started
-        return elapsed if self.profile else 0.0
-
-    def _dispatch_actions(self, active_workers: list[int]) -> list[int]:
-        """Send actions to workers, then collect which workers still have
-        live games and return them as the next round's active set."""
-        for worker in active_workers:
-            self.connections[worker].send(("actions_ready", None))
-
-        still_active: list[int] = []
-        for worker in active_workers:
-            _, payload = _expect(self.connections[worker], "results_ready")
-            if payload:
-                still_active.append(worker)
-        return still_active
-
-    def collect(
-        self,
-        model: BlindModel,
-        device: torch.device,
-        batch_seed: int,
-    ) -> tuple[RolloutBatch, RolloutTimings]:
-        started = perf_counter()
-        self.buffers.clear()
-        for connection in self.connections:
-            connection.send(("start", batch_seed))
-
-        active_workers = list(range(self.worker_count))
-        inference_batches = 0
-        inference_seconds = 0.0
-        round_index = 0
-        while active_workers:
-            self._await_observations(active_workers)
-            inference_seconds += self._run_inference(round_index, model, device)
-            active_workers = self._dispatch_actions(active_workers)
-            inference_batches += 1
-            round_index += 1
-
-        batch = RolloutBatch.from_buffers(
-            self.buffers,
-            self.episode_count,
-            self.max_steps,
-        )
-        timings = RolloutTimings(
-            rollout_seconds=perf_counter() - started,
-            inference_seconds=inference_seconds,
-            inference_batches=inference_batches,
-        )
-        return batch, timings
-
-    def close(self) -> None:
-        for connection in self.connections:
-            try:
-                connection.send(("close", None))
-            except (BrokenPipeError, EOFError):
-                pass
-            connection.close()
-        for process in self.processes:
-            process.join(timeout=5)
-            if process.is_alive():
-                process.terminate()
-                process.join()
-
-    def __enter__(self) -> "RolloutPool":
-        return self
-
-    def __exit__(self, *_args) -> None:
-        self.close()
+        episodes.extend(collect_episodes(model, env, stochastic))
+    return episodes

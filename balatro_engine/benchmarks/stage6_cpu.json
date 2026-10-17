@@ -1,0 +1,326 @@
+{
+  "python": "3.14.6",
+  "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "torch": "2.12.0",
+  "numpy": "2.4.4",
+  "engine_build_profile": "release",
+  "device": "cpu",
+  "cuda_available": false,
+  "mps_available": false,
+  "torch_threads": 1,
+  "seed": 0,
+  "model_config": {
+    "width": 64,
+    "heads": 4,
+    "depth": 2
+  },
+  "resource_limits": {
+    "max_collection_rows": 512,
+    "max_tokens": 1024,
+    "max_batch_attention_cells": 4194304
+  },
+  "notes": "Untrained seeded policy; continuous retained rollouts with explicit resets. Excludes PPO updates. Constraint timing is a subset of decoding, not additive. No asynchronous overlap or buffer reuse.",
+  "cases": [
+    {
+      "batch_size": 1,
+      "median_attempts_per_second": 453.302748595133,
+      "runs": [
+        {
+          "batch_size": 1,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 32,
+          "accepted_commands": 32,
+          "attempts_per_second": 438.3661557266194,
+          "accepted_commands_per_second": 438.3661557266194,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.007429724064422771,
+            "tensor_conversion_seconds": 0.7688593832426704,
+            "device_transfer_seconds": 0.018729104340309277,
+            "inference_seconds": 0.9325091778009664,
+            "decoding_seconds": 0.4566874704323709,
+            "constraint_binding_seconds": 0.021643143554683775,
+            "statistics_transfer_seconds": 0.0038983744161669165,
+            "rollout_storage_seconds": 0.0019504477677401155,
+            "end_to_end_seconds": 2.2811980052210856,
+            "command_decode_seconds": 0.0007149375,
+            "engine_step_seconds": 0.00217965625,
+            "observation_encode_seconds": 0.014343781249999996,
+            "array_export_seconds": 0.035751218749999994,
+            "binding_overhead_seconds": 0.0008046822774745517,
+            "python_bookkeeping_seconds": 0.03459240906522609
+          },
+          "phase_counts": {
+            "1": 22,
+            "0": 9,
+            "3": 1
+          }
+        },
+        {
+          "batch_size": 1,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 32,
+          "accepted_commands": 32,
+          "attempts_per_second": 454.91567384815363,
+          "accepted_commands_per_second": 454.91567384815363,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.007157526852097362,
+            "tensor_conversion_seconds": 0.7489257513952907,
+            "device_transfer_seconds": 0.01813938797567971,
+            "inference_seconds": 0.9154634681181051,
+            "decoding_seconds": 0.42103375744773075,
+            "constraint_binding_seconds": 0.019118433556286618,
+            "statistics_transfer_seconds": 0.0035911616578232497,
+            "rollout_storage_seconds": 0.0017056518117897213,
+            "end_to_end_seconds": 2.1982095968269277,
+            "command_decode_seconds": 0.0005937500000000001,
+            "engine_step_seconds": 0.0018671249999999994,
+            "observation_encode_seconds": 0.012587375000000001,
+            "array_export_seconds": 0.030179718750000004,
+            "binding_overhead_seconds": 0.0006443101107701662,
+            "python_bookkeeping_seconds": 0.03392716098460369
+          },
+          "phase_counts": {
+            "1": 22,
+            "0": 9,
+            "3": 1
+          }
+        },
+        {
+          "batch_size": 1,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 32,
+          "accepted_commands": 32,
+          "attempts_per_second": 453.302748595133,
+          "accepted_commands_per_second": 453.302748595133,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.007248665497172624,
+            "tensor_conversion_seconds": 0.7537525780207943,
+            "device_transfer_seconds": 0.019612005417002365,
+            "inference_seconds": 0.9134999418165535,
+            "decoding_seconds": 0.4238138171785977,
+            "constraint_binding_seconds": 0.019779952708631754,
+            "statistics_transfer_seconds": 0.0034701224649325013,
+            "rollout_storage_seconds": 0.0018294340407010168,
+            "end_to_end_seconds": 2.2060311857785564,
+            "command_decode_seconds": 0.0006054062500000001,
+            "engine_step_seconds": 0.0020924374999999997,
+            "observation_encode_seconds": 0.012459593750000001,
+            "array_export_seconds": 0.0297876875,
+            "binding_overhead_seconds": 0.0007033272146638491,
+            "python_bookkeeping_seconds": 0.034682259865803644
+          },
+          "phase_counts": {
+            "1": 22,
+            "0": 9,
+            "3": 1
+          }
+        }
+      ]
+    },
+    {
+      "batch_size": 4,
+      "median_attempts_per_second": 933.1172087927105,
+      "runs": [
+        {
+          "batch_size": 4,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 128,
+          "accepted_commands": 128,
+          "attempts_per_second": 907.56513714385,
+          "accepted_commands_per_second": 907.56513714385,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.009218108061759267,
+            "tensor_conversion_seconds": 0.3385403515494545,
+            "device_transfer_seconds": 0.005087546924187336,
+            "inference_seconds": 0.45938346374896355,
+            "decoding_seconds": 0.23219885770231485,
+            "constraint_binding_seconds": 0.014016197383170947,
+            "statistics_transfer_seconds": 0.0011227166396565735,
+            "rollout_storage_seconds": 0.001067405719368253,
+            "end_to_end_seconds": 1.1018492878065445,
+            "command_decode_seconds": 0.00027604687500000003,
+            "engine_step_seconds": 0.0015302812500000002,
+            "observation_encode_seconds": 0.011495429687499998,
+            "array_export_seconds": 0.011368148437500003,
+            "binding_overhead_seconds": 0.0002828830674672501,
+            "python_bookkeeping_seconds": 0.02940528156614164
+          },
+          "phase_counts": {
+            "1": 103,
+            "0": 24,
+            "3": 1
+          }
+        },
+        {
+          "batch_size": 4,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 128,
+          "accepted_commands": 128,
+          "attempts_per_second": 933.1172087927105,
+          "accepted_commands_per_second": 933.1172087927105,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.00892283242137637,
+            "tensor_conversion_seconds": 0.31998306440073065,
+            "device_transfer_seconds": 0.0049147120080306195,
+            "inference_seconds": 0.4547812368400628,
+            "decoding_seconds": 0.22907388483872637,
+            "constraint_binding_seconds": 0.013804788977722637,
+            "statistics_transfer_seconds": 0.0011975707820965908,
+            "rollout_storage_seconds": 0.0010410085451439954,
+            "end_to_end_seconds": 1.0716767310441355,
+            "command_decode_seconds": 0.000257484375,
+            "engine_step_seconds": 0.0013825078124999996,
+            "observation_encode_seconds": 0.010734710937500001,
+            "array_export_seconds": 0.010669593749999998,
+            "binding_overhead_seconds": 0.000223588023814373,
+            "python_bookkeeping_seconds": 0.027596999643719755
+          },
+          "phase_counts": {
+            "1": 103,
+            "0": 24,
+            "3": 1
+          }
+        },
+        {
+          "batch_size": 4,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 128,
+          "accepted_commands": 128,
+          "attempts_per_second": 943.8959728063313,
+          "accepted_commands_per_second": 943.8959728063313,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.008750972483539954,
+            "tensor_conversion_seconds": 0.32198371627600864,
+            "device_transfer_seconds": 0.005010751920053735,
+            "inference_seconds": 0.44928254374099197,
+            "decoding_seconds": 0.2218743447883753,
+            "constraint_binding_seconds": 0.013401153410086408,
+            "statistics_transfer_seconds": 0.001081680238712579,
+            "rollout_storage_seconds": 0.001016602254821919,
+            "end_to_end_seconds": 1.0594387822493445,
+            "command_decode_seconds": 0.0002679140624999999,
+            "engine_step_seconds": 0.0012988437499999999,
+            "observation_encode_seconds": 0.010666335937499999,
+            "array_export_seconds": 0.010277968749999998,
+            "binding_overhead_seconds": 0.00022526094440557067,
+            "python_bookkeeping_seconds": 0.026847637855098583
+          },
+          "phase_counts": {
+            "1": 103,
+            "0": 24,
+            "3": 1
+          }
+        }
+      ]
+    },
+    {
+      "batch_size": 16,
+      "median_attempts_per_second": 1426.8616745304244,
+      "runs": [
+        {
+          "batch_size": 16,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 512,
+          "accepted_commands": 512,
+          "attempts_per_second": 1426.8616745304244,
+          "accepted_commands_per_second": 1426.8616745304244,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.018079750134347705,
+            "tensor_conversion_seconds": 0.20908748865622329,
+            "device_transfer_seconds": 0.0014023455605638446,
+            "inference_seconds": 0.33277555917266,
+            "decoding_seconds": 0.09707804065328673,
+            "constraint_binding_seconds": 0.009460618002776755,
+            "statistics_transfer_seconds": 0.0002981723810080439,
+            "rollout_storage_seconds": 0.0007359215032920474,
+            "end_to_end_seconds": 0.7008387833593588,
+            "command_decode_seconds": 0.00010326757812499999,
+            "engine_step_seconds": 0.000942712890625,
+            "observation_encode_seconds": 0.010071857421875002,
+            "array_export_seconds": 0.005378345703125001,
+            "binding_overhead_seconds": 8.006174970814049e-05,
+            "python_bookkeeping_seconds": 0.024500492145307362
+          },
+          "phase_counts": {
+            "1": 339,
+            "0": 160,
+            "3": 11,
+            "2": 2
+          }
+        },
+        {
+          "batch_size": 16,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 512,
+          "accepted_commands": 512,
+          "attempts_per_second": 1426.0449792929141,
+          "accepted_commands_per_second": 1426.0449792929141,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.017218431139554013,
+            "tensor_conversion_seconds": 0.207987793146458,
+            "device_transfer_seconds": 0.0013396852409641724,
+            "inference_seconds": 0.33415307825634954,
+            "decoding_seconds": 0.09802897102417774,
+            "constraint_binding_seconds": 0.009508616813036497,
+            "statistics_transfer_seconds": 0.00030232877179514617,
+            "rollout_storage_seconds": 0.0007540613751189085,
+            "end_to_end_seconds": 0.7012401533756929,
+            "command_decode_seconds": 0.000112220703125,
+            "engine_step_seconds": 0.0009580156249999998,
+            "observation_encode_seconds": 0.009956382812500001,
+            "array_export_seconds": 0.0053002890625,
+            "binding_overhead_seconds": 8.039508887368751e-05,
+            "python_bookkeeping_seconds": 0.024734703174544848
+          },
+          "phase_counts": {
+            "1": 339,
+            "0": 160,
+            "3": 11,
+            "2": 2
+          }
+        },
+        {
+          "batch_size": 16,
+          "iterations": 32,
+          "warmup": 4,
+          "attempts": 512,
+          "accepted_commands": 512,
+          "attempts_per_second": 1441.1494815642611,
+          "accepted_commands_per_second": 1441.1494815642611,
+          "milliseconds_per_attempt": {
+            "reset_seconds": 0.016769771491453866,
+            "tensor_conversion_seconds": 0.20641520495701116,
+            "device_transfer_seconds": 0.0013408964605332585,
+            "inference_seconds": 0.33090568331317627,
+            "decoding_seconds": 0.09700601367512718,
+            "constraint_binding_seconds": 0.009501623708274565,
+            "statistics_transfer_seconds": 0.0003083487172261812,
+            "rollout_storage_seconds": 0.000711993379809428,
+            "end_to_end_seconds": 0.6938905455626809,
+            "command_decode_seconds": 0.00010848046874999999,
+            "engine_step_seconds": 0.0009362011718750001,
+            "observation_encode_seconds": 0.009698246093749998,
+            "array_export_seconds": 0.005058595703124999,
+            "binding_overhead_seconds": 9.358154229063072e-05,
+            "python_bookkeeping_seconds": 0.024198566507038777
+          },
+          "phase_counts": {
+            "1": 339,
+            "0": 160,
+            "3": 11,
+            "2": 2
+          }
+        }
+      ]
+    }
+  ]
+}

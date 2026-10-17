@@ -418,7 +418,11 @@ fn hook_does_not_use_the_first_discard_for_burnt_or_trading_card() {
     assert_eq!(s.blind.discards_used, 0);
     assert_eq!(
         s.hand_score(PokerHand::HighCard),
-        HandScore { chips: 5, mult: 1 }
+        HandScore {
+            level: 1,
+            chips: 5,
+            mult: 1
+        }
     );
     s.deal_cards(&mut h);
     h.cards_mut()[0].set_rank(Rank::Two);
@@ -426,6 +430,10 @@ fn hook_does_not_use_the_first_discard_for_burnt_or_trading_card() {
     assert_eq!((s.money, owned(&s, &h)), (3, 51));
     assert_eq!(
         s.hand_score(PokerHand::HighCard),
-        HandScore { chips: 15, mult: 2 }
+        HandScore {
+            level: 2,
+            chips: 15,
+            mult: 2
+        }
     );
 }

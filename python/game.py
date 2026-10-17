@@ -2,28 +2,18 @@ import time
 
 import mss
 import pyautogui
-from PIL import Image, ImageGrab
-
 from config.settings import (
-    CASH_OUT_X,
-    CASH_OUT_Y,
     HAND_CROP_LEFT,
     HAND_CROP_TOP,
     HAND_HEIGHT,
     HAND_WIDTH,
-    NEXT_ROUND_X,
-    NEXT_ROUND_Y,
     PLAY_HAND_X,
     PLAY_HAND_Y,
-    SELECT_BLIND_1_X,
-    SELECT_BLIND_1_Y,
-    SELECT_BLIND_2_X,
-    SELECT_BLIND_2_Y,
 )
 from core.enums import HandAction
-from core.models import Card, CardData, Deck, FinalScoringResults, GameState
-from model import preload_models
-from vision import get_card_locations, get_played_hand
+from core.models import CardData
+from PIL import Image, ImageGrab
+from vision import get_selected_cards
 
 count = 0
 
@@ -75,77 +65,16 @@ def play_hand(played_hand: list[CardData], mode: HandAction) -> None:
     pyautogui.click()
 
 
-def play_blind(deck: Deck, game_state: GameState) -> None:
-    hand = []
-    while game_state.hands > 0:
-        hand_img = get_hand()
-        hand_img.save("tmp.png")
-        selected_data, mode, hand = get_played_hand(hand_img, deck, game_state)
-        for card in hand:
-            print(card)
-        time.sleep(2)
+def execute_card_command(command, observation):
+    """Execute an already decoded play/discard command against a synchronized UI.
 
-        selected_cards = [data.card for data in selected_data]
-        play_hand(selected_data, mode)
-        has_won = game_state.execute_hand_action(
-            mode, selected_cards, hand, deck, draw=False
-        )
-
-        if mode == HandAction.PLAY_HAND:
-            card_time = 0.5
-            time.sleep(1.85 + card_time * len(selected_data))
-        else:
-            time.sleep(1)
-
-        if has_won:
-            break
-
-    deck.add_to_discard_pile(hand)
+    This function only clicks cards. The owner must synchronize the Rust game
+    after successful UI execution; full-game UI synchronization is separate.
+    """
+    selected = get_selected_cards(get_hand(), command, observation)
+    mode = HandAction.PLAY_HAND if command.kind == 2 else HandAction.DISCARD
+    play_hand(selected, mode)
 
 
 if __name__ == "__main__":
-    deck = Deck()
-    things_to_do = 100
-    game_state = GameState(score_to_beat=0)
-    scores_to_beat = [300, 450]
-    score_index = 0
-    preload_models()
-
-    for _ in range(things_to_do):
-        if score_index == 2:
-            pyautogui.keyDown("r")
-            time.sleep(3)
-            pyautogui.keyUp("r")
-            score_index = 0
-
-        if score_index == 0:
-            pyautogui.moveTo(SELECT_BLIND_1_X, SELECT_BLIND_1_Y)
-        else:
-            pyautogui.moveTo(SELECT_BLIND_2_X, SELECT_BLIND_2_Y)
-
-        print("Moved to the select blind_button")
-        time.sleep(0.05)
-        pyautogui.click()
-        time.sleep(2)
-
-        game_state.score_to_beat = scores_to_beat[score_index]
-        print("Playing Blind")
-        play_blind(deck, game_state)
-
-        score_index += 1
-
-        card_to_deck = 0.15
-        time.sleep(card_to_deck * len(deck.discards))
-        time.sleep(1.25)
-        print("Moving to CashOUT")
-        pyautogui.moveTo(CASH_OUT_X, CASH_OUT_Y)
-        pyautogui.click()
-
-        deck.reset()
-        game_state.reset()
-
-        time.sleep(1)
-        print("Moving to Next Round in the SHOP")
-        pyautogui.moveTo(NEXT_ROUND_X, NEXT_ROUND_Y)
-        pyautogui.click()
-        time.sleep(0.75)
+    screenshot_primary("tmp.png")

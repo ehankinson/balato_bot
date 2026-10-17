@@ -47,7 +47,7 @@ fn pk04_bean_expiry_removes_it_once_and_does_not_keep_shrinking_hand_size() {
         g.state.begin_blind_as(BlindKind::Small);
         g.state.blind.chips_scored = g.state.blind.score_requirement;
         g.state.finish_blind(&Hand::new()).unwrap();
-        assert_eq!(g.state.hand_size(), 8 + (4i8 - round).max(0));
+        assert_eq!(g.state.hand_size(), 8 + (4i64 - round).max(0));
     }
     assert!(g.state.jokers.as_slice().is_empty());
 }
@@ -94,7 +94,11 @@ fn pk08_full_inventory_celestial_option_is_used_and_grows_constellation_once() {
     assert_eq!(g.state.counters.planet_cards_used, 1);
     assert_eq!(
         g.state.hand_score(PokerHand::HighCard),
-        HandScore { chips: 15, mult: 2 }
+        HandScore {
+            level: 2,
+            chips: 15,
+            mult: 2
+        }
     );
     assert!((score_mult(&mut g) - 2.2).abs() < 0.0001);
 }
@@ -219,7 +223,11 @@ fn ge02_copied_perkeo_adds_two_plutos_without_usage_growth_then_observatory_scor
     assert_eq!(g.state.counters.planet_cards_used, 0);
     assert_eq!(
         g.state.hand_score(PokerHand::HighCard),
-        HandScore { chips: 5, mult: 1 }
+        HandScore {
+            level: 1,
+            chips: 5,
+            mult: 1
+        }
     );
     assert!((score_mult(&mut g) - 3.375).abs() < 0.0001);
 }

@@ -387,13 +387,13 @@ fn anaglyph_gains_one_double_tag_only_at_boss_completion() {
     state.begin_blind_as(BlindKind::Small);
     state.blind.chips_scored = state.blind.score_requirement;
     state.finish_blind(&Hand::new()).unwrap();
-    assert!(state.tags.held().is_empty());
+    assert!(state.tags.pending().is_empty());
     state.begin_blind_as(BlindKind::Boss(BossBlinds::Hook));
     state.blind.chips_scored = state.blind.score_requirement;
     state.finish_blind(&Hand::new()).unwrap();
-    assert_eq!(state.tags.held(), &[SkipTag::Double]);
+    assert_eq!(state.tags.pending(), &[SkipTag::Double]);
     assert!(state.finish_blind(&Hand::new()).is_none());
-    assert_eq!(state.tags.held().len(), 1);
+    assert_eq!(state.tags.pending().len(), 1);
 }
 
 #[test]

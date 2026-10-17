@@ -23,6 +23,9 @@ pub(crate) struct OwnedConsumable {
 }
 
 impl OwnedConsumable {
+    pub(crate) fn offer_sell_value(price: u16, discount: u8) -> u16 {
+        Self::discounted_price(price, discount) / 2
+    }
     pub(crate) fn new(consumable: Consumable, original_price: u16) -> OwnedConsumable {
         OwnedConsumable {
             consumable,
@@ -40,8 +43,12 @@ impl OwnedConsumable {
     }
 
     pub(crate) fn apply_discount(&mut self, discount_percent: u8) {
+        self.current_price = Self::discounted_price(self.original_price, discount_percent);
+    }
+
+    fn discounted_price(price: u16, discount_percent: u8) -> u16 {
         let remaining_percent = 100u32.saturating_sub(discount_percent as u32);
-        self.current_price = ((self.original_price as u32 * remaining_percent) / 100).max(1) as u16;
+        ((price as u32 * remaining_percent) / 100).max(1) as u16
     }
 
     pub(crate) fn sell_value(&self) -> u16 {
@@ -726,6 +733,7 @@ fn destroy_random_hand_card(
     let card = hand
         .remove_card_at(index)
         .expect("validated random hand target");
+    state.deck.record_destruction(&card);
     state.update_jokers(UpdateEvent::CardDestroyed { card: &card });
     Ok(())
 }
@@ -735,6 +743,7 @@ fn destroy_hand_cards(state: &mut GameState, hand: &mut Hand, mut indices: Vec<u
     indices.sort_unstable_by(|left, right| right.cmp(left));
     for index in indices {
         if let Some(card) = hand.remove_card_at(index) {
+            state.deck.record_destruction(&card);
             state.update_jokers(UpdateEvent::CardDestroyed { card: &card });
         }
     }

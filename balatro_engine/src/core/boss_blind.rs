@@ -327,17 +327,7 @@ impl BlindState {
     }
 
     pub(crate) fn reward(&self) -> u8 {
-        match self.kind {
-            BlindKind::Small => {
-                if self.stake == Stakes::White {
-                    3
-                } else {
-                    0
-                }
-            }
-            BlindKind::Big => 4,
-            BlindKind::Boss(boss) => boss.rule().reward,
-        }
+        self.kind.reward(self.stake)
     }
 
     pub(crate) fn disable_boss_ability(&mut self) {
@@ -410,6 +400,20 @@ impl BlindState {
 }
 
 impl BlindKind {
+    pub(crate) fn reward(self, stake: Stakes) -> u8 {
+        match self {
+            BlindKind::Small => {
+                if stake == Stakes::White {
+                    3
+                } else {
+                    0
+                }
+            }
+            BlindKind::Big => 4,
+            BlindKind::Boss(boss) => boss.rule().reward,
+        }
+    }
+
     pub(crate) fn score_requirement(self, stake: Stakes, ante: u8, disabled: bool) -> u64 {
         let requirements = score_requirements(stake, ante);
         match self {
@@ -422,7 +426,7 @@ impl BlindKind {
                     } else {
                         boss.rule().target_multiplier
                     };
-                requirements[2] / 2 * u64::from(multiplier)
+                (requirements[2] / 2).saturating_mul(u64::from(multiplier))
             }
         }
     }

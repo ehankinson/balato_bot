@@ -13,9 +13,22 @@ fn apply_tag(state: &mut GameState, tag: SkipTag) {
 }
 
 #[test]
-fn double_tag_copies_every_other_tag() {
+fn double_tag_copies_pending_tag_effects() {
     for tag in SkipTag::ALL {
-        if tag == SkipTag::Double {
+        if !matches!(
+            tag,
+            SkipTag::Uncommon
+                | SkipTag::Rare
+                | SkipTag::Negative
+                | SkipTag::Foil
+                | SkipTag::Holographic
+                | SkipTag::Polychrome
+                | SkipTag::Investment
+                | SkipTag::Voucher
+                | SkipTag::Coupon
+                | SkipTag::Juggle
+                | SkipTag::D6
+        ) {
             continue;
         }
         let mut state = GameState::new(tag as u64 + 100);
@@ -24,7 +37,7 @@ fn double_tag_copies_every_other_tag() {
 
         let copies = state
             .tags
-            .held()
+            .pending()
             .iter()
             .filter(|held| **held == tag)
             .count();
@@ -225,5 +238,5 @@ fn investment_tag_pays_at_the_next_boss_payout() {
 
 #[test]
 fn tag_state_starts_empty() {
-    assert!(TagState::new().held().is_empty());
+    assert!(TagState::new().pending().is_empty());
 }

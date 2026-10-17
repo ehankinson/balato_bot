@@ -1,4 +1,5 @@
 pub(crate) mod action;
+pub(crate) mod batch;
 pub(crate) mod blind;
 pub(crate) mod blind_selector;
 pub(crate) mod boss_blind;
@@ -10,6 +11,7 @@ pub(crate) mod game;
 pub(crate) mod hand;
 pub(crate) mod joker;
 pub(crate) mod joker_types;
+pub(crate) mod observation;
 pub(crate) mod pack;
 pub(crate) mod selection;
 pub(crate) mod shop;

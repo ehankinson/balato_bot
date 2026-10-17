@@ -29,6 +29,18 @@ pub struct Card {
     last_played_ante: Option<u8>,
     scoring_values: ScoringValues,
     id: u16,
+    concealed_properties: Option<CardProperties>,
+}
+
+/// Inspectable composition without pile membership, debuffs or play history.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct CardProperties {
+    pub(crate) rank: Rank,
+    pub(crate) suit: Suit,
+    pub(crate) enhancement: Enhancement,
+    pub(crate) edition: Edition,
+    pub(crate) seal: Seal,
+    pub(crate) bonuses: ScoringValues,
 }
 
 impl Card {
@@ -52,6 +64,7 @@ impl Card {
             last_played_ante: None,
             scoring_values: ScoringValues::default(),
             id: id,
+            concealed_properties: None,
         }
     }
 
@@ -115,7 +128,28 @@ impl Card {
     }
 
     pub(crate) fn set_face_down(&mut self, face_down: bool) {
+        if face_down && !self.face_down {
+            self.concealed_properties = Some(self.properties());
+        } else if !face_down {
+            self.concealed_properties = None;
+        }
         self.face_down = face_down;
+    }
+
+    fn properties(&self) -> CardProperties {
+        CardProperties {
+            rank: self.rank,
+            suit: self.suit,
+            enhancement: self.enhancement,
+            edition: self.edition,
+            seal: self.seal,
+            bonuses: self.scoring_values,
+        }
+    }
+
+    pub(crate) fn inspectable_properties(&self) -> CardProperties {
+        self.concealed_properties
+            .unwrap_or_else(|| self.properties())
     }
 
     pub(crate) fn scoring_values(&self) -> ScoringValues {

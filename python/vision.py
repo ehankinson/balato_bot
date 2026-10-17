@@ -1,32 +1,17 @@
-import os
-
-import torch
-from PIL import Image
-
-from calculation.poker_discards import generate_discard_table
-from calculation.score import get_best_scoring_hand
 from config.model_registry import LOCATION_MODEL
 from config.settings import (
     EDITION_CROP,
     ENHANCEMENT_CROP,
     RANK_CROP,
-    ROOT_DIR,
     SEAL_CROP,
     SUIT_CROP,
 )
-from core.enums import Edition, Enhancement, HandAction, Rank, Seal, Suit
-from core.models import Card, CardData, Deck, GameState
-from model import preload_models, run_model
-from simulation.blind_trainer import BlindModel
-from simulation.decoder import build_mask, model_decoder
-from simulation.encoder import encode_game_state
+from core.enums import Edition, Enhancement, Rank, Seal, Suit
+from core.models import Card, CardData
+from model import run_model
+from PIL import Image
 from utils.images import card_crop
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-BLIND_MODEL_CHECKPOINT = torch.load(os.path.join(ROOT_DIR, "models", "blind_model.pt"), map_location="cuda")
-BLIND_MODEL = BlindModel(BLIND_MODEL_CHECKPOINT["input_size"], BLIND_MODEL_CHECKPOINT["hidden_size"]).to(DEVICE)
-BLIND_MODEL.load_state_dict(BLIND_MODEL_CHECKPOINT["state_dict"])
-BLIND_MODEL.eval()
 
 def get_card_locations(img: Image.Image, save_path: str | None = None):
     results = LOCATION_MODEL(img)
@@ -67,9 +52,8 @@ def get_card_information(card_images: list[Image.Image]) -> list[Card]:
                 card_image.crop(card_crop(w, h, feature_map[feature]["crop"]))
             )
 
-    for feature in feature_map:
-        outputs = run_model(feature, feature_map[feature]["values"])
-        feature_map[feature]["values"] = outputs
+    for feature, properties in feature_map.items():
+        properties["values"] = run_model(feature, properties["values"])
 
     for i in range(len(card_images)):
         cards.append(
@@ -85,65 +69,26 @@ def get_card_information(card_images: list[Image.Image]) -> list[Card]:
     return cards
 
 
-def get_played_hand(
-    img: Image.Image, deck: Deck, game_state: GameState
-) -> tuple[list[CardData], HandAction, list[Card]]:
-    card_locations = []
-    results = LOCATION_MODEL(img, verbose=False)
+def get_selected_cards(img, command, observation):
+    """Map a completed Rust-policy card command onto detected screen positions.
 
-    for res in results:
-        for box in res.boxes:
-            print(box.conf)
-            if float(box.conf) < 0.9:
-                continue
-
-            if int(box.cls) != 0:
-                continue
-
-            location = [float(val) for val in box.xyxy[0]]
-            card_locations.append(location)
-
-    card_locations.sort(key=lambda x: x[0])
-
-    card_images = []
-    for i, location in enumerate(card_locations):
-        card_image = img.crop(location)
-        card_images.append(card_image)
-
-    hand = get_card_information(card_images)
-    deck.filter(hand)
-
-    best_hand = get_best_scoring_hand(hand, [], game_state)
-    discard_table = generate_discard_table(deck, hand)
-    encoded_state = encode_game_state(hand, game_state, best_hand, discard_table)
-
-    outputs = BLIND_MODEL(encoded_state.unsqueeze(0).to(DEVICE))
-    masks = build_mask(game_state, hand, DEVICE)
-    mode, _, card_indices, _, _ = model_decoder(
-        outputs, masks, DEVICE, stochastic=False
-    )
-
-    return_data = []
-    selected_cards = [hand[index] for index in sorted(card_indices)]
-
-    for card in selected_cards:
-        index = hand.index(card)
-        card_location = card_locations[index]
-        return_data.append(CardData(card=card, location=card_location))
-
-    for card in selected_cards:
-        hand.remove(card)
-
-    return return_data, mode, hand
-
-
-if __name__ == "__main__":
-    img = Image.open("/home/hank/projects/balatro_bot/python/tmp.png").convert("RGB")
-    print(img.size)
-    get_card_locations(img, save_path="tmp_annotated.png")
-    deck = Deck()
-    game_state = GameState(score_to_beat=300)
-    _, _, hand = get_played_hand(img, deck, game_state)
-
-    for card in hand:
-        print(card)
+    The caller supplies the synchronized full-game observation; a screenshot of
+    the hand alone cannot supply the policy's inventory, deck, or run context.
+    """
+    if command.kind not in (2, 3) or command.targets is None:
+        raise ValueError("screen card selection requires a play/discard command")
+    locations = []
+    for result in LOCATION_MODEL(img, verbose=False):
+        for box in result.boxes:
+            if float(box.conf) >= 0.9 and int(box.cls) == 0:
+                locations.append([float(value) for value in box.xyxy[0]])
+    locations.sort(key=lambda location: location[0])
+    if len(locations) != len(observation["hand.present"]):
+        raise ValueError("detected hand does not match the supplied Rust observation")
+    if any(index < 0 or index >= len(locations) for index in command.targets):
+        raise ValueError("selected card is outside the detected hand")
+    cards = get_card_information([img.crop(location) for location in locations])
+    return [
+        CardData(card=cards[index], location=locations[index])
+        for index in command.targets
+    ]

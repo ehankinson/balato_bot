@@ -9,6 +9,7 @@ const DECK_SIZE: u8 = 52;
 const BASE_HAND_SIZE: i8 = 8;
 
 pub(crate) struct Deck {
+    composition_uncertain: bool,
     deck_type: Decks,
     hand_size_modifier: i8,
     starting_size: u16,
@@ -25,6 +26,7 @@ impl Deck {
         };
 
         Deck {
+            composition_uncertain: false,
             deck_type,
             hand_size_modifier,
             starting_size: cards.len() as u16,
@@ -78,6 +80,14 @@ impl Deck {
         &self.cards
     }
 
+    pub(crate) fn record_destruction(&mut self, card: &Card) {
+        self.composition_uncertain |= card.is_face_down();
+    }
+
+    pub(crate) fn composition_uncertain(&self) -> bool {
+        self.composition_uncertain
+    }
+
     pub(crate) fn discarded_cards(&self) -> &[Card] {
         &self.discarded_cards
     }
@@ -117,8 +127,8 @@ impl Deck {
         self.starting_size
     }
 
-    pub(crate) fn hand_size(&self) -> i8 {
-        BASE_HAND_SIZE + self.hand_size_modifier
+    pub(crate) fn hand_size(&self) -> i32 {
+        i32::from(BASE_HAND_SIZE) + i32::from(self.hand_size_modifier)
     }
 
     pub(crate) fn discard_modifier(&self) -> i8 {

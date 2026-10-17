@@ -26,6 +26,7 @@ use rand::{RngExt, SeedableRng};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HandScore {
+    pub(crate) level: u64,
     pub(crate) chips: u16,
     pub(crate) mult: u16,
 }
@@ -40,27 +41,63 @@ pub(crate) struct BlindPayout {
 }
 
 pub(crate) const BASE_HAND_SCORES: [HandScore; 12] = [
-    HandScore { chips: 5, mult: 1 },
-    HandScore { chips: 10, mult: 2 },
-    HandScore { chips: 30, mult: 3 },
-    HandScore { chips: 60, mult: 7 },
     HandScore {
+        level: 1,
+        chips: 5,
+        mult: 1,
+    },
+    HandScore {
+        level: 1,
+        chips: 10,
+        mult: 2,
+    },
+    HandScore {
+        level: 1,
+        chips: 30,
+        mult: 3,
+    },
+    HandScore {
+        level: 1,
+        chips: 60,
+        mult: 7,
+    },
+    HandScore {
+        level: 1,
         chips: 120,
         mult: 12,
     },
-    HandScore { chips: 20, mult: 2 },
-    HandScore { chips: 30, mult: 4 },
-    HandScore { chips: 35, mult: 4 },
-    HandScore { chips: 40, mult: 4 },
     HandScore {
+        level: 1,
+        chips: 20,
+        mult: 2,
+    },
+    HandScore {
+        level: 1,
+        chips: 30,
+        mult: 4,
+    },
+    HandScore {
+        level: 1,
+        chips: 35,
+        mult: 4,
+    },
+    HandScore {
+        level: 1,
+        chips: 40,
+        mult: 4,
+    },
+    HandScore {
+        level: 1,
         chips: 100,
         mult: 8,
     },
     HandScore {
+        level: 1,
         chips: 140,
         mult: 14,
     },
     HandScore {
+        level: 1,
         chips: 160,
         mult: 16,
     },
@@ -80,6 +117,7 @@ pub(crate) struct GameCounters {
     pub(crate) used_planets: u16,
     pub(crate) sell_value_bonus: u8,
     pub(crate) poker_hands_played: [u32; 12],
+    pub(crate) ante_eight_cleared: bool,
 }
 
 impl GameCounters {
@@ -97,6 +135,7 @@ impl GameCounters {
             used_planets: 0,
             sell_value_bonus: 0,
             poker_hands_played: [0; 12],
+            ante_eight_cleared: false,
         }
     }
 }
@@ -316,8 +355,10 @@ impl GameState {
         state
     }
 
-    pub(crate) fn hand_size(&self) -> i8 {
-        self.deck.hand_size() + self.blind.hand_size_modifier + self.jokers.hand_size_modifier()
+    pub(crate) fn hand_size(&self) -> i64 {
+        i64::from(self.deck.hand_size())
+            + i64::from(self.blind.hand_size_modifier)
+            + self.jokers.hand_size_modifier()
     }
 
     pub(crate) fn consumable_capacity(&self) -> usize {
@@ -502,6 +543,7 @@ impl GameState {
 
         self.blind.finished = true;
         let is_boss = self.blind.kind.is_boss();
+        self.counters.ante_eight_cleared |= is_boss && self.blind.ante == 8;
         self.update_jokers(UpdateEvent::BlindCompleted { is_boss });
         if is_boss {
             self.update_jokers(UpdateEvent::BossBlindCompleted);
@@ -756,6 +798,7 @@ impl GameState {
 
     pub(crate) fn upgrade_hand_score(&mut self, hand: PokerHand, chips: u16, mult: u16) {
         let score = &mut self.hand_scores[hand as usize - 1];
+        score.level = score.level.saturating_add(1);
         score.chips = score.chips.saturating_add(chips);
         score.mult = score.mult.saturating_add(mult);
     }
@@ -763,9 +806,10 @@ impl GameState {
     pub(crate) fn downgrade_hand_score(&mut self, hand: PokerHand) -> bool {
         let score = &mut self.hand_scores[hand as usize - 1];
         let base = BASE_HAND_SCORES[hand as usize - 1];
-        if score.chips <= base.chips && score.mult <= base.mult {
+        if score.level <= 1 {
             return false;
         }
+        score.level -= 1;
         let (chips, mult) = crate::core::consumable::planet_upgrade_values(hand);
         score.chips = score.chips.saturating_sub(chips).max(base.chips);
         score.mult = score.mult.saturating_sub(mult).max(base.mult);
@@ -1288,6 +1332,7 @@ impl GameState {
             is_discard_action: counts_as_discard,
         });
         if effect.destroy_discarded_card {
+            self.deck.record_destruction(&discarded[0]);
             self.update_jokers(UpdateEvent::CardDestroyed {
                 card: &discarded[0],
             });
@@ -1752,8 +1797,9 @@ impl Game {
     fn begin_pack(&mut self, opening: PackOpening, previous_state: DecisionPoint) {
         if opening.has_hand() {
             self.reconcile_hand();
-            let size = (self.state.deck.hand_size() + self.state.jokers.hand_size_modifier()).max(0)
-                as usize;
+            let size = (i64::from(self.state.deck.hand_size())
+                + self.state.jokers.hand_size_modifier())
+            .max(0) as usize;
             self.state
                 .deck
                 .deal_cards(&mut self.hand, size, &mut self.state.rng);
@@ -1931,6 +1977,10 @@ mod game_flow_tests;
 #[cfg(test)]
 #[path = "tests/action_interface.rs"]
 mod action_interface_tests;
+
+#[cfg(test)]
+#[path = "tests/observation.rs"]
+mod observation_tests;
 
 #[cfg(test)]
 #[path = "tests/joker_modifiers.rs"]

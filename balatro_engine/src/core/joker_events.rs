@@ -589,13 +589,13 @@ impl Jokers {
         modifiers
     }
 
-    pub(crate) fn hand_size_modifier(&self) -> i8 {
+    pub(crate) fn hand_size_modifier(&self) -> i64 {
         self.jokers
             .iter()
             .filter(|joker| !joker.is_debuffed())
             .map(|joker| match &joker.structure {
-                JokerStructure::Normal(JokerData::GameState(data)) => data.hand_size,
-                JokerStructure::Normal(JokerData::Scoring(data)) => data.hand_size,
+                JokerStructure::Normal(JokerData::GameState(data)) => i64::from(data.hand_size),
+                JokerStructure::Normal(JokerData::Scoring(data)) => i64::from(data.hand_size),
                 _ => 0,
             })
             .sum()

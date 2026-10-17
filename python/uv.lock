@@ -18,6 +18,12 @@ wheels = [
 [[package]]
 name = "balatro-engine"
 source = { editable = "../balatro_engine" }
+dependencies = [
+    { name = "numpy" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "numpy", specifier = ">=1.23" }]
 
 [[package]]
 name = "certifi"

@@ -1,212 +1,292 @@
+from copy import deepcopy
+
+import numpy as np
 import pytest
 import torch
-
-from core.models import GameState
-from simulation.blind_env import ActionMasks
-from simulation.blind_trainer import BlindModel
-from simulation.decoder import (
-    evaluate_actions,
-    model_decoder,
-    model_decoder_batch,
+from simulation.encoder import (
+    TABLES,
+    ResourceLimits,
+    UnsupportedObservation,
+    tensor_observation,
 )
-from simulation.reward import (
-    calculate_game_score,
-    calculate_score_progress_reward,
-    calculate_terminal_reward,
+from simulation.policy import GamePolicy, ModelConfig
+
+import balatro_engine as engine
+
+
+@pytest.fixture(scope="module", autouse=True)
+def single_threaded():
+    previous = torch.get_num_threads()
+    torch.set_num_threads(1)
+    yield
+    torch.set_num_threads(previous)
+
+
+def observation(hand_size=8):
+    game = engine.new(0, deck=engine.Deck.Magic)
+    game.apply_action(engine.Action.SelectBlind, source=0)
+    result = game.observe()
+    for suffix in ("cat", "num", "flags", "present", "visible"):
+        key = f"hand.{suffix}"
+        result[key] = result[key][np.arange(hand_size) % 8].copy()
+    result["run.counts"][2] = result["run.counts"][9] = hand_size
+    return result
+
+
+def with_jokers(obs, count=2):
+    obs = deepcopy(obs)
+    for suffix, array in {
+        "cat": np.array([[103, 1, 0]] * count, dtype=np.int32),
+        "num": np.zeros((count, 1), dtype=np.float32),
+        "flags": np.zeros((count, 5), dtype=np.bool_),
+        "visible": np.ones((count, 9), dtype=np.bool_),
+        "present": np.ones(count, dtype=np.bool_),
+    }.items():
+        obs[f"jokers.{suffix}"] = array
+    return obs
+
+
+def model():
+    torch.manual_seed(7)
+    return GamePolicy(ModelConfig(width=16, heads=2, depth=1)).eval()
+
+
+def test_same_weights_keep_individual_rows_for_five_and_sixteen_cards():
+    policy = model()
+    output = policy([observation(5), observation(16), engine.new(1).observe()])
+    assert output.action_logits.shape == (3, 18)
+    assert output.value.shape == (3,)
+    assert torch.isfinite(output.value).all()
+    for index, size in enumerate([5, 16, 0]):
+        rows = output.objects(index, "hand")
+        assert rows.shape == (size, 16)
+        assert policy.selection_logits(rows, policy.query(output, index, 2)).shape == (
+            size + 1,
+        )
+    assert output.objects(2, "jokers").shape == (0, 16)
+
+
+def test_padding_and_other_games_do_not_change_valid_outputs():
+    policy = model()
+    short, long = observation(5), observation(16)
+    with torch.no_grad():
+        alone = policy([short])
+        batched = policy([short, long])
+        changed = deepcopy(long)
+        changed["run.num"][0] += 20
+        isolated = policy([short, changed])
+    for result in (batched, isolated):
+        torch.testing.assert_close(
+            alone.action_logits[0], result.action_logits[0], rtol=1e-5, atol=1e-6
+        )
+        torch.testing.assert_close(
+            alone.value[0], result.value[0], rtol=1e-5, atol=1e-6
+        )
+        for name in TABLES:
+            torch.testing.assert_close(
+                alone.objects(0, name), result.objects(0, name), rtol=1e-5, atol=1e-6
+            )
+
+
+def test_unknown_values_do_not_leak_and_known_zero_is_distinct():
+    policy = model()
+    hidden = observation()
+    hidden["hand.visible"][0, :8] = False
+    altered = deepcopy(hidden)
+    altered["hand.cat"][0] = 2**31 - 1
+    altered["hand.num"][0] = np.nan
+    expected, actual = policy([hidden]), policy([altered])
+    torch.testing.assert_close(expected.action_logits, actual.action_logits)
+    torch.testing.assert_close(expected.objects(0, "hand"), actual.objects(0, "hand"))
+    zero = deepcopy(hidden)
+    zero["hand.num"][0, 0] = 0
+    zero["hand.visible"][0, 5] = True
+    assert not torch.allclose(
+        expected.objects(0, "hand"), policy([zero]).objects(0, "hand")
+    )
+
+
+def test_catalogue_multiplicity_matters_but_its_order_is_not_draw_order():
+    policy = model()
+    obs = observation()
+    repeated = deepcopy(obs)
+    repeated["deck_multiplicity"][0] = 10
+    assert not torch.allclose(
+        policy([obs]).action_logits, policy([repeated]).action_logits
+    )
+    reversed_obs = deepcopy(obs)
+    for suffix in ("cat", "num", "flags", "present", "visible"):
+        key = f"deck_catalogue.{suffix}"
+        reversed_obs[key] = np.ascontiguousarray(reversed_obs[key][::-1])
+    reversed_obs["deck_multiplicity"] = reversed_obs["deck_multiplicity"][::-1].copy()
+    torch.testing.assert_close(
+        policy([obs]).action_logits,
+        policy([reversed_obs]).action_logits,
+        atol=1e-6,
+        rtol=1e-5,
+    )
+
+
+def test_hand_selection_depends_on_inventory_and_context_with_gradient_flow():
+    policy = model()
+    obs = with_jokers(observation())
+    output = policy([obs])
+    scores = policy.selection_logits(
+        output.objects(0, "hand"), policy.query(output, 0, 2)
+    )
+    scores[0].backward()
+    for name in ["hand", "jokers", "consumables", "run"]:
+        assert any(
+            parameter.grad is not None and parameter.grad.abs().sum() > 0
+            for parameter in policy.encoders[name].parameters()
+        ), name
+    assert policy.attention[0].self_attn.in_proj_weight.grad.abs().sum() > 0
+    assert policy.target_query.weight.grad.abs().sum() > 0
+    for key in ["jokers.cat", "consumables.cat", "run.num"]:
+        changed = deepcopy(obs)
+        if changed[key].ndim == 1:
+            changed[key][0] += 1
+        else:
+            changed[key][0, 0] += 1
+        actual = policy([changed])
+        new_scores = policy.selection_logits(
+            actual.objects(0, "hand"), policy.query(actual, 0, 2)
+        )
+        assert not torch.allclose(scores, new_scores), key
+
+
+@pytest.mark.parametrize(
+    "parent,collection", [(0, "jokers"), (1, "shop_items"), (2, "pack_options")]
 )
-
-
-def _outputs(mode: int) -> dict[str, torch.Tensor]:
-    mode_logits = [-10.0, -10.0]
-    mode_logits[mode] = 10.0
-    return {
-        "mode_logits": torch.tensor([mode_logits]),
-        "play_count_logits": torch.tensor([[0.0, 10.0, 0.0, 0.0, 0.0]]),
-        "discard_count_logits": torch.tensor([[0.0, 0.0, 0.0, 0.0, 10.0]]),
-        "play_card_logits": torch.tensor(
-            [[10.0, 9.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
-        ),
-        "discard_card_logits": torch.tensor(
-            [[0.0, 0.0, 0.0, 10.0, 9.0, 8.0, 7.0, 6.0]]
-        ),
-    }
-
-
-def _masks() -> ActionMasks:
-    return ActionMasks(
-        mode=torch.ones(2),
-        count=torch.ones(5),
-        card=torch.ones(8),
+def test_linked_joker_values_modify_the_correct_parent_before_attention(
+    parent, collection
+):
+    policy = model()
+    obs = with_jokers(observation())
+    if collection != "jokers":
+        for suffix, array in {
+            "cat": np.zeros((2, 10), dtype=np.int32),
+            "num": np.zeros((2, 5), dtype=np.float32),
+            "flags": np.zeros((2, 5), dtype=np.bool_),
+            "present": np.ones(2, dtype=np.bool_),
+            "visible": np.ones((2, 20), dtype=np.bool_),
+        }.items():
+            obs[f"{collection}.{suffix}"] = array
+    obs.update(
+        {
+            "joker_values.cat": np.array([[parent, 0, 1]], dtype=np.int32),
+            "joker_values.num": np.array([[3.0]], dtype=np.float32),
+            "joker_values.flags": np.empty((1, 0), dtype=np.bool_),
+            "joker_values.present": np.ones(1, dtype=np.bool_),
+            "joker_values.visible": np.ones((1, 4), dtype=np.bool_),
+        }
     )
-
-
-def test_decoder_uses_play_specific_count_and_card_heads():
-    mode, count, cards, _, _ = model_decoder(
-        _outputs(mode=0), _masks(), torch.device("cpu"), stochastic=False
+    inputs = []
+    handle = policy.attention[0].register_forward_pre_hook(
+        lambda _, args: inputs.append(args[0].detach().clone())
     )
-
-    assert int(mode) == 0
-    assert count == 2
-    assert cards == [0, 1]
-
-
-def test_decoder_uses_discard_specific_count_and_card_heads():
-    mode, count, cards, _, _ = model_decoder(
-        _outputs(mode=1), _masks(), torch.device("cpu"), stochastic=False
-    )
-
-    assert int(mode) == 1
-    assert count == 5
-    assert cards == [3, 4, 5, 6, 7]
-
-
-def test_reward_values_progress_and_wins_without_rewarding_discard_usage():
-    state = GameState(score_to_beat=400)
-    state.current_score = 100
-    state.discards_used = 3
-    state.discards = 0
-
-    assert calculate_score_progress_reward(0, state) == pytest.approx(0.0425)
-    assert calculate_terminal_reward(state) == -10.0
-    assert calculate_game_score(state) == -9.75
-
-    state.current_score = 400
-    state.hands = 2
-    state.hands_played = 2
-    assert calculate_score_progress_reward(100, state) == pytest.approx(0.1675)
-    assert calculate_terminal_reward(state) == pytest.approx(10.1)
-    assert calculate_game_score(state) == pytest.approx(11.1)
+    policy([obs])
+    other = deepcopy(obs)
+    other["joker_values.cat"][0, 1] = 1
+    policy([other])
+    handle.remove()
+    delta = (inputs[0] - inputs[1]).abs().sum(-1)[0]
+    offset = 4
+    for name in TABLES:
+        if name == collection:
+            break
+        offset += len(obs[f"{name}.present"])
+    assert torch.nonzero(delta).flatten().tolist() == [offset, offset + 1]
+    broken = deepcopy(obs)
+    broken["joker_values.cat"][0, 1] = 2
+    with pytest.raises(UnsupportedObservation, match="parent slot"):
+        policy([broken])
 
 
-def test_hand_cost_accumulates_across_every_play():
-    state = GameState(score_to_beat=300)
+def test_roles_and_positions_participate_and_poker_counts_are_attached():
+    policy = model()
+    obs = with_jokers(observation())
+    out = policy([obs])
+    # Identical owned Joker properties still have different slot representations.
+    assert not torch.allclose(out.objects(0, "jokers")[0], out.objects(0, "jokers")[1])
+    out.action_logits.sum().backward()
+    assert policy.roles.weight.grad.abs().sum() > 0
+    assert policy.positions.weight.grad.abs().sum() > 0
+    changed = deepcopy(obs)
+    changed["poker_hand_counts"][0] += 10
+    assert not torch.allclose(out.action_logits, policy([changed]).action_logits)
 
-    state.current_score = 50
-    first_weak_play = calculate_score_progress_reward(0, state)
 
-    state.current_score = 100
-    second_weak_play = calculate_score_progress_reward(50, state)
-
-    state.current_score = 300
-    winning_play = calculate_score_progress_reward(100, state)
-
-    assert first_weak_play == pytest.approx(13 / 600)
-    assert second_weak_play == pytest.approx(13 / 600)
-    assert winning_play == pytest.approx(11 / 75)
-    assert first_weak_play + second_weak_play + winning_play == pytest.approx(
-        0.19
+def test_adapter_keeps_categorical_dtype_and_does_not_retransform_rust_floats():
+    obs = observation()
+    rows = tensor_observation(obs)
+    assert rows["hand"].cat.dtype == torch.int32
+    assert rows["hand"].cat.data_ptr() == obs["hand.cat"].ctypes.data
+    np.testing.assert_array_equal(rows["hand"].num.numpy(), obs["hand.num"])
+    assert rows["deck_catalogue"].num[0, -1] == pytest.approx(
+        np.log1p(obs["deck_multiplicity"][0])
     )
 
 
 @pytest.mark.parametrize(
-    ("hands_played", "hands_remaining", "expected_reward"),
+    "limits,obs",
     [
-        (1, 3, 10.15),
-        (2, 2, 10.10),
-        (3, 1, 10.05),
-        (4, 0, 10.0),
+        (ResourceLimits(max_collection_rows=60), observation(61)),
+        (ResourceLimits(max_tokens=10), observation()),
+        (ResourceLimits(max_batch_attention_cells=1), observation()),
     ],
 )
-def test_terminal_reward_adds_small_bonus_per_preserved_hand(
-    hands_played: int,
-    hands_remaining: int,
-    expected_reward: float,
-):
-    state = GameState(score_to_beat=300)
-    state.current_score = 300
-    state.hands_played = hands_played
-    state.hands = hands_remaining
-
-    assert calculate_terminal_reward(state) == pytest.approx(expected_reward)
+def test_resource_limits_report_unsupported_without_truncation(limits, obs):
+    policy = GamePolicy(ModelConfig(16, 2, 1), limits)
+    with pytest.raises(UnsupportedObservation):
+        policy([obs])
 
 
-def test_score_reward_prefers_fewer_plays_for_equal_progress():
-    state = GameState(score_to_beat=300)
+def test_bad_schema_and_visible_values_fail_explicitly():
+    policy = model()
+    obs = observation()
+    obs["schema_version"][0] = 2
+    with pytest.raises(UnsupportedObservation, match="schema"):
+        policy([obs])
+    obs = observation()
+    obs["hand.cat"][0, 0] = 100
+    with pytest.raises(UnsupportedObservation, match="categorical"):
+        policy([obs])
+    obs = observation()
+    obs["hand.num"][0, 0] = np.inf
+    with pytest.raises(UnsupportedObservation, match="non-finite"):
+        policy([obs])
 
-    previous_score = 0.0
-    small_hand_reward = 0.0
-    for current_score in (50.0, 100.0, 150.0):
-        state.current_score = current_score
-        small_hand_reward += calculate_score_progress_reward(previous_score, state)
-        previous_score = current_score
 
-    state.current_score = 150.0
-    large_hand_reward = calculate_score_progress_reward(0.0, state)
+@pytest.mark.parametrize(
+    "key,dtype",
+    [
+        ("run.cat", np.float32),
+        ("blind.counts", np.int32),
+        ("hand.num", np.float64),
+    ],
+)
+def test_adapter_rejects_schema_dtype_mismatches_instead_of_coercing(key, dtype):
+    obs = observation()
+    obs[key] = obs[key].astype(dtype)
+    with pytest.raises(UnsupportedObservation, match=key):
+        model()([obs])
 
-    assert large_hand_reward > small_hand_reward
 
-
-def test_ppo_evaluation_updates_both_mode_specific_heads():
-    model = BlindModel(input_size=6, hidden_size=8)
-    outputs = model(torch.randn(2, 6))
-    log_probs, entropies = evaluate_actions(
-        outputs,
-        mode_masks=torch.ones(2, 2),
-        count_masks=torch.ones(2, 5),
-        card_masks=torch.ones(2, 8),
-        modes=torch.tensor([0, 1]),
-        counts=torch.tensor([2, 3]),
-        card_indices=torch.tensor([[0, 1, -1, -1, -1], [2, 3, 4, -1, -1]]),
-        card_valid=torch.tensor(
-            [[1.0, 1.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 0.0, 0.0]]
-        ),
+def test_joker_tooltip_values_remain_associated_with_their_feature_keys():
+    policy = model()
+    obs = with_jokers(observation(), count=1)
+    obs.update(
+        {
+            "joker_values.cat": np.array([[0, 0, 1], [0, 0, 2]], dtype=np.int32),
+            "joker_values.num": np.array([[1.0], [4.0]], dtype=np.float32),
+            "joker_values.flags": np.empty((2, 0), dtype=np.bool_),
+            "joker_values.present": np.ones(2, dtype=np.bool_),
+            "joker_values.visible": np.ones((2, 4), dtype=np.bool_),
+        }
     )
-
-    assert torch.isfinite(log_probs).all()
-    assert torch.isfinite(entropies).all()
-    loss = -(log_probs.mean() + 0.01 * entropies.mean())
-    loss.backward()
-    assert model.play_count_head.weight.grad is not None
-    assert model.discard_count_head.weight.grad is not None
-    assert model.play_card_head.weight.grad is not None
-    assert model.discard_card_head.weight.grad is not None
-
-
-def test_batched_decoder_uses_the_correct_heads_for_each_row():
-    play = _outputs(mode=0)
-    discard = _outputs(mode=1)
-    outputs = {
-        key: torch.cat((play[key], discard[key]))
-        for key in play
-    }
-    masks = ActionMasks(
-        mode=torch.ones(2, 2),
-        count=torch.ones(2, 5),
-        card=torch.ones(2, 8),
+    swapped = deepcopy(obs)
+    swapped["joker_values.num"] = swapped["joker_values.num"][::-1].copy()
+    assert not torch.allclose(
+        policy([obs]).objects(0, "jokers"), policy([swapped]).objects(0, "jokers")
     )
-
-    modes, counts, cards, valid, _, _ = model_decoder_batch(
-        outputs, masks, stochastic=False
-    )
-
-    assert modes.tolist() == [0, 1]
-    assert counts.tolist() == [2, 5]
-    assert cards.tolist() == [[0, 1, -1, -1, -1], [3, 4, 5, 6, 7]]
-    assert valid.tolist() == [[1.0, 1.0, 0.0, 0.0, 0.0], [1.0] * 5]
-
-
-def test_batched_decoder_log_probs_match_ppo_action_evaluation():
-    torch.manual_seed(123)
-    model = BlindModel(input_size=6, hidden_size=8)
-    outputs = model(torch.randn(4, 6))
-    masks = ActionMasks(
-        mode=torch.ones(4, 2),
-        count=torch.ones(4, 5),
-        card=torch.ones(4, 8),
-    )
-    modes, counts, cards, valid, sampled_log_probs, _ = model_decoder_batch(
-        outputs, masks, stochastic=True
-    )
-
-    evaluated_log_probs, _ = evaluate_actions(
-        outputs,
-        masks.mode,
-        masks.count,
-        masks.card,
-        modes,
-        counts,
-        cards,
-        valid,
-    )
-
-    assert torch.allclose(sampled_log_probs, evaluated_log_probs)

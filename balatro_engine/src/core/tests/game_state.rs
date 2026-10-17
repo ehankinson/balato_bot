@@ -1450,7 +1450,7 @@ fn burnt_joker_levels_the_discarded_hand_and_diet_cola_materializes_a_double_tag
         .jokers
         .add(Joker::create_joker(JokerKind::DietCola));
     tag_state.sell_joker(0).unwrap();
-    assert!(tag_state.tags.held().contains(&SkipTag::Double));
+    assert!(tag_state.tags.pending().contains(&SkipTag::Double));
 
     let mut invisible_state = GameState::new(411);
     invisible_state
@@ -1731,7 +1731,7 @@ fn sale_effect_belongs_to_the_sold_source_including_compatible_copies() {
         assert_eq!(
             state
                 .tags
-                .held()
+                .pending()
                 .iter()
                 .filter(|&&tag| tag == SkipTag::Double)
                 .count(),

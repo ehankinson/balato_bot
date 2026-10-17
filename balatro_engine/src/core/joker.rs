@@ -9,8 +9,11 @@ use rand::prelude::IndexedRandom;
 
 #[path = "joker_events.rs"]
 mod events;
+#[path = "joker_observation.rs"]
+mod observation;
 pub(crate) use events::{GeneratedConsumable, JokerContext, JokerOperation};
 pub use events::{JokerEffect, JokerScoringEffect, Jokers, TriggerEvent, UpdateEvent};
+pub(crate) use observation::JokerValueKey;
 
 #[derive(Clone)]
 pub struct Joker {

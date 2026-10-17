@@ -15,7 +15,7 @@ struct TaggedJoker {
 /// Tags earned by skipping blinds and the effects waiting for a later phase.
 #[derive(Default)]
 pub(crate) struct TagState {
-    held: Vec<SkipTag>,
+    pending: Vec<SkipTag>,
     shop_jokers: Vec<TaggedJoker>,
     free_packs: Vec<ShopPack>,
     voucher_next_shop: u8,
@@ -31,22 +31,43 @@ impl TagState {
         TagState::default()
     }
 
-    pub(crate) fn held(&self) -> &[SkipTag] {
-        &self.held
+    pub(crate) fn pending(&self) -> &[SkipTag] {
+        &self.pending
     }
 
     pub(crate) fn gain(&mut self, tag: SkipTag, state: &mut GameState) {
         if tag == SkipTag::Double {
             self.double_next_tag = self.double_next_tag.saturating_add(1);
-            self.held.push(tag);
+            self.pending.push(tag);
             return;
         }
 
         let copies = self.double_next_tag.saturating_add(1);
         self.double_next_tag = 0;
+        self.pending.retain(|tag| *tag != SkipTag::Double);
         for _ in 0..copies {
             self.apply_once(tag, state);
-            self.held.push(tag);
+            if matches!(
+                tag,
+                SkipTag::Uncommon
+                    | SkipTag::Rare
+                    | SkipTag::Negative
+                    | SkipTag::Foil
+                    | SkipTag::Holographic
+                    | SkipTag::Polychrome
+                    | SkipTag::Investment
+                    | SkipTag::Voucher
+                    | SkipTag::Standard
+                    | SkipTag::Charm
+                    | SkipTag::Meteor
+                    | SkipTag::Buffoon
+                    | SkipTag::Ethereal
+                    | SkipTag::Coupon
+                    | SkipTag::Juggle
+                    | SkipTag::D6
+            ) {
+                self.pending.push(tag);
+            }
         }
     }
 
@@ -206,6 +227,20 @@ impl TagState {
             }
         }
         self.voucher_next_shop = 0;
+        self.pending.retain(|tag| {
+            !matches!(
+                tag,
+                SkipTag::Uncommon
+                    | SkipTag::Rare
+                    | SkipTag::Negative
+                    | SkipTag::Foil
+                    | SkipTag::Holographic
+                    | SkipTag::Polychrome
+                    | SkipTag::Voucher
+                    | SkipTag::Coupon
+                    | SkipTag::D6
+            )
+        });
     }
 
     pub(crate) fn free_packs(&self) -> &[ShopPack] {
@@ -213,6 +248,16 @@ impl TagState {
     }
 
     pub(crate) fn open_free_packs(&mut self, state: &mut GameState) -> Vec<PackOpening> {
+        self.pending.retain(|tag| {
+            !matches!(
+                tag,
+                SkipTag::Standard
+                    | SkipTag::Charm
+                    | SkipTag::Meteor
+                    | SkipTag::Buffoon
+                    | SkipTag::Ethereal
+            )
+        });
         self.free_packs
             .drain(..)
             .map(|pack| pack.open(state))
@@ -220,10 +265,12 @@ impl TagState {
     }
 
     pub(crate) fn take_juggle_hand_size(&mut self) -> i8 {
+        self.pending.retain(|tag| *tag != SkipTag::Juggle);
         std::mem::take(&mut self.juggle_hand_size)
     }
 
     pub(crate) fn take_investment(&mut self) -> u8 {
+        self.pending.retain(|tag| *tag != SkipTag::Investment);
         std::mem::take(&mut self.investment_pending)
     }
 }

@@ -365,6 +365,7 @@ fn flint_rounds_both_base_values_up_and_leaves_card_and_joker_bonuses_unhalved()
 fn flint_halving_does_not_overflow_at_the_hand_score_limit() {
     let mut state = boss_state(BossBlinds::Flint);
     state.hand_scores[0] = HandScore {
+        level: 1,
         chips: u16::MAX,
         mult: u16::MAX,
     };

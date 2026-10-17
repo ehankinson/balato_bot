@@ -347,6 +347,7 @@ fn co05_burnt_copy_only_levels_the_first_discard_and_resets_next_round() {
             assert_eq!(
                 s.hand_score(PokerHand::Pair),
                 HandScore {
+                    level: u64::from(round) * 2 + 3,
                     chips: 40 + 30 * round,
                     mult: 4 + 2 * round
                 },
@@ -769,7 +770,11 @@ fn debuffed_space_and_its_copy_cannot_level_the_hand() {
     assert_eq!((score.chips, score.mult), (7, 1.0));
     assert_eq!(
         s.hand_score(PokerHand::HighCard),
-        HandScore { chips: 5, mult: 1 }
+        HandScore {
+            level: 1,
+            chips: 5,
+            mult: 1
+        }
     );
 }
 
