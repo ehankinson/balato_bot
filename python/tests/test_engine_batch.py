@@ -55,6 +55,9 @@ def test_seeded_batch_actions_match_single_trajectories_and_are_independent():
                 assert result["accepted"][index]
             else:
                 assert not result["accepted"][index] and not result["attempted"][index]
+        assert result["blind_scores"].dtype == np.uint64
+        assert result["blind_scores"].shape == (len(singles),)
+        assert result["blind_scores"].tolist() == [game.blind_score for game in singles]
         for actual, single in zip(
             unbatch_observations(result["observations"]), singles
         ):
@@ -193,6 +196,99 @@ def test_batched_conditional_constraints_match_single_masks_and_prefix_indices()
             np.array([[2, 0, 0], [0, -1, -1]], dtype=np.int32),
         )
     same(before, games.observe())
+
+
+@pytest.mark.parametrize("observe", [True, False])
+@pytest.mark.parametrize("profile", [True, False])
+def test_blind_scores_include_final_hands_and_idle_rejected_and_reset_slots(
+    observe, profile
+):
+    games = batch((0, 1, 0, 3))
+
+    def step(commands):
+        result = games.step(pack_commands(commands), observe=observe, profile=profile)
+        scores = result["blind_scores"]
+        assert scores.dtype == np.uint64
+        assert scores.shape == (4,)
+        assert scores.flags.c_contiguous and scores.flags.aligned
+        assert (result["observations"] is not None) == observe
+        assert ("timings" in result) == profile
+        return result
+
+    assert step([None] * 4)["blind_scores"].tolist() == [0, 0, 0, 0]
+    selected = step([Command(0, source=0)] * 3 + [None])
+    assert selected["blind_scores"].tolist() == [0, 0, 0, 0]
+    play = Command(2, targets=(0, 1, 2, 3, 4))
+    first = step([play] * 3 + [None])
+    assert first["blind_scores"].tolist() == [44, 16, 44, 0]
+    for winning_score, losing_score in [(76, 112), (136, 144), (472, 252)]:
+        result = step([play, play, None, None])
+        assert result["blind_scores"].tolist() == [winning_score, losing_score, 44, 0]
+        assert result["accepted"].tolist() == [True, True, False, False]
+    assert result["phases"].tolist() == [2, 5, 1, 0]
+    if observe:
+        assert not result["observations"]["blind.visible"][:2].any()
+        assert not result["observations"]["blind.num"][:2].any()
+
+    rejected = step([play, play, Command(2, targets=(0, 0)), None])
+    assert not rejected["accepted"].any()
+    assert rejected["attempted"].tolist() == [True, True, True, False]
+    assert all(rejected["errors"][:3]) and rejected["errors"][3] is None
+    assert rejected["blind_scores"].tolist() == [472, 252, 44, 0]
+    idle = step([None] * 4)
+    assert not idle["accepted"].any() and not idle["attempted"].any()
+    assert idle["blind_scores"].tolist() == [472, 252, 44, 0]
+
+    # Each result owns its scores; subsequent play/reset cannot rewrite a snapshot.
+    assert first["blind_scores"].tolist() == [44, 16, 44, 0]
+    games.reset(np.array([0, 1], dtype=np.int32), np.array([0, 1], dtype=np.uint64))
+    assert step([None] * 4)["blind_scores"].tolist() == [0, 0, 44, 0]
+    assert result["blind_scores"].tolist() == [472, 252, 44, 0]
+    selected = step([Command(0, source=0), None, None, None])
+    assert selected["blind_scores"].tolist() == [0, 0, 44, 0]
+    assert step([play, None, None, None])["blind_scores"].tolist() == [44, 0, 44, 0]
+
+
+def test_blind_scores_persist_in_shop_pack_and_selection_then_clear_on_next_blind():
+    games = batch((0,))
+    games.step(pack_commands([Command(0, source=0)]))
+    for _ in range(4):
+        result = games.step(pack_commands([Command(2, targets=(0, 1, 2, 3, 4))]))
+    assert result["phases"].tolist() == [2]
+    assert result["blind_scores"].tolist() == [472]
+    for command, phase in [
+        (Command(7, source=0), 3),
+        (Command(13), 2),
+        (Command(12), 0),
+    ]:
+        result = games.step(pack_commands([command]), observe=False)
+        assert result["accepted"].tolist() == [True]
+        assert result["phases"].tolist() == [phase]
+        assert result["blind_scores"].tolist() == [472]
+    result = games.step(pack_commands([Command(0, source=1)]), observe=False)
+    assert result["phases"].tolist() == [1]
+    assert result["blind_scores"].tolist() == [0]
+
+
+def test_blind_scores_are_detached_and_malformed_commands_preserve_nonzero_scores():
+    games = batch((0, 1))
+    games.step(pack_commands([Command(0, source=0)] * 2))
+    result = games.step(pack_commands([Command(2, targets=(0, 1, 2, 3, 4))] * 2))
+    assert result["blind_scores"].tolist() == [44, 16]
+    result["blind_scores"][:] = np.iinfo(np.uint64).max
+    idle = pack_commands([None, None])
+    assert games.step(idle)["blind_scores"].tolist() == [44, 16]
+
+    malformed = pack_commands([Command(2, targets=(0,)), None])
+    malformed[1, 0] = -2
+    with pytest.raises(ValueError):
+        games.step(malformed)
+    assert games.step(idle)["blind_scores"].tolist() == [44, 16]
+
+    # Field decoding fails per slot, like game-rule rejections, without losing metrics.
+    result = games.step(pack_commands([Command(2), None]))
+    assert result["errors"][0] and result["errors"][1] is None
+    assert result["blind_scores"].tolist() == [44, 16]
 
 
 def test_terminal_shop_pack_and_selection_coexist_without_automatic_resets():

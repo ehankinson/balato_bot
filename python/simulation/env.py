@@ -7,6 +7,7 @@ import numpy as np
 
 import balatro_engine as engine
 from simulation.encoder import unbatch_observations
+from simulation.policy_actions import REORDER_COLLECTIONS, policy_observation
 from simulation.reward import RewardConfig, transition_reward
 
 
@@ -18,6 +19,7 @@ class StepResult:
     terminated: bool
     truncated: bool
     end_reason: str | None
+    completed_blind_score: int | None
     error: str | None = None
 
 
@@ -33,36 +35,52 @@ class EpisodeState:
         self.done = False
         self.accepted_commands = self.consecutive_rejections = 0
         self.observation = None
+        self.reordered = set()
 
     def reset(self, observation):
-        self.observation = observation
+        self.reordered.clear()
+        self.observation = policy_observation(observation, self.reordered)
         self.done = False
         self.accepted_commands = self.consecutive_rejections = 0
 
-    def finish(self, observation, accepted, error):
+    def finish(self, observation, accepted, error, command_kind, blind_score):
         before = self.observation
         if accepted:
             self.accepted_commands += 1
             self.consecutive_rejections = 0
+            if command_kind in REORDER_COLLECTIONS:
+                self.reordered.add(command_kind)
+            else:
+                self.reordered.clear()
         else:
             self.consecutive_rejections += 1
+        observation = policy_observation(observation, self.reordered)
         self.observation = observation
-        terminated = bool(observation["run.flags"][0])
-        reason = (
-            "loss"
-            if terminated
-            else (
-                "horizon"
-                if self.accepted_commands >= self.horizon
-                else (
-                    "rejection_limit"
-                    if self.consecutive_rejections >= self.rejection_limit
-                    else None
-                )
-            )
-        )
+        lost = bool(observation["run.flags"][0])
+        won = bool(observation["run.flags"][1])
+        # The training objective ends at ante eight; Rust itself remains endless.
+        terminated = lost or won
+        if lost:
+            reason = "loss"
+        elif won:
+            reason = "win"
+        elif self.accepted_commands >= self.horizon:
+            reason = "horizon"
+        elif self.consecutive_rejections >= self.rejection_limit:
+            reason = "rejection_limit"
+        else:
+            reason = None
         truncated = reason is not None and not terminated
         self.done = terminated or truncated
+        # Capture the final scoring action, even though blind observation columns
+        # are hidden after shop entry/death. A selected blind may also end at once.
+        completed_blind_score = (
+            int(blind_score)
+            if accepted
+            and (before["run.cat"][0] == 1 or command_kind == 0)
+            and observation["run.cat"][0] != 1
+            else None
+        )
         return StepResult(
             observation,
             transition_reward(before, observation, accepted, self.rewards),
@@ -70,6 +88,7 @@ class EpisodeState:
             terminated,
             truncated,
             reason,
+            completed_blind_score,
             error,
         )
 
@@ -117,7 +136,13 @@ class GameEnv:
             accepted = True
         except ValueError as exc:
             accepted, error = False, str(exc)
-        return self.state.finish(self.game.observe(), accepted, error)
+        return self.state.finish(
+            self.game.observe(),
+            accepted,
+            error,
+            command.kind,
+            self.game.blind_score if accepted else None,
+        )
 
 
 @dataclass(frozen=True)
@@ -147,6 +172,16 @@ class BatchEnv:
         self.snapshots = unbatch_observations(self.observations)
         for state, observation in zip(self.states, self.snapshots):
             state.reset(observation)
+        self._refresh_policy_observations()
+
+    def _refresh_policy_observations(self):
+        self.snapshots = [state.observation for state in self.states]
+        self.observations = {
+            **self.observations,
+            "action_kinds": np.stack(
+                [observation["action_kinds"] for observation in self.snapshots]
+            ),
+        }
 
     @property
     def active(self):
@@ -160,6 +195,7 @@ class BatchEnv:
         self.snapshots = unbatch_observations(self.observations)
         for slot in slots:
             self.states[slot].reset(self.snapshots[slot])
+        self._refresh_policy_observations()
         return self.observations
 
     def step(self, commands, profile=False):
@@ -180,10 +216,13 @@ class BatchEnv:
                     self.snapshots[index],
                     bool(result["accepted"][index]),
                     result["errors"][index],
+                    int(commands[index, 0]),
+                    result["blind_scores"][index],
                 )
                 if result["attempted"][index]
                 else None
             )
+        self._refresh_policy_observations()
         timings = result.get("timings")
         if profile:
             native_seconds = sum(timings.values())

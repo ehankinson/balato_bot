@@ -20,7 +20,7 @@ class TrainingConfig:
     learning_rate: float = 3e-4
     clip_ratio: float = 0.2
     entropy_coefficient: float = 0.001
-    gamma: float = 0.99
+    gamma: float = 1.0
     gae_lambda: float = 0.95
     max_gradient_norm: float = 0.5
     seed: int = 0

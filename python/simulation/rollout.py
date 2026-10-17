@@ -19,6 +19,7 @@ class Transition:
     terminated: bool
     truncated: bool
     error: str | None
+    completed_blind_score: int | None
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,7 @@ def collect_episode(model, env, seed, stochastic=True):
                         result.terminated,
                         result.truncated,
                         result.error,
+                        result.completed_blind_score,
                     )
                 )
                 observation = result.observation
@@ -120,6 +122,7 @@ def collect_episodes(model, env, stochastic=True):
                             result.terminated,
                             result.truncated,
                             result.error,
+                            result.completed_blind_score,
                         )
                     )
                 finished = [

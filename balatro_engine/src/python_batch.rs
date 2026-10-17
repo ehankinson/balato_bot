@@ -300,6 +300,18 @@ impl PyGameBatch {
                 ),
             ],
         )?;
+        // Export every slot, including idle/rejected commands and completed blinds.
+        result.set_item(
+            "blind_scores",
+            PyArray1::from_vec(
+                py,
+                self.batch
+                    .games
+                    .iter()
+                    .map(|game| game.state().blind.chips_scored)
+                    .collect(),
+            ),
+        )?;
         result.set_item("errors", errors)?;
         result.set_item(
             "observations",

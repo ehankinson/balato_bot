@@ -170,6 +170,10 @@ class Game:
     @property
     def ante(self) -> int: ...
     @property
+    def blind_score(self) -> int:
+        """Exact current/last blind score; zero until play and on starting a new blind."""
+        ...
+    @property
     def blind_index(self) -> int | None: ...
     @property
     def decision_point(self) -> int: ...
@@ -213,6 +217,8 @@ class BatchStepResult(TypedDict):
     accepted: NDArray[np.bool_]
     attempted: NDArray[np.bool_]
     phases: NDArray[np.int32]
+    # uint64[N], current/last score for every slot, even idle/rejected or observe=False.
+    blind_scores: NDArray[np.uint64]
     errors: list[str | None]
     observations: BatchArrays | None
     timings: NotRequired[dict[str, float]]

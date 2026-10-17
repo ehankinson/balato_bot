@@ -7,6 +7,7 @@ import torch
 from torch.distributions import Categorical
 
 import balatro_engine as engine
+from simulation.policy_actions import action_kind_mask, exclude_identity_completion
 
 ACTION_NAMES = (
     "SelectBlind",
@@ -142,7 +143,7 @@ def decode_action(model, output, game, observation, stochastic=True, game_index=
         return selected
 
     kind = choose(
-        "kind", "", output.action_logits[game_index], observation["action_kinds"]
+        "kind", "", output.action_logits[game_index], action_kind_mask(observation)
     )
     query = model.query(output, game_index, kind)
     action = ACTIONS[kind]
@@ -175,6 +176,8 @@ def decode_action(model, output, game, observation, stochastic=True, game_index=
                 action, np.array(prefix, dtype=np.int32), source=source
             )
             mask = np.concatenate((constraint["target_mask"], constraint["can_submit"]))
+            if permutation:
+                exclude_identity_completion(mask, prefix, len(rows))
             selected = choose(
                 "selection",
                 collection,
@@ -312,7 +315,7 @@ def decode_action_batch(model, output, games, observations, active, stochastic=T
         return selected, selected.detach().cpu().numpy()
 
     kind_mask = np.stack(
-        [observation["action_kinds"] for observation in observations]
+        [action_kind_mask(observation) for observation in observations]
     ).copy()
     kind_mask[~active] = False
     kind_mask[~active, 0] = True
@@ -404,6 +407,10 @@ def decode_action_batch(model, output, games, observations, active, stochastic=T
             mask[:, : conditional["target_mask"].shape[1]] = conditional["target_mask"]
             mask[:, -1] = conditional["can_submit"][:, 0]
             mask[~pending, -1] = True
+            for index in np.flatnonzero(pending & (permutation != 0)):
+                exclude_identity_completion(
+                    mask[index], sequences[index], int(lengths[index])
+                )
             sampled, selected = sample(
                 model.selection_logits(rows, query), mask, pending
             )

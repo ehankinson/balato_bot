@@ -14,7 +14,7 @@ class PPOUpdateMetrics:
 
 
 def compute_gae(episodes, gamma, gae_lambda):
-    """Bootstrap external cutoffs, zero-bootstrap losses, never cross episodes."""
+    """Bootstrap external cutoffs, zero-bootstrap wins/losses, never cross episodes."""
     transitions, returns, advantages = [], [], []
     for episode in episodes:
         next_value, gae = episode.bootstrap_value, 0.0

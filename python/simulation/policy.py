@@ -293,29 +293,32 @@ class GamePolicy(nn.Module):
         )
 
     def forward_batch(self, batch):
+        # Empty collections have no tokens to encode. Besides wasting work,
+        # empty embedding/index operations can fail during MPS backward.
         encoded = {
             name: self.encoders[name](features)
             for name, features in batch.features.items()
+            if features.values.shape[0] > 0
         }
-        values = self.joker_value_encoder(batch.joker_features)
-        values = (
-            values
-            + self.joker_suit(batch.joker_suits)
-            + self.joker_hand(batch.joker_hands)
-        )
-        for name, (rows, slots) in batch.links.items():
-            encoded[name] = encoded[name].index_add(0, slots, values[rows])
+        if batch.joker_features.values.shape[0] > 0:
+            values = self.joker_value_encoder(batch.joker_features)
+            values = (
+                values
+                + self.joker_suit(batch.joker_suits)
+                + self.joker_hand(batch.joker_hands)
+            )
+            for name, (rows, slots) in batch.links.items():
+                if rows.numel() > 0:
+                    encoded[name] = encoded[name].index_add(0, slots, values[rows])
         chunks, masks, spans = [], [], {}
         offset = 0
         for role, (name, spec) in enumerate((CONTEXT | TABLES).items()):
             indices = batch.positions[name]
             size = indices.shape[1]
-            hidden = (
-                encoded[name][indices]
-                if size
-                else encoded[name].reshape(len(batch.lengths), 0, self.config.width)
-            )
-            hidden = hidden + self.roles.weight[role]
+            spans[name] = slice(offset, offset + size)
+            if size == 0:
+                continue
+            hidden = encoded[name][indices] + self.roles.weight[role]
             if spec.positioned:
                 hidden = (
                     hidden
@@ -323,7 +326,6 @@ class GamePolicy(nn.Module):
                 )
             chunks.append(hidden)
             masks.append(~batch.present[name])
-            spans[name] = slice(offset, offset + size)
             offset += size
         hidden, padding = torch.cat(chunks, 1), torch.cat(masks, 1)
         for layer in self.attention:
@@ -352,6 +354,10 @@ class GamePolicy(nn.Module):
         ) + self.source_known(known[..., None].float()).squeeze(-1)
 
     def selection_logits(self, rows, query):
+        if rows.shape[-2] == 0:
+            # An empty permutation has only the stop choice; avoid an empty
+            # pointer branch in the autograd graph on MPS.
+            return self.stop_head(query)
         return torch.cat(
             (
                 (rows * self.target_query(query).unsqueeze(-2)).sum(-1)

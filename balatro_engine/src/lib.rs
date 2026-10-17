@@ -69,6 +69,12 @@ impl PyGame {
         self.game.state().counters.ante
     }
 
+    /// Exact chips scored in the current or most recently played blind.
+    #[getter]
+    fn blind_score(&self) -> u64 {
+        self.game.state().blind.chips_scored
+    }
+
     #[getter]
     fn blind_index(&self) -> Option<u8> {
         (self.game.decision_point() == crate::core::game::DecisionPoint::BlindSelection).then(
@@ -101,6 +107,22 @@ impl PyGame {
             .apply_action(command)
             .map_err(|error| pyo3::exceptions::PyValueError::new_err(format!("{error:?}")))?;
         Ok(self.game.next_step().code())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blind_score_preserves_the_full_u64_range() {
+        let mut game = new(0, core::enums::Decks::Red, core::enums::Stakes::White);
+        for score in [0, 1, (1 << 24) + 1, (1 << 53) + 1, (1 << 63) + 1, u64::MAX] {
+            game.game.state.blind.chips_scored = score;
+            assert_eq!(game.blind_score(), score);
+            assert_eq!(game.blind_score(), score);
+            assert_eq!(game.game.state.blind.chips_scored, score);
+        }
     }
 }
 

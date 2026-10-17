@@ -117,6 +117,7 @@ def benchmark_case(model, batch_size, iterations=32, warmup=4, seed=0):
                             result.terminated,
                             result.truncated,
                             result.error,
+                            result.completed_blind_score,
                         )
                     )
                 storage_seconds = perf_counter() - stage

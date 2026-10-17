@@ -49,8 +49,7 @@ def evaluate_model(
     )
     return EvaluationMetrics(
         episodes,
-        sum(bool(result.final_observation["run.flags"][1]) for result in results)
-        / episodes,
+        sum(result.end_reason == "win" for result in results) / episodes,
         sum(int(result.final_observation["run.counts"][1]) for result in results)
         / episodes,
         sum(result.end_reason == "loss" for result in results),

@@ -1,8 +1,11 @@
 from copy import deepcopy
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
+
+import balatro_engine as engine
 from simulation.encoder import (
     TABLES,
     ResourceLimits,
@@ -10,8 +13,10 @@ from simulation.encoder import (
     tensor_observation,
 )
 from simulation.policy import GamePolicy, ModelConfig
-
-import balatro_engine as engine
+from simulation.ppo import compute_gae
+from simulation.reward import transition_reward
+from simulation.rollout import Episode
+from simulation.training_config import TrainingConfig
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -51,6 +56,66 @@ def model():
     return GamePolicy(ModelConfig(width=16, heads=2, depth=1)).eval()
 
 
+@pytest.mark.parametrize("delay", [0, 1, 20])
+def test_undiscounted_terminal_loss_return_is_not_improved_by_delaying(delay):
+    config = TrainingConfig()
+    before = engine.new(0).observe()
+    lost = deepcopy(before)
+    lost["run.flags"][0] = True
+    neutral_reward = transition_reward(before, before, True, config.rewards)
+    loss_reward = transition_reward(before, lost, True, config.rewards)
+    assert neutral_reward == 0
+    assert loss_reward == -25
+    episodes = [
+        Episode(
+            transitions=tuple(
+                SimpleNamespace(
+                    reward=reward,
+                    old_value=2.0,
+                    terminated=index == len(rewards) - 1,
+                )
+                for index, reward in enumerate(rewards)
+            ),
+            bootstrap_value=999.0,
+            end_reason="loss",
+            accepted_commands=len(rewards),
+        )
+        for rewards in ([loss_reward], [neutral_reward] * delay + [loss_reward])
+    ]
+    # Lambda=1 gives full returns; default GAE targets also depend on the critic.
+    _, returns, _ = compute_gae(episodes, gamma=config.gamma, gae_lambda=1.0)
+    torch.testing.assert_close(returns, torch.full((delay + 2,), -25.0))
+
+
+@pytest.mark.parametrize(
+    "end_reason, reward, expected",
+    [
+        ("loss", -25.0, [-23.55, -25.0]),
+        ("win", 25.0, [23.95, 25.0]),
+        ("horizon", 0.0, [9.7, 10.0]),
+        ("rejection_limit", -0.1, [9.605, 9.9]),
+    ],
+)
+def test_undiscounted_default_preserves_gae_lambda_and_cutoff_bootstrap(
+    end_reason, reward, expected
+):
+    config = TrainingConfig()
+    terminal = end_reason in {"loss", "win"}
+    episode = Episode(
+        transitions=(
+            SimpleNamespace(reward=0.0, old_value=2.0, terminated=False),
+            SimpleNamespace(reward=reward, old_value=4.0, terminated=terminal),
+        ),
+        bootstrap_value=10.0,
+        end_reason=end_reason,
+        accepted_commands=1 if end_reason == "rejection_limit" else 2,
+    )
+    _, returns, _ = compute_gae(
+        [episode], gamma=config.gamma, gae_lambda=config.gae_lambda
+    )
+    torch.testing.assert_close(returns, torch.tensor(expected))
+
+
 def test_same_weights_keep_individual_rows_for_five_and_sixteen_cards():
     policy = model()
     output = policy([observation(5), observation(16), engine.new(1).observe()])
@@ -64,6 +129,62 @@ def test_same_weights_keep_individual_rows_for_five_and_sixteen_cards():
             size + 1,
         )
     assert output.objects(2, "jokers").shape == (0, 16)
+
+
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        pytest.param(
+            "mps",
+            marks=pytest.mark.skipif(
+                not torch.backends.mps.is_available(), reason="MPS unavailable"
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize("contents", ["initial", "mixed", "joker_values"])
+def test_backward_handles_empty_collections_and_optional_joker_values(device, contents):
+    initial = engine.new(1).observe()
+    observations = [initial]
+    if contents != "initial":
+        populated = with_jokers(observation(5))
+        if contents == "joker_values":
+            populated["joker_values.cat"] = np.array([[0, 0, 1]], dtype=np.int32)
+            populated["joker_values.num"] = np.array([[1.0]], dtype=np.float32)
+            populated["joker_values.flags"] = np.empty((1, 0), dtype=np.bool_)
+            populated["joker_values.present"] = np.ones(1, dtype=np.bool_)
+            populated["joker_values.visible"] = np.ones((1, 4), dtype=np.bool_)
+        observations.insert(0, populated)
+    policy = model().to(device).train()
+    before = policy.attention[0].self_attn.in_proj_weight.detach().clone()
+    optimizer = torch.optim.Adam(policy.parameters(), lr=1e-3)
+    output = policy(observations)
+    game = len(observations) - 1
+    empty = output.objects(game, "jokers")
+    assert empty.shape == (0, policy.config.width)
+    stop = policy.selection_logits(empty, policy.query(output, game, 15))
+    assert stop.shape == (1,)
+    loss = (
+        output.value.square().mean()
+        + output.action_logits.square().mean()
+        + stop.square().sum()
+    )
+    loss.backward()
+    assert all(
+        torch.isfinite(parameter.grad).all()
+        for parameter in policy.parameters()
+        if parameter.grad is not None
+    )
+    if contents == "initial":
+        assert all(
+            parameter.grad is None for parameter in policy.encoders["hand"].parameters()
+        )
+        assert policy.joker_suit.weight.grad is None
+    if contents == "joker_values":
+        assert policy.joker_value_encoder.features[0].weight.grad is not None
+    optimizer.step()
+    assert not torch.equal(before, policy.attention[0].self_attn.in_proj_weight)
 
 
 def test_padding_and_other_games_do_not_change_valid_outputs():
